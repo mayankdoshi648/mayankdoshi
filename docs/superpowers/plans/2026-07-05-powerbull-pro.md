@@ -1620,9 +1620,11 @@ function createDhanFeed({
   const emitter = new EventEmitter();
   let ws = null;
   let reconnectDelay = 1000;
+  let stopped = false;
   const MAX_DELAY_MS = 30000;
 
   async function connect(instruments) {
+    stopped = false;
     const url = `${baseUrl}?version=2&token=${accessToken}&clientId=${clientId}&authType=2`;
     ws = new WebSocketImpl(url);
 
@@ -1643,7 +1645,7 @@ function createDhanFeed({
 
     ws.on('close', () => {
       emitter.emit('disconnected');
-      scheduleReconnect(instruments);
+      if (!stopped) scheduleReconnect(instruments);
     });
 
     ws.on('error', (err) => emitter.emit('error', err));
@@ -1655,6 +1657,7 @@ function createDhanFeed({
   }
 
   function close() {
+    stopped = true;
     if (ws) ws.close();
   }
 
