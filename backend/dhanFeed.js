@@ -14,6 +14,23 @@ function decodeQuotePacket(buffer) {
   return [{ symbol: String(securityId), ltp, ltq, timestamp: ltt * 1000 }];
 }
 
+// Dhan's live feed can coalesce multiple self-describing packets into a single WS
+// frame. Byte 0 is the feed response code, bytes 1-2 are a little-endian uint16
+// holding that packet's own total length (header included). Walk the buffer using
+// each packet's own length prefix, slicing out whole packets and stopping safely
+// (without throwing) on anything truncated or malformed.
+function splitPackets(buffer) {
+  const packets = [];
+  let offset = 0;
+  while (offset + 3 <= buffer.length) {
+    const packetLength = buffer.readUInt16LE(offset + 1);
+    if (packetLength <= 0 || offset + packetLength > buffer.length) break;
+    packets.push(buffer.subarray(offset, offset + packetLength));
+    offset += packetLength;
+  }
+  return packets;
+}
+
 function createDhanFeed({
   clientId,
   accessToken,
@@ -44,8 +61,10 @@ function createDhanFeed({
     });
 
     ws.on('message', (data) => {
-      const ticks = decodeMessage(data);
-      for (const tick of ticks) emitter.emit('tick', tick);
+      for (const packet of splitPackets(data)) {
+        const ticks = decodeMessage(packet);
+        for (const tick of ticks) emitter.emit('tick', tick);
+      }
     });
 
     ws.on('close', () => {
@@ -69,4 +88,4 @@ function createDhanFeed({
   return { connect, close, on: emitter.on.bind(emitter) };
 }
 
-module.exports = { createDhanFeed, decodeQuotePacket };
+module.exports = { createDhanFeed, decodeQuotePacket, splitPackets };

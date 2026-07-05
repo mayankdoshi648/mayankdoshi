@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
-const { createDhanFeed, decodeQuotePacket } = require('./dhanFeed');
+const { createDhanFeed, decodeQuotePacket, splitPackets } = require('./dhanFeed');
 
 class FakeWebSocket extends EventEmitter {
   constructor(url) {
@@ -83,9 +83,59 @@ test('message events are decoded and emitted as tick events', async () => {
   await feed.connect([{ exchangeSegment: 'NSE_EQ', securityId: '2885' }]);
   const ws = FakeWebSocket.instances[0];
   ws.emit('open');
-  ws.emit('message', Buffer.from('irrelevant-because-decoder-is-faked'));
+  // Structurally valid single-packet framing; decodeMessage is faked so its actual
+  // decode step doesn't matter, but the packet-splitting logic needs real length bytes.
+  ws.emit('message', buildQuotePacket({ securityId: 2885, ltp: 100, ltq: 5, ltt: 1 }));
 
   assert.deepEqual(received, fakeTicks);
+});
+
+test('splitPackets slices a buffer into individual packets using each packet\'s own length prefix', () => {
+  const p1 = buildQuotePacket({ securityId: 2885, ltp: 100, ltq: 5, ltt: 1 });
+  const p2 = buildQuotePacket({ securityId: 1594, ltp: 200, ltq: 10, ltt: 2 });
+  const packets = splitPackets(Buffer.concat([p1, p2]));
+  assert.equal(packets.length, 2);
+  assert.deepEqual(packets[0], p1);
+  assert.deepEqual(packets[1], p2);
+});
+
+test('splitPackets stops safely on a truncated trailing packet instead of throwing', () => {
+  const p1 = buildQuotePacket({ securityId: 2885, ltp: 100, ltq: 5, ltt: 1 });
+  const truncated = buildQuotePacket({ securityId: 1594, ltp: 200, ltq: 10, ltt: 2 }).subarray(0, 20);
+  const packets = splitPackets(Buffer.concat([p1, truncated]));
+  assert.equal(packets.length, 1);
+  assert.deepEqual(packets[0], p1);
+});
+
+test('splitPackets returns an empty array for an empty or too-short buffer', () => {
+  assert.deepEqual(splitPackets(Buffer.alloc(0)), []);
+  assert.deepEqual(splitPackets(Buffer.alloc(2)), []);
+});
+
+test('a single WS message containing two back-to-back Quote packets emits two ticks', async () => {
+  FakeWebSocket.instances = [];
+  const feed = createDhanFeed({
+    clientId: '1100011000',
+    accessToken: 'test-token',
+    // real decoder, not faked, to prove both packets in the frame get decoded
+    WebSocketImpl: FakeWebSocket,
+    baseUrl: 'wss://fake-feed.example',
+  });
+
+  const received = [];
+  feed.on('tick', (t) => received.push(t));
+
+  await feed.connect([{ exchangeSegment: 'NSE_EQ', securityId: '2885' }]);
+  const ws = FakeWebSocket.instances[0];
+  ws.emit('open');
+
+  const p1 = buildQuotePacket({ securityId: 2885, ltp: 1234.5, ltq: 10, ltt: 1735500000 });
+  const p2 = buildQuotePacket({ securityId: 1594, ltp: 500.25, ltq: 3, ltt: 1735500001 });
+  ws.emit('message', Buffer.concat([p1, p2]));
+
+  assert.equal(received.length, 2);
+  assert.equal(received[0].symbol, '2885');
+  assert.equal(received[1].symbol, '1594');
 });
 
 test('on close, schedules a reconnect with increasing backoff', async () => {
