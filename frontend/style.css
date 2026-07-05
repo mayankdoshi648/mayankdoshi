@@ -51,8 +51,6 @@ body {
   padding: 0.5rem 1.25rem;
 }
 
-.hidden { display: none; }
-
 .counters {
   display: flex;
   gap: 1rem;
@@ -117,3 +115,5 @@ body {
   font-size: 0.8rem;
   color: #8892a0;
 }
+
+.hidden { display: none; }

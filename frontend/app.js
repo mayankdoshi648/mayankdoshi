@@ -127,6 +127,13 @@ setInterval(loadStatus, 30000);
 // --- appended to frontend/app.js ---
 let activeChart = null;
 
+function formatCandleTime(epochMs) {
+  const ist = new Date(epochMs + 5.5 * 60 * 60 * 1000);
+  const hh = String(ist.getUTCHours()).padStart(2, '0');
+  const mm = String(ist.getUTCMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
 async function openChartModal(symbol) {
   const resp = await fetch(`/api/candles/${symbol}`);
   const candles = await resp.json();
@@ -134,10 +141,10 @@ async function openChartModal(symbol) {
   document.getElementById('chart-title').textContent = symbol;
   modal.classList.remove('hidden');
 
-  const ohlc = candles.map((c) => ({ x: c.time, o: c.open, h: c.high, l: c.low, c: c.close }));
+  const ohlc = candles.map((c) => ({ x: formatCandleTime(c.time), o: c.open, h: c.high, l: c.low, c: c.close }));
   const markers = state.signals
     .filter((s) => s.symbol === symbol)
-    .map((s) => ({ x: new Date(s.candle_time).getTime(), y: s.price, side: s.side }));
+    .map((s) => ({ x: formatCandleTime(new Date(s.candle_time).getTime()), y: s.price, side: s.side }));
 
   if (activeChart) activeChart.destroy();
   const ctx = document.getElementById('chart-canvas').getContext('2d');
@@ -157,7 +164,7 @@ async function openChartModal(symbol) {
       ],
     },
     options: {
-      scales: { x: { type: 'time', time: { unit: 'minute' } } },
+      scales: { x: { type: 'category' } },
     },
   });
 }
