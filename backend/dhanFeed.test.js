@@ -112,3 +112,24 @@ test('on close, schedules a reconnect with increasing backoff', async () => {
   assert.equal(scheduled.length, 2);
   assert.equal(scheduled[1].ms, 2000);
 });
+
+test('close() stops the reconnect loop instead of scheduling another reconnect', async () => {
+  FakeWebSocket.instances = [];
+  const scheduled = [];
+  const scheduler = (fn, ms) => scheduled.push({ fn, ms });
+
+  const feed = createDhanFeed({
+    clientId: '1100011000',
+    accessToken: 'test-token',
+    decodeMessage: () => [],
+    WebSocketImpl: FakeWebSocket,
+    baseUrl: 'wss://fake-feed.example',
+    scheduler,
+  });
+
+  await feed.connect([{ exchangeSegment: 'NSE_EQ', securityId: '2885' }]);
+  feed.close();
+  FakeWebSocket.instances[0].emit('close');
+
+  assert.equal(scheduled.length, 0);
+});
