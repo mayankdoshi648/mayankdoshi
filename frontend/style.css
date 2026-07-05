@@ -1,0 +1,119 @@
+:root {
+  --bg: #0b0f14;
+  --panel: #131a22;
+  --border: #223;
+  --text: #e6edf3;
+  --buy: #21c55d;
+  --sell: #ef4444;
+  --accent: #f5b400;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: var(--accent);
+}
+
+.nav { display: flex; gap: 0.5rem; margin-left: auto; }
+
+.tab {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.9rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tab.active { border-color: var(--accent); color: var(--accent); }
+
+.banner {
+  background: #4a1f1f;
+  color: #ffb4b4;
+  padding: 0.5rem 1.25rem;
+}
+
+.hidden { display: none; }
+
+.counters {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.counter {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  text-align: center;
+}
+
+.counter span { display: block; font-size: 1.8rem; font-weight: 700; }
+.counter.buy span { color: var(--buy); }
+.counter.sell span { color: var(--sell); }
+
+.signal-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 1.25rem 2rem;
+}
+
+.signal-table th, .signal-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.signal-table tr { cursor: pointer; }
+.signal-table .side-buy { color: var(--buy); font-weight: 600; }
+.signal-table .side-sell { color: var(--sell); font-weight: 600; }
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: var(--panel);
+  padding: 1.5rem;
+  border-radius: 10px;
+  width: min(90vw, 720px);
+}
+
+#chart-close {
+  float: right;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.disclaimer {
+  padding: 0 1.25rem 2rem;
+  font-size: 0.8rem;
+  color: #8892a0;
+}

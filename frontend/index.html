@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>PowerBull Pro</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="brand">⚡ <span>PowerBull Pro</span></div>
+    <nav class="nav">
+      <button id="tab-live" class="tab active">Live Signals</button>
+      <button id="tab-track" class="tab">Track Record</button>
+    </nav>
+    <input type="date" id="date-picker" />
+  </header>
+
+  <div id="market-banner" class="banner hidden"></div>
+
+  <section id="counters" class="counters">
+    <div class="counter"><span id="count-total">0</span><label>Total</label></div>
+    <div class="counter buy"><span id="count-buy">0</span><label>Buy</label></div>
+    <div class="counter sell"><span id="count-sell">0</span><label>Sell</label></div>
+  </section>
+
+  <section id="view-live">
+    <table class="signal-table">
+      <thead><tr><th>Symbol</th><th>Side</th><th>Price</th><th>Time</th></tr></thead>
+      <tbody id="signal-rows"></tbody>
+    </table>
+  </section>
+
+  <section id="view-track" class="hidden">
+    <table class="signal-table">
+      <thead><tr><th>Symbol</th><th>Side</th><th>Entry</th><th>Time</th><th>Outcome</th></tr></thead>
+      <tbody id="track-rows"></tbody>
+    </table>
+  </section>
+
+  <div id="chart-modal" class="modal hidden">
+    <div class="modal-content">
+      <button id="chart-close">&times;</button>
+      <h3 id="chart-title"></h3>
+      <canvas id="chart-canvas"></canvas>
+    </div>
+  </div>
+
+  <p class="disclaimer">
+    Personal experiment, not investment advice. No order execution. Not affiliated with any SEBI-registered research analyst.
+  </p>
+
+  <audio id="alert-sound" src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=" preload="auto"></audio>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1"></script>
+  <script src="app.js"></script>
+</body>
+</html>
