@@ -123,3 +123,45 @@ loadSignals(state.date);
 loadStatus();
 connectLiveSocket();
 setInterval(loadStatus, 30000);
+
+// --- appended to frontend/app.js ---
+let activeChart = null;
+
+async function openChartModal(symbol) {
+  const resp = await fetch(`/api/candles/${symbol}`);
+  const candles = await resp.json();
+  const modal = document.getElementById('chart-modal');
+  document.getElementById('chart-title').textContent = symbol;
+  modal.classList.remove('hidden');
+
+  const ohlc = candles.map((c) => ({ x: c.time, o: c.open, h: c.high, l: c.low, c: c.close }));
+  const markers = state.signals
+    .filter((s) => s.symbol === symbol)
+    .map((s) => ({ x: new Date(s.candle_time).getTime(), y: s.price, side: s.side }));
+
+  if (activeChart) activeChart.destroy();
+  const ctx = document.getElementById('chart-canvas').getContext('2d');
+  activeChart = new Chart(ctx, {
+    type: 'candlestick',
+    data: {
+      datasets: [
+        { label: symbol, data: ohlc },
+        {
+          type: 'scatter',
+          label: 'Signals',
+          data: markers.map((m) => ({ x: m.x, y: m.y })),
+          pointBackgroundColor: markers.map((m) => (m.side === 'BUY' ? '#21c55d' : '#ef4444')),
+          pointStyle: markers.map((m) => (m.side === 'BUY' ? 'triangle' : 'rectRot')),
+          pointRadius: 6,
+        },
+      ],
+    },
+    options: {
+      scales: { x: { type: 'time', time: { unit: 'minute' } } },
+    },
+  });
+}
+
+document.getElementById('chart-close').addEventListener('click', () => {
+  document.getElementById('chart-modal').classList.add('hidden');
+});
