@@ -1,4 +1,5 @@
 // backend/instrumentMap.js
+const FETCH_TIMEOUT_MS = 15000;
 const NIFTY50_CSV_URL = 'https://archives.nseindia.com/content/indices/ind_nifty50list.csv';
 const DHAN_SCRIP_MASTER_URL = 'https://images.dhan.co/api-data/api-scrip-master.csv';
 
@@ -29,11 +30,11 @@ function parseDhanScripMaster(csvText) {
 }
 
 async function resolveNifty50InstrumentMap(fetchImpl = fetch) {
-  const csvResp = await fetchImpl(NIFTY50_CSV_URL, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  const csvResp = await fetchImpl(NIFTY50_CSV_URL, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!csvResp.ok) throw new Error(`Failed to fetch Nifty50 list: HTTP ${csvResp.status}`);
   const symbols = parseNifty50Csv(await csvResp.text());
 
-  const scripResp = await fetchImpl(DHAN_SCRIP_MASTER_URL);
+  const scripResp = await fetchImpl(DHAN_SCRIP_MASTER_URL, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!scripResp.ok) throw new Error(`Failed to fetch Dhan scrip master: HTTP ${scripResp.status}`);
   const bySymbol = parseDhanScripMaster(await scripResp.text());
 
