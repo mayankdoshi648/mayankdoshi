@@ -5,7 +5,7 @@
 Local intraday stock-signal dashboard modeled on powerbullstocks.com (a SEBI-RA
 site currently in "launching soon" state showing live buy/sell signal counts).
 This project replicates the visual layout and adds real functioning signal
-generation on live Nifty 50 data via the Upstox API, running locally.
+generation on live Nifty 50 data via the Dhan API (DhanHQ v2), running locally.
 
 **Legal note:** "Power Bull" name/logo is a registered trademark of the real
 site's SEBI-registered operator. This build is for personal/local use only —
@@ -16,27 +16,39 @@ not real investment advice, personal experiment only, no order execution.
 
 Two pieces in one repo:
 
-- `backend/` — Node.js + Express + `ws`. Owns Upstox OAuth, live market
-  data ingestion, candle aggregation, signal engine, SQLite persistence,
+- `backend/` — Node.js + Express + `ws`. Owns the Dhan live market feed
+  connection, candle aggregation, signal engine, SQLite persistence,
   and a REST + WebSocket API for the frontend.
 - `frontend/` — single dashboard (HTML/CSS/JS, dark theme, Chart.js),
   visually close to the real site's layout. Talks to backend only over
   localhost REST/WS. No build step — plain static files served by Express.
 
-## Upstox Integration
+## Dhan Integration
 
-- Developer app registered at Upstox Developer Console (client_id,
-  client_secret, redirect_uri) — stored in `.env`, never committed.
-  `docs/upstox-setup.md` documents the one-time app registration steps.
-- Daily OAuth login flow: `GET /auth/login` redirects to Upstox authorize
-  URL → `GET /auth/callback` exchanges the code for an access_token.
-  Upstox tokens expire every day around 3:30am IST — this is an Upstox
-  platform limit, not something the app can avoid. Dashboard shows a
-  "Login to Upstox" banner whenever the token is missing/expired.
-- Live prices via Upstox WebSocket market-data-feed, subscribed to all
-  Nifty 50 instrument keys (loaded once at startup from a static
-  `nifty50.json` instrument-key map, refreshed manually if Upstox changes
-  their instrument master).
+- Auth is a manually-generated 24-hour access token: log into
+  web.dhan.co → "Access DhanHQ APIs" → generate token, copy `dhanClientId`
+  and the token into `.env` (`DHAN_CLIENT_ID`, `DHAN_ACCESS_TOKEN`). No
+  OAuth redirect flow — this is a personal/single-user app, so the
+  simplest of Dhan's three auth methods applies. The token expires every
+  ~24 hours; the dashboard surfaces a "Reconnect: regenerate your Dhan
+  token" banner whenever the live feed is disconnected, since Dhan itself
+  reports token expiry as a WebSocket disconnect (reason code 807), not
+  as a separate validity check.
+- Live prices via Dhan's v2 market feed WebSocket
+  (`wss://api-feed.dhan.co?version=2&token=...&clientId=...&authType=2`
+  — auth is via query params, no separate handshake message), subscribed
+  in **Quote mode** (`RequestCode: 17`) for all Nifty 50 instruments —
+  Quote mode carries last-traded-price *and* last-traded-quantity, which
+  Ticker mode (`RequestCode: 15`) omits and this app's candle aggregator
+  needs. Responses are fixed-width binary packets (documented byte
+  offsets, little-endian) — no protobuf, decoded directly with Node's
+  `Buffer` reads.
+- Instrument identifiers (`SecurityId` per `ExchangeSegment`) are
+  resolved at startup by joining NSE's live Nifty 50 constituent list
+  against Dhan's published scrip master CSV
+  (`https://images.dhan.co/api-data/api-scrip-master.csv`) on trading
+  symbol — never hardcoded, since both the index membership and Dhan's
+  internal IDs can change over time.
 
 ## Candle Aggregation
 
@@ -68,7 +80,8 @@ state).
 
 ## Persistence & Track Record
 
-- SQLite via `better-sqlite3`, one file `data/signals.db`.
+- SQLite via Node's built-in `node:sqlite` (`DatabaseSync`), one file
+  `data/signals.db` — no native build dependency.
 - Table `signals`: id, symbol, side (BUY/SELL), price, candle_time, score.
 - Outcome tracking: fixed target/stoploss from signal price — **+0.5%
   target / −0.3% stoploss**. Every subsequent candle for that symbol is
@@ -78,7 +91,7 @@ state).
 
 ## REST + WebSocket API (backend)
 
-- `GET /api/status` — market open/closed, token valid y/n, capture window.
+- `GET /api/status` — market open/closed, Dhan feed connected y/n, capture window.
 - `GET /api/signals?date=YYYY-MM-DD` — signal log for a given day.
 - `GET /api/candles/:symbol?date=` — candle history for chart view.
 - `WS /live` — pushes `{type: "signal"|"candle", ...}` events to the
@@ -103,10 +116,12 @@ state).
 
 - WebSocket disconnects: auto-reconnect with exponential backoff (1s →
   30s cap).
-- Access token expired/missing: `/api/status` reports it, frontend shows
-  a persistent "Login to Upstox" banner linking to `/auth/login`; live
-  ingestion pauses until re-auth completes.
-- Missing instrument-key mapping for a symbol: skip that symbol, log a
+- Access token expired (Dhan disconnects the feed with reason code 807)
+  or feed otherwise disconnected: `/api/status` reports it, frontend
+  shows a persistent "Reconnect: regenerate your Dhan token in .env and
+  restart the server" banner; live ingestion pauses until the feed
+  reconnects with a valid token.
+- Missing SecurityId mapping for a symbol: skip that symbol, log a
   warning, don't crash the ingestion loop.
 - Insufficient candle history (<21) for a symbol: skip signal calc for
   that symbol only, resume once buffer fills.
@@ -119,13 +134,13 @@ Live market hours can't be relied on for repeatable tests, so:
   scoring function, driven by recorded sample candle fixtures
   (`test/fixtures/*.json`) — deterministic, run anytime.
 - Manual smoke test during actual market hours (9:30–15:30 IST) before
-  calling the feature done: confirm OAuth login, live candle ingestion,
-  at least one real signal fires and appears on the dashboard + gets
-  persisted to SQLite.
+  calling the feature done: confirm the Dhan feed connects with a fresh
+  token, live candle ingestion works, at least one real signal fires and
+  appears on the dashboard + gets persisted to SQLite.
 
 ## Out of Scope (v1)
 
 - Order placement/execution (site explicitly has none either).
-- Multi-user accounts / auth beyond the single Upstox login.
+- Multi-user accounts / auth beyond the single Dhan token in `.env`.
 - Deployment/hosting beyond local machine.
 - Stocks outside Nifty 50.
