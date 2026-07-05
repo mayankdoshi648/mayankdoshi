@@ -31,3 +31,9 @@ test('flat price scenario stays NEUTRAL', () => {
   assert.equal(result.side, 'NEUTRAL');
   assert.equal(result.score, 0);
 });
+
+test('volume spike on final candle multiplies score by 1.5', () => {
+  const result = evaluateSignal(fixtures.volumeSpikeCandles);
+  assert.equal(result.side, 'BUY');
+  assert.equal(result.score, 3);
+});
