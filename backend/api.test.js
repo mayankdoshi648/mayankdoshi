@@ -54,10 +54,19 @@ test('GET /api/signals?date= returns rows for that date', async () => {
   db.close();
 });
 
-test('GET /api/signals without date param returns rows for today (IST)', async () => {
+test('GET /api/signals without date param returns rows for today (IST)', async (t) => {
+  // Enable mock timers to freeze clock at a specific UTC/IST divergence instant
+  t.mock.timers.enable({ apis: ['Date'] });
+
+  // Set time to 2026-07-05T20:00:00.000Z (UTC)
+  // At this instant, IST (UTC+5:30) is 2026-07-06T01:30:00 — a full day later
+  // UTC date: 2026-07-05 | IST date: 2026-07-06
+  const utcTimestamp = new Date('2026-07-05T20:00:00.000Z').getTime();
+  t.mock.timers.setTime(utcTimestamp);
+
   const db = openDb(':memory:');
-  const istDate = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  insertSignal(db, { symbol: 'INFY', side: 'SELL', price: 50, score: 3, candleTime: 't2', tradeDate: istDate });
+  // Insert signal with the IST date (2026-07-06)
+  insertSignal(db, { symbol: 'INFY', side: 'SELL', price: 50, score: 3, candleTime: 't2', tradeDate: '2026-07-06' });
   const router = createApiRouter({
     db,
     connectionStatus: { isConnected: () => true, getLastError: () => null },
@@ -66,6 +75,8 @@ test('GET /api/signals without date param returns rows for today (IST)', async (
   });
   const { server, port } = await startTestServer(router);
 
+  // Call API without date param — should compute IST date (2026-07-06) and return the signal
+  // If code reverted to UTC, it would compute '2026-07-05' and fail (no matching row)
   const resp = await fetch(`http://localhost:${port}/api/signals`);
   const body = await resp.json();
   assert.equal(body.length, 1);
@@ -73,6 +84,7 @@ test('GET /api/signals without date param returns rows for today (IST)', async (
 
   await new Promise((resolve) => server.close(resolve));
   db.close();
+  // t.mock.timers auto-restores after test completes
 });
 
 test('GET /api/candles/:symbol delegates to getCandles', async () => {
