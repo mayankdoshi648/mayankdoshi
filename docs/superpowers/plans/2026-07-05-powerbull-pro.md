@@ -1885,6 +1885,16 @@ body {
 // frontend/app.js
 const state = { signals: [], date: new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10) };
 
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]));
+}
+
 function updateCounters(signals) {
   document.getElementById('count-total').textContent = signals.length;
   document.getElementById('count-buy').textContent = signals.filter((s) => s.side === 'BUY').length;
@@ -1894,10 +1904,10 @@ function updateCounters(signals) {
 function renderSignalRow(signal) {
   const tr = document.createElement('tr');
   tr.innerHTML = `
-    <td>${signal.symbol}</td>
-    <td class="side-${signal.side.toLowerCase()}">${signal.side}</td>
-    <td>${signal.price}</td>
-    <td>${new Date(signal.candle_time).toLocaleTimeString()}</td>
+    <td>${escapeHtml(signal.symbol)}</td>
+    <td class="side-${signal.side.toLowerCase()}">${escapeHtml(signal.side)}</td>
+    <td>${escapeHtml(signal.price)}</td>
+    <td>${escapeHtml(new Date(signal.candle_time).toLocaleTimeString())}</td>
   `;
   tr.addEventListener('click', () => openChartModal(signal.symbol));
   return tr;
@@ -1906,11 +1916,11 @@ function renderSignalRow(signal) {
 function renderTrackRow(signal) {
   const tr = document.createElement('tr');
   tr.innerHTML = `
-    <td>${signal.symbol}</td>
-    <td class="side-${signal.side.toLowerCase()}">${signal.side}</td>
-    <td>${signal.price}</td>
-    <td>${new Date(signal.candle_time).toLocaleTimeString()}</td>
-    <td>${signal.outcome}</td>
+    <td>${escapeHtml(signal.symbol)}</td>
+    <td class="side-${signal.side.toLowerCase()}">${escapeHtml(signal.side)}</td>
+    <td>${escapeHtml(signal.price)}</td>
+    <td>${escapeHtml(new Date(signal.candle_time).toLocaleTimeString())}</td>
+    <td>${escapeHtml(signal.outcome)}</td>
   `;
   return tr;
 }
