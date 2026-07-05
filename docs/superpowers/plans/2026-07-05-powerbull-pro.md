@@ -4,9 +4,11 @@
 
 **Goal:** Build a local Node.js dashboard that replicates powerbullstocks.com's layout and generates real BUY/SELL signals on live Nifty 50 data (5-min candles, 9:30-15:30 IST) via the Upstox API, with chart view, track record, and alerts.
 
-**Architecture:** `backend/` (Express + `ws` + `better-sqlite3`) owns Upstox OAuth, live WebSocket ingestion, candle aggregation, a multi-indicator signal engine, SQLite persistence, and a REST + WebSocket API. `frontend/` is static HTML/CSS/JS (no build step) served by the same Express app, talking to the backend over `localhost`.
+**Architecture:** `backend/` (Express + `ws` + Node's built-in `node:sqlite`) owns Upstox OAuth, live WebSocket ingestion, candle aggregation, a multi-indicator signal engine, SQLite persistence, and a REST + WebSocket API. `frontend/` is static HTML/CSS/JS (no build step) served by the same Express app, talking to the backend over `localhost`.
 
-**Tech Stack:** Node.js 18+, Express, `ws`, `better-sqlite3`, `protobufjs`, `dotenv`, Chart.js + `chartjs-chart-financial` (via CDN in the frontend). Tests use Node's built-in `node:test` runner — no test framework dependency needed.
+**Tech Stack:** Node.js 22.5+ (for built-in `node:sqlite`), Express, `ws`, `protobufjs`, `dotenv`, Chart.js + `chartjs-chart-financial` (via CDN in the frontend). Tests use Node's built-in `node:test` runner — no test framework dependency needed.
+
+**Deviation note (recorded during Task 1):** the plan originally specified `better-sqlite3`. On the actual dev machine (Node 24.18, win32/x64), `better-sqlite3` has no prebuilt binary for that Node version and the machine lacks Visual Studio C++ build tools needed to compile it from source. Node's built-in `node:sqlite` (`DatabaseSync`) has the same `.prepare(sql).run()/.all()/.get()` shape, named (`@param`) and positional (`?`) binding, and `lastInsertRowid` on `run()` — confirmed by hand before switching. Task 4 below is written against `node:sqlite` directly; no `better-sqlite3` dependency exists in `package.json`.
 
 ## Global Constraints
 
@@ -86,10 +88,12 @@ powerbull-pro/
   "type": "commonjs",
   "scripts": {
     "start": "node backend/server.js",
-    "test": "node --test backend"
+    "test": "node --test backend/**/*.test.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
   },
   "dependencies": {
-    "better-sqlite3": "^11.3.0",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "protobufjs": "^7.4.0",
@@ -640,11 +644,13 @@ Expected: FAIL — `Cannot find module './db'`
 ```js
 // backend/db.js
 const path = require('node:path');
-const Database = require('better-sqlite3');
+const fs = require('node:fs');
+const { DatabaseSync } = require('node:sqlite');
 
 function openDb(dbPath = path.join(__dirname, '..', 'data', 'signals.db')) {
-  const db = new Database(dbPath);
-  db.pragma('journal_mode = WAL');
+  if (dbPath !== ':memory:') fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+  const db = new DatabaseSync(dbPath);
+  db.exec('PRAGMA journal_mode = WAL');
   db.exec(`
     CREATE TABLE IF NOT EXISTS signals (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

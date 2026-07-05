@@ -5,10 +5,12 @@
   "type": "commonjs",
   "scripts": {
     "start": "node backend/server.js",
-    "test": "node --test backend"
+    "test": "node --test backend/**/*.test.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
   },
   "dependencies": {
-    "better-sqlite3": "^11.3.0",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "protobufjs": "^7.4.0",
