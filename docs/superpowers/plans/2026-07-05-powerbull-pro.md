@@ -2,11 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a local Node.js dashboard that replicates powerbullstocks.com's layout and generates real BUY/SELL signals on live Nifty 50 data (5-min candles, 9:30-15:30 IST) via the Upstox API, with chart view, track record, and alerts.
+**Goal:** Build a local Node.js dashboard that replicates powerbullstocks.com's layout and generates real BUY/SELL signals on live Nifty 50 data (5-min candles, 9:30-15:30 IST) via the Dhan API (DhanHQ v2), with chart view, track record, and alerts.
 
-**Architecture:** `backend/` (Express + `ws` + Node's built-in `node:sqlite`) owns Upstox OAuth, live WebSocket ingestion, candle aggregation, a multi-indicator signal engine, SQLite persistence, and a REST + WebSocket API. `frontend/` is static HTML/CSS/JS (no build step) served by the same Express app, talking to the backend over `localhost`.
+**Architecture:** `backend/` (Express + `ws` + Node's built-in `node:sqlite`) owns the Dhan live market feed connection, candle aggregation, a multi-indicator signal engine, SQLite persistence, and a REST + WebSocket API. `frontend/` is static HTML/CSS/JS (no build step) served by the same Express app, talking to the backend over `localhost`.
 
-**Tech Stack:** Node.js 22.5+ (for built-in `node:sqlite`), Express, `ws`, `protobufjs`, `dotenv`, Chart.js + `chartjs-chart-financial` (via CDN in the frontend). Tests use Node's built-in `node:test` runner — no test framework dependency needed.
+**Tech Stack:** Node.js 22.5+ (for built-in `node:sqlite`), Express, `ws`, `dotenv`, Chart.js + `chartjs-chart-financial` (via CDN in the frontend). Tests use Node's built-in `node:test` runner — no test framework dependency needed.
+
+**Deviation note (recorded when the user switched broker mid-build, after Tasks 1-5 were already done):** the plan originally targeted the Upstox API (OAuth login, protobuf WebSocket feed). It now targets Dhan (DhanHQ v2) instead: a manually-generated 24-hour access token (no OAuth flow — simplest of Dhan's three auth methods, appropriate for a single-user personal app) and a binary WebSocket feed that is NOT protobuf — fixed-width struct packets, byte offsets confirmed against Dhan's official `dhanhq` Python SDK source (downloaded from PyPI, MIT-licensed, not guessed from docs alone). This removes the OAuth task entirely and drops the `protobufjs` dependency. Tasks 1-5 (market window, indicators, signal engine, DB, candle aggregator) are broker-agnostic and unaffected by this switch.
 
 **Deviation note (recorded during Task 1):** the plan originally specified `better-sqlite3`. On the actual dev machine (Node 24.18, win32/x64), `better-sqlite3` has no prebuilt binary for that Node version and the machine lacks Visual Studio C++ build tools needed to compile it from source. Node's built-in `node:sqlite` (`DatabaseSync`) has the same `.prepare(sql).run()/.all()/.get()` shape, named (`@param`) and positional (`?`) binding, and `lastInsertRowid` on `run()` — confirmed by hand before switching. Task 4 below is written against `node:sqlite` directly; no `better-sqlite3` dependency exists in `package.json`.
 
@@ -14,10 +16,12 @@
 
 - Personal/local use only — do not deploy publicly. "Power Bull" name/logo is a trademark of the real site's operator; keep this project's branding as a visual homage, not a public release.
 - Dashboard must show a disclaimer: not real investment advice, no order execution, personal experiment only.
-- Signal capture only runs 9:30-15:30 IST; outside that window the app reads the last saved day from SQLite instead of hitting Upstox.
+- Signal capture only runs 9:30-15:30 IST; outside that window the app reads the last saved day from SQLite instead of hitting Dhan.
 - Signal score: EMA9/EMA21 cross (±1), RSI14 <30/>70 (±1), close vs session VWAP (±1), ×1.5 multiplier if candle volume > 1.5× rolling 20-candle average volume. Score ≥+2 → BUY, ≤−2 → SELL, else NEUTRAL. No signal until ≥21 candles buffered for that symbol.
 - Track-record outcome: target/stoploss are **+0.5% / −0.3%** from signal price for BUY (mirrored for SELL), checked against every subsequent candle until hit or end-of-day (`EOD_CLOSE`).
-- Universe: Nifty 50 only, resolved at startup from live NSE + Upstox instrument data — never hardcode a stock/ISIN list in code (index membership changes over time).
+- Universe: Nifty 50 only, resolved at startup from live NSE + Dhan's published scrip master — never hardcode a stock/SecurityId list in code (index membership and Dhan's internal IDs both change over time).
+- Dhan auth: a single manually-generated 24-hour token (`DHAN_CLIENT_ID` + `DHAN_ACCESS_TOKEN` in `.env`). No OAuth flow, no token-refresh code in the app — the user regenerates the token at web.dhan.co and restarts the server each trading day.
+- Dhan's v2 market feed sends fixed-width binary packets, not protobuf — decode with `Buffer` reads at the documented byte offsets (see Task 11), verified against the official `dhanhq` Python SDK source rather than guessed from prose docs.
 
 ---
 
@@ -29,7 +33,7 @@ powerbull-pro/
   .env.example
   .gitignore
   docs/
-    upstox-setup.md
+    dhan-setup.md
   backend/
     config.js
     marketWindow.js
@@ -44,18 +48,16 @@ powerbull-pro/
     candleAggregator.test.js
     outcomeTracker.js
     outcomeTracker.test.js
-    auth.js
-    auth.test.js
-    upstoxFeed.js
-    upstoxFeed.test.js
+    connectionStatus.js
+    connectionStatus.test.js
+    dhanFeed.js
+    dhanFeed.test.js
     instrumentMap.js
     api.js
     api.test.js
     liveSocket.js
     liveSocket.test.js
     server.js
-    proto/
-      MarketDataFeed.proto
     test/fixtures/
       sample-candles.json
   frontend/
@@ -96,7 +98,6 @@ powerbull-pro/
   "dependencies": {
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
-    "protobufjs": "^7.4.0",
     "ws": "^8.18.0"
   }
 }
@@ -116,9 +117,8 @@ data/*.db-shm
 - [ ] **Step 3: Write .env.example**
 
 ```
-UPSTOX_CLIENT_ID=
-UPSTOX_CLIENT_SECRET=
-UPSTOX_REDIRECT_URI=http://localhost:3000/auth/callback
+DHAN_CLIENT_ID=
+DHAN_ACCESS_TOKEN=
 PORT=3000
 ```
 
@@ -993,14 +993,16 @@ git commit -m "feat: add target/stoploss outcome tracking for signals"
 **Files:**
 - Create: `backend/config.js`
 - Create: `backend/instrumentMap.js`
-- Create: `docs/upstox-setup.md` (initial version — extended in Task 14)
+- Create: `docs/dhan-setup.md`
 
 **Interfaces:**
-- Produces: `loadConfig(): {clientId, clientSecret, redirectUri, port}` (throws if required env vars missing).
-- Produces: `resolveNifty50InstrumentMap(fetchImpl = fetch): Promise<Map<symbol, instrumentKey>>` — joins the NSE-published Nifty 50 constituent list against Upstox's instrument master, both fetched live (never hardcoded — index membership changes).
-- Consumed by: `server.js` (Task 10).
+- Produces: `loadConfig(): {clientId, accessToken, port}` (throws if required env vars missing).
+- Produces: `resolveNifty50InstrumentMap(fetchImpl = fetch): Promise<Map<symbol, securityId>>` — joins the NSE-published Nifty 50 constituent list against Dhan's published scrip master CSV, both fetched live (never hardcoded — index membership and Dhan's internal IDs both change over time). `securityId` is a string (matches the `SecurityId` field Dhan's WebSocket subscribe message expects).
+- Consumed by: `server.js` (Task 14).
 
-**Why not hardcode the list:** Nifty 50 constituents and Upstox instrument keys both change over time (index rebalancing, ISIN updates). Baking either into source risks silently tracking the wrong stocks months from now. Both are pulled from their authoritative live sources at startup instead.
+**Why not hardcode the list:** Nifty 50 constituents and Dhan's SecurityIds both change over time (index rebalancing, instrument master updates). Baking either into source risks silently tracking the wrong stocks months from now. Both are pulled from their authoritative live sources at startup instead.
+
+**Ground truth for the CSV format:** the column names and NSE-equity filter below (`SEM_EXM_EXCH_ID='NSE'`, `SEM_SEGMENT='E'`, `SEM_SERIES='EQ'`) were confirmed by downloading the real file (`curl https://images.dhan.co/api-data/api-scrip-master.csv`) and inspecting its header and matching rows (e.g. `NSE,E,2885,EQUITY,0,RELIANCE,...,EQ,RELIANCE INDUSTRIES LTD`) — not guessed from prose docs. The file has no quoted/escaped commas, so a plain `split(',')` per line is safe.
 
 - [ ] **Step 1: Write config.js**
 
@@ -1009,15 +1011,14 @@ git commit -m "feat: add target/stoploss outcome tracking for signals"
 require('dotenv').config();
 
 function loadConfig() {
-  const required = ['UPSTOX_CLIENT_ID', 'UPSTOX_CLIENT_SECRET', 'UPSTOX_REDIRECT_URI'];
+  const required = ['DHAN_CLIENT_ID', 'DHAN_ACCESS_TOKEN'];
   const missing = required.filter((key) => !process.env[key]);
   if (missing.length > 0) {
     throw new Error(`Missing required env vars: ${missing.join(', ')}. Copy .env.example to .env and fill it in.`);
   }
   return {
-    clientId: process.env.UPSTOX_CLIENT_ID,
-    clientSecret: process.env.UPSTOX_CLIENT_SECRET,
-    redirectUri: process.env.UPSTOX_REDIRECT_URI,
+    clientId: process.env.DHAN_CLIENT_ID,
+    accessToken: process.env.DHAN_ACCESS_TOKEN,
     port: Number(process.env.PORT || 3000),
   };
 }
@@ -1030,8 +1031,7 @@ module.exports = { loadConfig };
 ```js
 // backend/instrumentMap.js
 const NIFTY50_CSV_URL = 'https://archives.nseindia.com/content/indices/ind_nifty50list.csv';
-const UPSTOX_INSTRUMENTS_URL = 'https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz';
-const zlib = require('node:zlib');
+const DHAN_SCRIP_MASTER_URL = 'https://images.dhan.co/api-data/api-scrip-master.csv';
 
 function parseNifty50Csv(csvText) {
   const lines = csvText.trim().split('\n');
@@ -1040,33 +1040,43 @@ function parseNifty50Csv(csvText) {
   return lines.slice(1).map((line) => line.split(',')[symbolIdx].trim());
 }
 
+function parseDhanScripMaster(csvText) {
+  const lines = csvText.trim().split('\n');
+  const header = lines[0].split(',');
+  const exchIdx = header.indexOf('SEM_EXM_EXCH_ID');
+  const segIdx = header.indexOf('SEM_SEGMENT');
+  const seriesIdx = header.indexOf('SEM_SERIES');
+  const symbolIdx = header.indexOf('SEM_TRADING_SYMBOL');
+  const secIdIdx = header.indexOf('SEM_SMST_SECURITY_ID');
+
+  const bySymbol = new Map();
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',');
+    if (cols[exchIdx] === 'NSE' && cols[segIdx] === 'E' && cols[seriesIdx] === 'EQ') {
+      bySymbol.set(cols[symbolIdx], cols[secIdIdx]);
+    }
+  }
+  return bySymbol;
+}
+
 async function resolveNifty50InstrumentMap(fetchImpl = fetch) {
   const csvResp = await fetchImpl(NIFTY50_CSV_URL, { headers: { 'User-Agent': 'Mozilla/5.0' } });
   if (!csvResp.ok) throw new Error(`Failed to fetch Nifty50 list: HTTP ${csvResp.status}`);
   const symbols = parseNifty50Csv(await csvResp.text());
 
-  const instrResp = await fetchImpl(UPSTOX_INSTRUMENTS_URL);
-  if (!instrResp.ok) throw new Error(`Failed to fetch Upstox instrument master: HTTP ${instrResp.status}`);
-  const gzBuffer = Buffer.from(await instrResp.arrayBuffer());
-  const jsonText = zlib.gunzipSync(gzBuffer).toString('utf8');
-  const instruments = JSON.parse(jsonText);
-
-  const bySymbol = new Map();
-  for (const inst of instruments) {
-    if (inst.segment === 'NSE_EQ' && inst.trading_symbol) {
-      bySymbol.set(inst.trading_symbol, inst.instrument_key);
-    }
-  }
+  const scripResp = await fetchImpl(DHAN_SCRIP_MASTER_URL);
+  if (!scripResp.ok) throw new Error(`Failed to fetch Dhan scrip master: HTTP ${scripResp.status}`);
+  const bySymbol = parseDhanScripMaster(await scripResp.text());
 
   const map = new Map();
   for (const symbol of symbols) {
-    const key = bySymbol.get(symbol);
-    if (key) map.set(symbol, key);
+    const securityId = bySymbol.get(symbol);
+    if (securityId) map.set(symbol, securityId);
   }
   return map;
 }
 
-module.exports = { resolveNifty50InstrumentMap, parseNifty50Csv };
+module.exports = { resolveNifty50InstrumentMap, parseNifty50Csv, parseDhanScripMaster };
 ```
 
 - [ ] **Step 3: Manual verification (no live network call in automated tests)**
@@ -1074,185 +1084,139 @@ module.exports = { resolveNifty50InstrumentMap, parseNifty50Csv };
 This function depends on two live external endpoints, so it isn't unit-tested with a real network call. Instead:
 
 Run: `node -e "require('./backend/instrumentMap').resolveNifty50InstrumentMap().then(m => console.log(m.size, [...m.entries()].slice(0,3)))"`
-Expected: prints a number close to 50 and a few `[symbol, instrument_key]` pairs. If the NSE CSV URL 403s (NSE occasionally blocks non-browser user agents), note the working URL/headers in `docs/upstox-setup.md` and adjust `NIFTY50_CSV_URL`/headers accordingly — this is exactly the kind of drift the live-fetch approach is meant to survive without a code change to a hardcoded list.
+Expected: prints a number close to 50 and a few `[symbol, securityId]` pairs (e.g. `['RELIANCE', '2885']`). If the NSE CSV URL 403s (NSE occasionally blocks non-browser user agents), note the working URL/headers in `docs/dhan-setup.md` and adjust `NIFTY50_CSV_URL`/headers accordingly — this is exactly the kind of drift the live-fetch approach is meant to survive without a code change to a hardcoded list. If Dhan's CSV column names have changed since this plan was written, `parseDhanScripMaster`'s `header.indexOf(...)` calls will return `-1` and every row will be skipped (map ends up empty) rather than crashing — check the CSV's actual header row against the names above if that happens.
 
-- [ ] **Step 4: Write docs/upstox-setup.md (initial)**
+- [ ] **Step 4: Write docs/dhan-setup.md**
 
 ```markdown
-# Upstox Setup
+# Dhan Setup
 
-1. Go to https://developer.upstox.com, log in, create a new app.
-2. Set the redirect URI to `http://localhost:3000/auth/callback` (must match `.env` exactly).
-3. Copy the Client ID and Client Secret into `.env` (see `.env.example`).
-4. Every trading day, the Upstox access token expires overnight. Visit
-   `http://localhost:3000/auth/login` each morning before 9:30 IST to
-   re-authenticate.
+This app uses a manually-generated access token — no OAuth flow, since
+it's a single-user personal app.
+
+1. Log into https://web.dhan.co
+2. Go to "Access DhanHQ APIs" (developer/API section of your profile).
+3. Generate an access token. Copy your Client ID (`dhanClientId`) and
+   the generated token into `.env` as `DHAN_CLIENT_ID` and
+   `DHAN_ACCESS_TOKEN` (see `.env.example`).
+4. The token is valid for **24 hours from generation**. Every trading
+   day, regenerate it at web.dhan.co and restart the server
+   (`npm start`) before 9:30 IST — there is no in-app refresh flow.
 ```
-
-(Extended with the WebSocket proto step in Task 14.)
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/config.js backend/instrumentMap.js docs/upstox-setup.md
-git commit -m "feat: add config loader and live Nifty50 instrument resolution"
+git add backend/config.js backend/instrumentMap.js docs/dhan-setup.md
+git commit -m "feat: add config loader and live Nifty50 instrument resolution via Dhan"
 ```
 
 ---
 
-### Task 8: Upstox OAuth routes
+### Task 8: Dhan connection status tracker
 
 **Files:**
-- Create: `backend/auth.js`
-- Test: `backend/auth.test.js`
+- Create: `backend/connectionStatus.js`
+- Test: `backend/connectionStatus.test.js`
 
 **Interfaces:**
-- Produces: `createTokenStore(): {set(token), get(), isValid()}`
-- Produces: `createAuthRouter({clientId, clientSecret, redirectUri, tokenStore, fetchImpl = fetch}): express.Router` — mounts `GET /login` (redirects to Upstox), `GET /callback` (exchanges code for token).
-- Consumed by: `server.js` (Task 10), `api.js` (Task 9, via `tokenStore.isValid()`).
+- Produces: `createConnectionStatus(): {setConnected(value: boolean), setError(err: Error|string|null), isConnected(): boolean, getLastError(): string|null}`
+- Consumed by: `api.js` (Task 9, via `isConnected()`/`getLastError()`), `server.js` (Task 14, updated from the Dhan feed's `connected`/`disconnected`/`error` events).
+
+**Why this replaces an OAuth token store:** Dhan auth for this app is a single manually-generated 24-hour token pasted into `.env` (see Task 7) — there is no in-app login/callback flow to track a token through. What the app actually needs to know is "is the live feed connected right now," which the feed's own connection events answer directly; a disconnect with reason "Access Token is expired" (Dhan's server-side code 807) surfaces to the user as the same "not connected" state as any other disconnect, with the last error message shown for context.
 
 - [ ] **Step 1: Write the failing test**
 
 ```js
-// backend/auth.test.js
+// backend/connectionStatus.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const http = require('node:http');
-const express = require('express');
-const { createAuthRouter, createTokenStore } = require('./auth');
+const { createConnectionStatus } = require('./connectionStatus');
 
-test('tokenStore starts invalid, becomes valid after set', () => {
-  const store = createTokenStore();
-  assert.equal(store.isValid(), false);
-  store.set('abc123');
-  assert.equal(store.isValid(), true);
-  assert.equal(store.get(), 'abc123');
+test('starts disconnected with no error', () => {
+  const status = createConnectionStatus();
+  assert.equal(status.isConnected(), false);
+  assert.equal(status.getLastError(), null);
 });
 
-test('GET /login redirects to Upstox authorize URL with client_id and redirect_uri', async () => {
-  const tokenStore = createTokenStore();
-  const app = express();
-  app.use('/auth', createAuthRouter({
-    clientId: 'test-client',
-    clientSecret: 'test-secret',
-    redirectUri: 'http://localhost:3000/auth/callback',
-    tokenStore,
-  }));
-  const server = http.createServer(app);
-  await new Promise((resolve) => server.listen(0, resolve));
-  const port = server.address().port;
-
-  const resp = await fetch(`http://localhost:${port}/auth/login`, { redirect: 'manual' });
-  assert.equal(resp.status, 302);
-  const location = resp.headers.get('location');
-  assert.ok(location.startsWith('https://api.upstox.com/v2/login/authorization/dialog'));
-  assert.ok(location.includes('client_id=test-client'));
-  assert.ok(location.includes(encodeURIComponent('http://localhost:3000/auth/callback')));
-
-  await new Promise((resolve) => server.close(resolve));
+test('setConnected(true) marks connected and clears any prior error', () => {
+  const status = createConnectionStatus();
+  status.setError('Access Token is expired');
+  status.setConnected(true);
+  assert.equal(status.isConnected(), true);
+  assert.equal(status.getLastError(), null);
 });
 
-test('GET /callback exchanges code for a token via fetchImpl and stores it', async () => {
-  const tokenStore = createTokenStore();
-  const fakeFetch = async (url, opts) => {
-    assert.equal(url, 'https://api.upstox.com/v2/login/authorization/token');
-    assert.ok(opts.body.toString().includes('code=abc'));
-    return {
-      ok: true,
-      json: async () => ({ access_token: 'live-token-xyz' }),
-    };
-  };
-  const app = express();
-  app.use('/auth', createAuthRouter({
-    clientId: 'test-client',
-    clientSecret: 'test-secret',
-    redirectUri: 'http://localhost:3000/auth/callback',
-    tokenStore,
-    fetchImpl: fakeFetch,
-  }));
-  const server = http.createServer(app);
-  await new Promise((resolve) => server.listen(0, resolve));
-  const port = server.address().port;
+test('setConnected(false) marks disconnected but keeps the last error visible', () => {
+  const status = createConnectionStatus();
+  status.setConnected(true);
+  status.setError('Access Token is expired');
+  status.setConnected(false);
+  assert.equal(status.isConnected(), false);
+  assert.equal(status.getLastError(), 'Access Token is expired');
+});
 
-  const resp = await fetch(`http://localhost:${port}/auth/callback?code=abc`, { redirect: 'manual' });
-  assert.equal(resp.status, 302);
-  assert.equal(tokenStore.get(), 'live-token-xyz');
+test('setError accepts an Error object and stores its message', () => {
+  const status = createConnectionStatus();
+  status.setError(new Error('WebSocket closed'));
+  assert.equal(status.getLastError(), 'WebSocket closed');
+});
 
-  await new Promise((resolve) => server.close(resolve));
+test('setError(null) clears the error', () => {
+  const status = createConnectionStatus();
+  status.setError('something');
+  status.setError(null);
+  assert.equal(status.getLastError(), null);
 });
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `node --test backend/auth.test.js`
-Expected: FAIL — `Cannot find module './auth'`
+Run: `node --test backend/connectionStatus.test.js`
+Expected: FAIL — `Cannot find module './connectionStatus'`
 
 - [ ] **Step 3: Write implementation**
 
 ```js
-// backend/auth.js
-const express = require('express');
-const crypto = require('node:crypto');
+// backend/connectionStatus.js
+function createConnectionStatus() {
+  let connected = false;
+  let lastError = null;
 
-function createTokenStore() {
-  let accessToken = null;
   return {
-    set(token) { accessToken = token; },
-    get() { return accessToken; },
-    isValid() { return Boolean(accessToken); },
+    setConnected(value) {
+      connected = value;
+      if (value) lastError = null;
+    },
+    setError(err) {
+      if (err === null || err === undefined) {
+        lastError = null;
+      } else {
+        lastError = err instanceof Error ? err.message : String(err);
+      }
+    },
+    isConnected() {
+      return connected;
+    },
+    getLastError() {
+      return lastError;
+    },
   };
 }
 
-function createAuthRouter({ clientId, clientSecret, redirectUri, tokenStore, fetchImpl = fetch }) {
-  const router = express.Router();
-
-  router.get('/login', (req, res) => {
-    const state = crypto.randomBytes(8).toString('hex');
-    const url = `https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
-    res.redirect(url);
-  });
-
-  router.get('/callback', async (req, res) => {
-    const { code } = req.query;
-    if (!code) return res.status(400).send('Missing code');
-    try {
-      const params = new URLSearchParams({
-        code: String(code),
-        client_id: clientId,
-        client_secret: clientSecret,
-        redirect_uri: redirectUri,
-        grant_type: 'authorization_code',
-      });
-      const resp = await fetchImpl('https://api.upstox.com/v2/login/authorization/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-        body: params,
-      });
-      const data = await resp.json();
-      if (!resp.ok) return res.status(502).send(`Upstox token exchange failed: ${JSON.stringify(data)}`);
-      tokenStore.set(data.access_token);
-      res.redirect('/');
-    } catch (err) {
-      res.status(500).send(`OAuth callback error: ${err.message}`);
-    }
-  });
-
-  return router;
-}
-
-module.exports = { createAuthRouter, createTokenStore };
+module.exports = { createConnectionStatus };
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `node --test backend/auth.test.js`
-Expected: 3 tests pass.
+Run: `node --test backend/connectionStatus.test.js`
+Expected: 5 tests pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/auth.js backend/auth.test.js
-git commit -m "feat: add Upstox OAuth login/callback routes"
+git add backend/connectionStatus.js backend/connectionStatus.test.js
+git commit -m "feat: add Dhan feed connection status tracker"
 ```
 
 ---
@@ -1264,9 +1228,9 @@ git commit -m "feat: add Upstox OAuth login/callback routes"
 - Test: `backend/api.test.js`
 
 **Interfaces:**
-- Consumes: `getSignalsByDate` from `./db` (Task 4), `isMarketOpen` from `./marketWindow` (Task 1), `tokenStore` from `./auth` (Task 8).
-- Produces: `createApiRouter({db, tokenStore, isMarketOpenFn, getCandles}): express.Router` — mounts `GET /status`, `GET /signals?date=`, `GET /candles/:symbol`.
-- Consumed by: `server.js` (Task 10).
+- Consumes: `getSignalsByDate` from `./db` (Task 4), `isMarketOpen` from `./marketWindow` (Task 1), `connectionStatus` from `./connectionStatus` (Task 8).
+- Produces: `createApiRouter({db, connectionStatus, isMarketOpenFn, getCandles}): express.Router` — mounts `GET /status`, `GET /signals?date=`, `GET /candles/:symbol`.
+- Consumed by: `server.js` (Task 14).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1287,11 +1251,11 @@ async function startTestServer(router) {
   return { server, port: server.address().port };
 }
 
-test('GET /api/status reports market state and token validity', async () => {
+test('GET /api/status reports market state and feed connection', async () => {
   const db = openDb(':memory:');
   const router = createApiRouter({
     db,
-    tokenStore: { isValid: () => true },
+    connectionStatus: { isConnected: () => true, getLastError: () => null },
     isMarketOpenFn: () => false,
     getCandles: () => [],
   });
@@ -1300,7 +1264,8 @@ test('GET /api/status reports market state and token validity', async () => {
   const resp = await fetch(`http://localhost:${port}/api/status`);
   const body = await resp.json();
   assert.equal(body.marketOpen, false);
-  assert.equal(body.tokenValid, true);
+  assert.equal(body.feedConnected, true);
+  assert.equal(body.lastError, null);
 
   await new Promise((resolve) => server.close(resolve));
   db.close();
@@ -1311,7 +1276,7 @@ test('GET /api/signals?date= returns rows for that date', async () => {
   insertSignal(db, { symbol: 'TCS', side: 'BUY', price: 100, score: 2, candleTime: 't1', tradeDate: '2026-07-06' });
   const router = createApiRouter({
     db,
-    tokenStore: { isValid: () => true },
+    connectionStatus: { isConnected: () => true, getLastError: () => null },
     isMarketOpenFn: () => true,
     getCandles: () => [],
   });
@@ -1330,7 +1295,7 @@ test('GET /api/candles/:symbol delegates to getCandles', async () => {
   const db = openDb(':memory:');
   const router = createApiRouter({
     db,
-    tokenStore: { isValid: () => true },
+    connectionStatus: { isConnected: () => true, getLastError: () => null },
     isMarketOpenFn: () => true,
     getCandles: (symbol) => (symbol === 'TCS' ? [{ time: 0, open: 1, high: 2, low: 0, close: 1, volume: 10 }] : []),
   });
@@ -1358,13 +1323,14 @@ Expected: FAIL — `Cannot find module './api'`
 const express = require('express');
 const { getSignalsByDate } = require('./db');
 
-function createApiRouter({ db, tokenStore, isMarketOpenFn, getCandles }) {
+function createApiRouter({ db, connectionStatus, isMarketOpenFn, getCandles }) {
   const router = express.Router();
 
   router.get('/status', (req, res) => {
     res.json({
       marketOpen: isMarketOpenFn(),
-      tokenValid: tokenStore.isValid(),
+      feedConnected: connectionStatus.isConnected(),
+      lastError: connectionStatus.getLastError(),
     });
   });
 
@@ -1484,25 +1450,30 @@ git commit -m "feat: add WebSocket broadcast server for live dashboard updates"
 
 ---
 
-### Task 11: Upstox WebSocket feed client
+### Task 11: Dhan WebSocket feed client
 
 **Files:**
-- Create: `backend/upstoxFeed.js`
-- Test: `backend/upstoxFeed.test.js`
+- Create: `backend/dhanFeed.js`
+- Test: `backend/dhanFeed.test.js`
 
 **Interfaces:**
-- Produces: `createUpstoxFeed({getAuthorizedFeedUrl, decodeMessage, WebSocketImpl?, scheduler?}): {connect(instrumentKeys), close(), on(event, handler)}`. Events: `'connected'`, `'tick'` (payload `{symbol, ltp, ltq, timestamp}`), `'disconnected'`, `'error'`.
-- The real `decodeMessage(buffer): Tick[]` (protobuf decoding) is wired in Task 14, once `proto/MarketDataFeed.proto` is copied from Upstox's docs — this task only builds and tests the connect/subscribe/reconnect/emit plumbing against an injected fake decoder, so it never depends on the exact protobuf schema.
+- Produces: `createDhanFeed({clientId, accessToken, decodeMessage?, WebSocketImpl?, scheduler?, baseUrl?}): {connect(instruments), close(), on(event, handler)}`, where `instruments: Array<{exchangeSegment: string, securityId: string}>`. Events: `'connected'`, `'tick'` (payload `{symbol, ltp, ltq, timestamp}`), `'disconnected'`, `'error'`.
+- Produces: `decodeQuotePacket(buffer: Buffer): Tick[]` — the real, fully-tested binary decoder (default for `decodeMessage`). Unlike the original Upstox design, this is NOT deferred to a later task: Dhan's Quote packet is a fixed-width binary struct (confirmed against the official `dhanhq` Python SDK source, not guessed), so it's plain, pure, synchronous `Buffer` parsing — no external schema file, no async step.
 - Consumed by: `server.js` (Task 14).
+
+**Ground truth for the wire format** (confirmed by downloading `dhanhq==2.2.0` from PyPI and reading `dhanhq/marketfeed.py` directly, not from prose docs alone):
+- Connect URL: `wss://api-feed.dhan.co?version=2&token=<accessToken>&clientId=<clientId>&authType=2` — auth is via query params; v2 needs no separate binary handshake message (that's v1-only).
+- Subscribe message (JSON, sent as a text WS frame): `{"RequestCode": 17, "InstrumentCount": N, "InstrumentList": [{"ExchangeSegment": "NSE_EQ", "SecurityId": "2885"}, ...]}`. `RequestCode: 17` is Quote mode — chosen over Ticker (`15`, no traded quantity) because the candle aggregator (Task 5) needs `ltq` (last traded quantity) for its volume field. Dhan caps each subscribe message at 100 instruments; since the Global Constraints fix the universe at Nifty 50 (50 symbols), a single message always suffices — no batching loop needed.
+- Response packets are binary, little-endian, first byte = packet type. Quote packets have type byte `4` and are exactly 50 bytes, laid out as (offset, size, field): `0,1,code` `1,2,messageLength` `3,1,exchangeSegment` `4,4,securityId(int32)` `8,4,LTP(float32)` `12,2,LTQ(uint16)` `14,4,LTT(uint32, epoch seconds)` `18,4,avgPrice(float32)` `22,4,volume(uint32)` `26,4,totalSellQty` `30,4,totalBuyQty` `34,4,open` `38,4,close` `42,4,high` `46,4,low`. This app only needs `securityId`, `LTP`, `LTQ`, and `LTT` — the rest of the Quote packet is ignored.
 
 - [ ] **Step 1: Write the failing test**
 
 ```js
-// backend/upstoxFeed.test.js
+// backend/dhanFeed.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
-const { createUpstoxFeed } = require('./upstoxFeed');
+const { createDhanFeed, decodeQuotePacket } = require('./dhanFeed');
 
 class FakeWebSocket extends EventEmitter {
   constructor(url) {
@@ -1516,38 +1487,71 @@ class FakeWebSocket extends EventEmitter {
 }
 FakeWebSocket.instances = [];
 
-test('connect() opens ws to the authorized URL and sends a subscribe message on open', async () => {
+function buildQuotePacket({ securityId, ltp, ltq, ltt }) {
+  const buf = Buffer.alloc(50);
+  buf.writeUInt8(4, 0);
+  buf.writeUInt16LE(50, 1);
+  buf.writeUInt8(1, 3);
+  buf.writeInt32LE(securityId, 4);
+  buf.writeFloatLE(ltp, 8);
+  buf.writeUInt16LE(ltq, 12);
+  buf.writeUInt32LE(ltt, 14);
+  return buf;
+}
+
+test('decodeQuotePacket parses a real Quote packet layout', () => {
+  const buf = buildQuotePacket({ securityId: 2885, ltp: 1234.5, ltq: 10, ltt: 1735500000 });
+  const ticks = decodeQuotePacket(buf);
+  assert.equal(ticks.length, 1);
+  assert.equal(ticks[0].symbol, '2885');
+  assert.ok(Math.abs(ticks[0].ltp - 1234.5) < 0.01);
+  assert.equal(ticks[0].ltq, 10);
+  assert.equal(ticks[0].timestamp, 1735500000000);
+});
+
+test('decodeQuotePacket ignores non-Quote packet types', () => {
+  const buf = Buffer.alloc(50);
+  buf.writeUInt8(2, 0); // Ticker packet, not Quote
+  assert.deepEqual(decodeQuotePacket(buf), []);
+});
+
+test('connect() builds the v2 query-param URL and sends a Quote subscribe message on open', async () => {
   FakeWebSocket.instances = [];
-  const feed = createUpstoxFeed({
-    getAuthorizedFeedUrl: async () => 'wss://fake-feed.example/socket',
+  const feed = createDhanFeed({
+    clientId: '1100011000',
+    accessToken: 'test-token',
     decodeMessage: () => [],
     WebSocketImpl: FakeWebSocket,
+    baseUrl: 'wss://fake-feed.example',
   });
 
-  await feed.connect(['NSE_EQ|INE1']);
+  await feed.connect([{ exchangeSegment: 'NSE_EQ', securityId: '2885' }]);
   const ws = FakeWebSocket.instances[0];
   ws.emit('open');
 
-  assert.equal(ws.url, 'wss://fake-feed.example/socket');
+  assert.equal(ws.url, 'wss://fake-feed.example?version=2&token=test-token&clientId=1100011000&authType=2');
   assert.equal(ws.sent.length, 1);
   const sub = JSON.parse(ws.sent[0]);
-  assert.equal(sub.method, 'sub');
-  assert.deepEqual(sub.data.instrumentKeys, ['NSE_EQ|INE1']);
+  assert.equal(sub.RequestCode, 17);
+  assert.equal(sub.InstrumentCount, 1);
+  assert.deepEqual(sub.InstrumentList, [{ ExchangeSegment: 'NSE_EQ', SecurityId: '2885' }]);
 });
 
 test('message events are decoded and emitted as tick events', async () => {
   FakeWebSocket.instances = [];
-  const fakeTicks = [{ symbol: 'TCS', ltp: 100, ltq: 5, timestamp: 123 }];
-  const feed = createUpstoxFeed({
-    getAuthorizedFeedUrl: async () => 'wss://fake-feed.example/socket',
+  const fakeTicks = [{ symbol: '2885', ltp: 100, ltq: 5, timestamp: 123 }];
+  const feed = createDhanFeed({
+    clientId: '1100011000',
+    accessToken: 'test-token',
     decodeMessage: () => fakeTicks,
     WebSocketImpl: FakeWebSocket,
+    baseUrl: 'wss://fake-feed.example',
   });
 
   const received = [];
   feed.on('tick', (t) => received.push(t));
 
-  await feed.connect(['NSE_EQ|INE1']);
+  await feed.connect([{ exchangeSegment: 'NSE_EQ', securityId: '2885' }]);
   const ws = FakeWebSocket.instances[0];
   ws.emit('open');
   ws.emit('message', Buffer.from('irrelevant-because-decoder-is-faked'));
@@ -1560,14 +1564,16 @@ test('on close, schedules a reconnect with increasing backoff', async () => {
   const scheduled = [];
   const scheduler = (fn, ms) => scheduled.push({ fn, ms });
 
-  const feed = createUpstoxFeed({
-    getAuthorizedFeedUrl: async () => 'wss://fake-feed.example/socket',
+  const feed = createDhanFeed({
+    clientId: '1100011000',
+    accessToken: 'test-token',
     decodeMessage: () => [],
     WebSocketImpl: FakeWebSocket,
+    baseUrl: 'wss://fake-feed.example',
     scheduler,
   });
 
-  await feed.connect(['NSE_EQ|INE1']);
+  await feed.connect([{ exchangeSegment: 'NSE_EQ', securityId: '2885' }]);
   FakeWebSocket.instances[0].emit('close');
   assert.equal(scheduled.length, 1);
   assert.equal(scheduled[0].ms, 1000);
@@ -1581,32 +1587,51 @@ test('on close, schedules a reconnect with increasing backoff', async () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `node --test backend/upstoxFeed.test.js`
-Expected: FAIL — `Cannot find module './upstoxFeed'`
+Run: `node --test backend/dhanFeed.test.js`
+Expected: FAIL — `Cannot find module './dhanFeed'`
 
 - [ ] **Step 3: Write implementation**
 
 ```js
-// backend/upstoxFeed.js
+// backend/dhanFeed.js
 const WebSocket = require('ws');
 const { EventEmitter } = require('node:events');
 
-function createUpstoxFeed({ getAuthorizedFeedUrl, decodeMessage, WebSocketImpl = WebSocket, scheduler = (fn, ms) => setTimeout(fn, ms) }) {
+const QUOTE_PACKET_CODE = 4;
+const REQUEST_CODE_QUOTE = 17;
+
+function decodeQuotePacket(buffer) {
+  if (buffer.length < 50 || buffer.readUInt8(0) !== QUOTE_PACKET_CODE) return [];
+  const securityId = buffer.readInt32LE(4);
+  const ltp = buffer.readFloatLE(8);
+  const ltq = buffer.readUInt16LE(12);
+  const ltt = buffer.readUInt32LE(14);
+  return [{ symbol: String(securityId), ltp, ltq, timestamp: ltt * 1000 }];
+}
+
+function createDhanFeed({
+  clientId,
+  accessToken,
+  decodeMessage = decodeQuotePacket,
+  WebSocketImpl = WebSocket,
+  scheduler = (fn, ms) => setTimeout(fn, ms),
+  baseUrl = 'wss://api-feed.dhan.co',
+}) {
   const emitter = new EventEmitter();
   let ws = null;
   let reconnectDelay = 1000;
   const MAX_DELAY_MS = 30000;
 
-  async function connect(instrumentKeys) {
-    const feedUrl = await getAuthorizedFeedUrl();
-    ws = new WebSocketImpl(feedUrl);
+  async function connect(instruments) {
+    const url = `${baseUrl}?version=2&token=${accessToken}&clientId=${clientId}&authType=2`;
+    ws = new WebSocketImpl(url);
 
     ws.on('open', () => {
       reconnectDelay = 1000;
       ws.send(JSON.stringify({
-        guid: 'powerbull-pro',
-        method: 'sub',
-        data: { mode: 'full', instrumentKeys },
+        RequestCode: REQUEST_CODE_QUOTE,
+        InstrumentCount: instruments.length,
+        InstrumentList: instruments.map((i) => ({ ExchangeSegment: i.exchangeSegment, SecurityId: i.securityId })),
       }));
       emitter.emit('connected');
     });
@@ -1618,14 +1643,14 @@ function createUpstoxFeed({ getAuthorizedFeedUrl, decodeMessage, WebSocketImpl =
 
     ws.on('close', () => {
       emitter.emit('disconnected');
-      scheduleReconnect(instrumentKeys);
+      scheduleReconnect(instruments);
     });
 
     ws.on('error', (err) => emitter.emit('error', err));
   }
 
-  function scheduleReconnect(instrumentKeys) {
-    scheduler(() => connect(instrumentKeys).catch((err) => emitter.emit('error', err)), reconnectDelay);
+  function scheduleReconnect(instruments) {
+    scheduler(() => connect(instruments).catch((err) => emitter.emit('error', err)), reconnectDelay);
     reconnectDelay = Math.min(reconnectDelay * 2, MAX_DELAY_MS);
   }
 
@@ -1636,19 +1661,19 @@ function createUpstoxFeed({ getAuthorizedFeedUrl, decodeMessage, WebSocketImpl =
   return { connect, close, on: emitter.on.bind(emitter) };
 }
 
-module.exports = { createUpstoxFeed };
+module.exports = { createDhanFeed, decodeQuotePacket };
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `node --test backend/upstoxFeed.test.js`
-Expected: 3 tests pass.
+Run: `node --test backend/dhanFeed.test.js`
+Expected: 5 tests pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/upstoxFeed.js backend/upstoxFeed.test.js
-git commit -m "feat: add Upstox WebSocket feed client with reconnect backoff"
+git add backend/dhanFeed.js backend/dhanFeed.test.js
+git commit -m "feat: add Dhan WebSocket feed client with binary Quote-packet decoding"
 ```
 
 ---
@@ -1906,8 +1931,10 @@ async function loadStatus() {
   const resp = await fetch('/api/status');
   const status = await resp.json();
   const banner = document.getElementById('market-banner');
-  if (!status.tokenValid) {
-    banner.textContent = 'Not logged in to Upstox — go to /auth/login to authenticate.';
+  if (!status.feedConnected) {
+    banner.textContent = status.lastError
+      ? `Dhan feed disconnected (${status.lastError}) — regenerate your token at web.dhan.co, update .env, and restart the server.`
+      : 'Dhan feed not connected — check DHAN_CLIENT_ID/DHAN_ACCESS_TOKEN in .env and restart the server.';
     banner.classList.remove('hidden');
   } else if (!status.marketOpen) {
     banner.textContent = 'Market closed — showing last saved session.';
@@ -2056,51 +2083,22 @@ git commit -m "feat: add per-stock candlestick chart modal with signal markers"
 
 ---
 
-### Task 14: Wire the full backend (server.js, proto, live pipeline) + finish setup docs
+### Task 14: Wire the full backend (server.js, live pipeline)
 
 **Files:**
-- Create: `backend/proto/MarketDataFeed.proto`
 - Create: `backend/server.js`
-- Modify: `docs/upstox-setup.md` (add WebSocket proto step)
 
 **Interfaces:**
 - Consumes every module from Tasks 1-11.
 - Produces: the running application (`npm start`).
 
-- [ ] **Step 1: Get the current MarketDataFeed proto from Upstox**
-
-Upstox's V2 WebSocket feed sends binary protobuf messages. Go to
-https://upstox.com/developer/api-documentation/websocket (Market Data Feed
-section) and copy the **current** `MarketDataFeed.proto` file they publish
-there into `backend/proto/MarketDataFeed.proto`. Do not hand-type this from
-memory — Upstox has changed field names/structure across versions before,
-and a stale schema fails silently (fields decode as `undefined`, not an
-error). Confirm the top-level message name and the `ltpc`/`ltp`/`ltq` field
-names match what's on the page before moving on, and update the field
-references in `server.js` Step 3 below if they differ.
-
-- [ ] **Step 2: Update docs/upstox-setup.md**
-
-Append:
-
-```markdown
-5. WebSocket market data uses protobuf. Copy the current
-   `MarketDataFeed.proto` from
-   https://upstox.com/developer/api-documentation/websocket into
-   `backend/proto/MarketDataFeed.proto` before first run — it is not
-   committed as a placeholder because Upstox updates it independently of
-   this project.
-```
-
-- [ ] **Step 3: Write backend/server.js**
+- [ ] **Step 1: Write backend/server.js**
 
 ```js
 // backend/server.js
 const path = require('node:path');
-const fs = require('node:fs');
 const express = require('express');
 const http = require('node:http');
-const protobuf = require('protobufjs');
 
 const { loadConfig } = require('./config');
 const { isMarketOpen } = require('./marketWindow');
@@ -2108,23 +2106,22 @@ const { openDb, insertSignal } = require('./db');
 const { evaluateSignal, MIN_CANDLES } = require('./signalEngine');
 const { CandleAggregator } = require('./candleAggregator');
 const { checkOpenSignals, closeRemainingOpenSignals } = require('./outcomeTracker');
-const { createAuthRouter, createTokenStore } = require('./auth');
+const { createConnectionStatus } = require('./connectionStatus');
 const { createApiRouter } = require('./api');
 const { createLiveSocketServer } = require('./liveSocket');
-const { createUpstoxFeed } = require('./upstoxFeed');
+const { createDhanFeed } = require('./dhanFeed');
 const { resolveNifty50InstrumentMap } = require('./instrumentMap');
 
 const config = loadConfig();
 const db = openDb();
-const tokenStore = createTokenStore();
+const connectionStatus = createConnectionStatus();
 const aggregator = new CandleAggregator();
 
 const app = express();
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
-app.use('/auth', createAuthRouter({ ...config, tokenStore }));
 app.use('/api', createApiRouter({
   db,
-  tokenStore,
+  connectionStatus,
   isMarketOpenFn: isMarketOpen,
   getCandles: (symbol) => aggregator.getCandles(symbol),
 }));
@@ -2137,48 +2134,20 @@ function todayTradeDate() {
   return ist.toISOString().slice(0, 10);
 }
 
-async function decodeMessage(buffer) {
-  const protoPath = path.join(__dirname, 'proto', 'MarketDataFeed.proto');
-  if (!fs.existsSync(protoPath)) {
-    throw new Error('backend/proto/MarketDataFeed.proto missing — see docs/upstox-setup.md step 5');
-  }
-  const root = await protobuf.load(protoPath);
-  const FeedResponse = root.lookupType('com.upstox.marketdatafeeder.rpc.proto.FeedResponse');
-  const decoded = FeedResponse.decode(buffer);
-  const ticks = [];
-  const feeds = decoded.feeds || {};
-  for (const [instrumentKey, feed] of Object.entries(feeds)) {
-    const ltpc = feed.ltpc || (feed.fullFeed && feed.fullFeed.marketFF && feed.fullFeed.marketFF.ltpc);
-    if (ltpc) {
-      ticks.push({
-        symbol: instrumentKey,
-        ltp: ltpc.ltp,
-        ltq: ltpc.ltq || 0,
-        timestamp: Number(ltpc.ltt) || Date.now(),
-      });
-    }
-  }
-  return ticks;
-}
-
-async function getAuthorizedFeedUrl() {
-  const resp = await fetch('https://api.upstox.com/v2/feed/market-data-feed/authorize', {
-    headers: { Authorization: `Bearer ${tokenStore.get()}` },
-  });
-  const data = await resp.json();
-  return data.data.authorized_redirect_uri;
-}
-
 async function startIngestion() {
   const instrumentMap = await resolveNifty50InstrumentMap();
-  const keyToSymbol = new Map();
-  for (const [symbol, key] of instrumentMap) keyToSymbol.set(key, symbol);
+  const securityIdToSymbol = new Map();
+  for (const [symbol, securityId] of instrumentMap) securityIdToSymbol.set(securityId, symbol);
 
-  const feed = createUpstoxFeed({ getAuthorizedFeedUrl, decodeMessage });
+  const feed = createDhanFeed({ clientId: config.clientId, accessToken: config.accessToken });
+
+  feed.on('connected', () => connectionStatus.setConnected(true));
+  feed.on('disconnected', () => connectionStatus.setConnected(false));
+  feed.on('error', (err) => connectionStatus.setError(err));
 
   feed.on('tick', (tick) => {
     if (!isMarketOpen()) return;
-    const symbol = keyToSymbol.get(tick.symbol) || tick.symbol;
+    const symbol = securityIdToSymbol.get(tick.symbol) || tick.symbol;
     const closedCandle = aggregator.onTick({ ...tick, symbol });
     if (!closedCandle) return;
 
@@ -2196,7 +2165,8 @@ async function startIngestion() {
     broadcast({ type: 'signal', id, symbol, side, price: closedCandle.close, score, candle_time: candleTime, outcome: 'OPEN' });
   });
 
-  await feed.connect([...instrumentMap.values()]);
+  const instruments = [...instrumentMap.values()].map((securityId) => ({ exchangeSegment: 'NSE_EQ', securityId }));
+  await feed.connect(instruments);
 }
 
 setInterval(() => {
@@ -2215,19 +2185,19 @@ httpServer.listen(config.port, () => {
 
 - [ ] **Step 2: Manual end-to-end smoke test (must be run during 9:30-15:30 IST on a trading day)**
 
-1. Follow `docs/upstox-setup.md` fully (app credentials in `.env`, `MarketDataFeed.proto` copied in).
+1. Follow `docs/dhan-setup.md` fully — generate a fresh token at web.dhan.co (it's only valid ~24h), put `DHAN_CLIENT_ID`/`DHAN_ACCESS_TOKEN` in `.env`.
 2. Run: `npm start`
-3. Visit `http://localhost:3000/auth/login`, log into Upstox, confirm redirect back to `/` with the "Not logged in" banner gone.
-4. Confirm the server log shows no ingestion errors and `GET /api/status` (via browser or `curl http://localhost:3000/api/status`) reports `marketOpen: true, tokenValid: true`.
-5. Wait for at least one 5-minute candle boundary; confirm `GET /api/candles/RELIANCE` (or any Nifty50 symbol) returns a non-empty array.
-6. Wait until at least one symbol has ≥21 candles and a real BUY/SELL fires; confirm it appears in the dashboard table, plays the alert sound, and shows a browser notification (grant permission if prompted).
-7. Confirm the fired signal is queryable via `GET /api/signals?date=<today>` and that clicking its row opens the chart modal with a marker at the right time/price.
+3. Confirm the server log shows `Ingestion failed to start` is NOT printed, and `GET /api/status` (browser or `curl http://localhost:3000/api/status`) reports `marketOpen: true, feedConnected: true, lastError: null`.
+4. Wait for at least one 5-minute candle boundary; confirm `GET /api/candles/RELIANCE` (or any Nifty50 symbol) returns a non-empty array.
+5. Wait until at least one symbol has ≥21 candles and a real BUY/SELL fires; confirm it appears in the dashboard table, plays the alert sound, and shows a browser notification (grant permission if prompted).
+6. Confirm the fired signal is queryable via `GET /api/signals?date=<today>` and that clicking its row opens the chart modal with a marker at the right time/price.
+7. If the token expires mid-session (Dhan disconnects with "Access Token is expired"), confirm `/api/status` flips to `feedConnected: false` with that message in `lastError`, and the dashboard banner reflects it.
 8. Run `npm test` once more to confirm nothing broke: all backend unit tests should still pass (these don't depend on live market data).
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add backend/server.js docs/upstox-setup.md
+git add backend/server.js
 git commit -m "feat: wire full ingestion pipeline into server.js"
 ```
 
@@ -2235,6 +2205,6 @@ git commit -m "feat: wire full ingestion pipeline into server.js"
 
 ## Self-Review Notes
 
-- **Spec coverage:** OAuth (Task 8), live WS ingestion (Task 11/14), 5-min candles (Task 5), multi-indicator scoring (Task 3), SQLite + track record (Task 4/6), REST+WS API (Task 9/10), dashboard/counters/table (Task 12), chart+markers (Task 13), alerts (Task 12's `playAlert`), date picker (Task 12), Nifty50 universe resolved live (Task 7), market-window gating (Task 1, used in Task 9/14), disclaimer (Task 12's `index.html`) — all covered.
-- **Known honest gap:** the exact Upstox protobuf schema and NSE CSV response shape can't be pinned down from documentation alone with full certainty at plan-writing time — Tasks 7 and 14 call this out explicitly as manual verification/copy-from-source steps rather than asserting fabricated schema details as fact.
+- **Spec coverage:** Dhan connection status (Task 8), live WS ingestion (Task 11/14), 5-min candles (Task 5), multi-indicator scoring (Task 3), SQLite + track record (Task 4/6), REST+WS API (Task 9/10), dashboard/counters/table (Task 12), chart+markers (Task 13), alerts (Task 12's `playAlert`), date picker (Task 12), Nifty50 universe resolved live (Task 7), market-window gating (Task 1, used in Task 9/14), disclaimer (Task 12's `index.html`) — all covered.
+- **Known honest gap:** the exact NSE Nifty50 CSV response shape (and whether NSE's anti-bot headers still accept `User-Agent: Mozilla/5.0`) can't be pinned down with full certainty at plan-writing time since it's an unofficial endpoint — Task 7 calls this out as a manual-verification step. In contrast, Dhan's wire format (auth URL, subscribe JSON, binary Quote packet layout) is NOT a gap: it was confirmed by downloading the actual `dhanhq` PyPI package and reading its source, and separately by downloading and inspecting the real scrip-master CSV — both are asserted as fact because they were verified, not guessed.
 - **Type consistency checked:** `Candle` shape `{time, open, high, low, close, volume}` is identical across `candleAggregator.js`, `signalEngine.js`, `outcomeTracker.js`, and the frontend chart code. Signal row shape (`symbol, side, price, score, candle_time/candleTime, trade_date/tradeDate, outcome`) matches between `db.js`'s SQL columns, `server.js`'s broadcast payloads, and `frontend/app.js`'s renderers (SQLite returns snake_case columns; `insertSignal`'s JS-facing params are camelCase — both forms appear intentionally, matching which side of the boundary they're on).
