@@ -31,12 +31,13 @@ function renderSignalRow(signal) {
 
 function renderTrackRow(signal) {
   const tr = document.createElement('tr');
+  tr.dataset.id = signal.id;
   tr.innerHTML = `
     <td>${escapeHtml(signal.symbol)}</td>
     <td class="side-${signal.side.toLowerCase()}">${escapeHtml(signal.side)}</td>
     <td>${escapeHtml(signal.price)}</td>
     <td>${escapeHtml(new Date(signal.candle_time).toLocaleTimeString())}</td>
-    <td>${escapeHtml(signal.outcome)}</td>
+    <td class="outcome-cell">${escapeHtml(signal.outcome)}</td>
   `;
   return tr;
 }
@@ -83,6 +84,12 @@ function connectLiveSocket() {
       document.getElementById('signal-rows').appendChild(renderSignalRow(msg));
       document.getElementById('track-rows').appendChild(renderTrackRow(msg));
       playAlert(msg);
+    } else if (msg.type === 'outcome') {
+      const signal = state.signals.find((s) => String(s.id) === String(msg.id));
+      if (signal) signal.outcome = msg.outcome;
+      const row = document.querySelector(`#track-rows tr[data-id="${msg.id}"]`);
+      const cell = row && row.querySelector('.outcome-cell');
+      if (cell) cell.textContent = msg.outcome;
     }
   });
   ws.addEventListener('close', () => setTimeout(connectLiveSocket, 2000));

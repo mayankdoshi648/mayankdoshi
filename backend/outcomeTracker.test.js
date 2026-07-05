@@ -46,3 +46,53 @@ test('closeRemainingOpenSignals marks all open rows EOD_CLOSE', () => {
   assert.equal(getOpenSignals(db, '2026-07-06').length, 0);
   db.close();
 });
+
+test('checkOpenSignals invokes onUpdate with the signal and outcome when a signal closes', () => {
+  const db = openDb(':memory:');
+  const id = insertSignal(db, { symbol: 'TCS', side: 'BUY', price: 100, score: 2, candleTime: 't1', tradeDate: '2026-07-06' });
+  const updates = [];
+  checkOpenSignals(db, 'TCS', { high: 100.6, low: 99.9 }, '2026-07-06', (signal, outcome) => {
+    updates.push({ id: signal.id, symbol: signal.symbol, outcome });
+  });
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].id, id);
+  assert.equal(updates[0].symbol, 'TCS');
+  assert.equal(updates[0].outcome, 'HIT_TARGET');
+  db.close();
+});
+
+test('checkOpenSignals does not invoke onUpdate when a signal stays open', () => {
+  const db = openDb(':memory:');
+  insertSignal(db, { symbol: 'TCS', side: 'BUY', price: 100, score: 2, candleTime: 't1', tradeDate: '2026-07-06' });
+  const updates = [];
+  checkOpenSignals(db, 'TCS', { high: 100.2, low: 99.8 }, '2026-07-06', (signal, outcome) => updates.push(outcome));
+  assert.equal(updates.length, 0);
+  db.close();
+});
+
+test('checkOpenSignals works without an onUpdate callback (backward compatible)', () => {
+  const db = openDb(':memory:');
+  insertSignal(db, { symbol: 'TCS', side: 'BUY', price: 100, score: 2, candleTime: 't1', tradeDate: '2026-07-06' });
+  assert.doesNotThrow(() => checkOpenSignals(db, 'TCS', { high: 100.6, low: 99.9 }, '2026-07-06'));
+  db.close();
+});
+
+test('closeRemainingOpenSignals invokes onUpdate with EOD_CLOSE for each closed row', () => {
+  const db = openDb(':memory:');
+  const id = insertSignal(db, { symbol: 'TCS', side: 'BUY', price: 100, score: 2, candleTime: 't1', tradeDate: '2026-07-06' });
+  const updates = [];
+  closeRemainingOpenSignals(db, '2026-07-06', (signal, outcome) => {
+    updates.push({ id: signal.id, outcome });
+  });
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].id, id);
+  assert.equal(updates[0].outcome, 'EOD_CLOSE');
+  db.close();
+});
+
+test('closeRemainingOpenSignals works without an onUpdate callback (backward compatible)', () => {
+  const db = openDb(':memory:');
+  insertSignal(db, { symbol: 'TCS', side: 'BUY', price: 100, score: 2, candleTime: 't1', tradeDate: '2026-07-06' });
+  assert.doesNotThrow(() => closeRemainingOpenSignals(db, '2026-07-06'));
+  db.close();
+});

@@ -54,7 +54,9 @@ async function startIngestion() {
     const closedCandle = aggregator.onTick({ ...tick, symbol });
     if (!closedCandle) return;
 
-    checkOpenSignals(db, symbol, closedCandle, todayTradeDate());
+    checkOpenSignals(db, symbol, closedCandle, todayTradeDate(), (signal, outcome) => {
+      broadcast({ type: 'outcome', id: signal.id, symbol: signal.symbol, outcome });
+    });
     broadcast({ type: 'candle', symbol, candle: closedCandle });
 
     const candles = aggregator.getCandles(symbol);
@@ -73,7 +75,11 @@ async function startIngestion() {
 }
 
 setInterval(() => {
-  if (!isMarketOpen()) closeRemainingOpenSignals(db, todayTradeDate());
+  if (!isMarketOpen()) {
+    closeRemainingOpenSignals(db, todayTradeDate(), (signal, outcome) => {
+      broadcast({ type: 'outcome', id: signal.id, symbol: signal.symbol, outcome });
+    });
+  }
 }, 5 * 60 * 1000);
 
 httpServer.listen(config.port, () => {
