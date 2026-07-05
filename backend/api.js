@@ -14,7 +14,7 @@ function createApiRouter({ db, connectionStatus, isMarketOpenFn, getCandles }) {
   });
 
   router.get('/signals', (req, res) => {
-    const date = req.query.date || new Date().toISOString().slice(0, 10);
+    const date = req.query.date || new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
     res.json(getSignalsByDate(db, date));
   });
 

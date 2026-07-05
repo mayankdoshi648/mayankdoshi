@@ -54,6 +54,27 @@ test('GET /api/signals?date= returns rows for that date', async () => {
   db.close();
 });
 
+test('GET /api/signals without date param returns rows for today (IST)', async () => {
+  const db = openDb(':memory:');
+  const istDate = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  insertSignal(db, { symbol: 'INFY', side: 'SELL', price: 50, score: 3, candleTime: 't2', tradeDate: istDate });
+  const router = createApiRouter({
+    db,
+    connectionStatus: { isConnected: () => true, getLastError: () => null },
+    isMarketOpenFn: () => true,
+    getCandles: () => [],
+  });
+  const { server, port } = await startTestServer(router);
+
+  const resp = await fetch(`http://localhost:${port}/api/signals`);
+  const body = await resp.json();
+  assert.equal(body.length, 1);
+  assert.equal(body[0].symbol, 'INFY');
+
+  await new Promise((resolve) => server.close(resolve));
+  db.close();
+});
+
 test('GET /api/candles/:symbol delegates to getCandles', async () => {
   const db = openDb(':memory:');
   const router = createApiRouter({
