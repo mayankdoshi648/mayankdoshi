@@ -80,7 +80,7 @@ powerbull-pro/
 **Interfaces:**
 - Produces: `isMarketOpen(date = new Date()): boolean` — used by `api.js`, `server.js` to gate live ingestion.
 
-- [ ] **Step 1: Write package.json**
+- [x] **Step 1: Write package.json**
 
 ```json
 {
@@ -103,7 +103,7 @@ powerbull-pro/
 }
 ```
 
-- [ ] **Step 2: Write .gitignore**
+- [x] **Step 2: Write .gitignore**
 
 ```
 node_modules/
@@ -114,7 +114,7 @@ data/*.db-wal
 data/*.db-shm
 ```
 
-- [ ] **Step 3: Write .env.example**
+- [x] **Step 3: Write .env.example**
 
 ```
 DHAN_CLIENT_ID=
@@ -122,12 +122,12 @@ DHAN_ACCESS_TOKEN=
 PORT=3000
 ```
 
-- [ ] **Step 4: Install dependencies**
+- [x] **Step 4: Install dependencies**
 
 Run: `npm install`
 Expected: `node_modules/` created, no errors.
 
-- [ ] **Step 5: Write the failing test**
+- [x] **Step 5: Write the failing test**
 
 ```js
 // backend/marketWindow.test.js
@@ -161,12 +161,12 @@ test('closed on Saturday even during market hours', () => {
 });
 ```
 
-- [ ] **Step 6: Run test to verify it fails**
+- [x] **Step 6: Run test to verify it fails**
 
 Run: `node --test backend/marketWindow.test.js`
 Expected: FAIL — `Cannot find module './marketWindow'`
 
-- [ ] **Step 7: Write minimal implementation**
+- [x] **Step 7: Write minimal implementation**
 
 ```js
 // backend/marketWindow.js
@@ -185,12 +185,12 @@ function isMarketOpen(date = new Date()) {
 module.exports = { isMarketOpen, IST_OFFSET_MS };
 ```
 
-- [ ] **Step 8: Run test to verify it passes**
+- [x] **Step 8: Run test to verify it passes**
 
 Run: `node --test backend/marketWindow.test.js`
 Expected: 5 tests pass.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add package.json .gitignore .env.example backend/marketWindow.js backend/marketWindow.test.js
@@ -212,7 +212,7 @@ git commit -m "chore: scaffold project, add market-window utility"
 - Produces: `isVolumeSpike(volumes: number[], index: number, period = 20, multiplier = 1.5): boolean`
 - Consumed by: `signalEngine.js` (Task 3).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 // backend/indicators.test.js
@@ -264,12 +264,12 @@ test('isVolumeSpike is false before enough history', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `node --test backend/indicators.test.js`
 Expected: FAIL — `Cannot find module './indicators'`
 
-- [ ] **Step 3: Write implementation**
+- [x] **Step 3: Write implementation**
 
 ```js
 // backend/indicators.js
@@ -344,12 +344,12 @@ function isVolumeSpike(volumes, index, period = 20, multiplier = 1.5) {
 module.exports = { computeEMA, computeRSI, computeSessionVWAP, isVolumeSpike };
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `node --test backend/indicators.test.js`
 Expected: 6 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/indicators.js backend/indicators.test.js
@@ -370,7 +370,7 @@ git commit -m "feat: add EMA/RSI/VWAP/volume-spike indicator math"
 - Produces: `evaluateSignal(candles: {open,high,low,close,volume}[]): { side: 'BUY'|'SELL'|'NEUTRAL', score: number }` — consumed by `server.js` ingestion pipeline (Task 10).
 - Produces: `MIN_CANDLES` (= 21) — the warmup threshold.
 
-- [ ] **Step 1: Write the fixture file**
+- [x] **Step 1: Write the fixture file**
 
 ```json
 {
@@ -458,7 +458,7 @@ git commit -m "feat: add EMA/RSI/VWAP/volume-spike indicator math"
 }
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 ```js
 // backend/signalEngine.test.js
@@ -496,12 +496,12 @@ test('flat price scenario stays NEUTRAL', () => {
 });
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run: `node --test backend/signalEngine.test.js`
 Expected: FAIL — `Cannot find module './signalEngine'`
 
-- [ ] **Step 4: Write implementation**
+- [x] **Step 4: Write implementation**
 
 ```js
 // backend/signalEngine.js
@@ -563,12 +563,12 @@ function evaluateSignal(candles) {
 module.exports = { evaluateSignal, MIN_CANDLES };
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `node --test backend/signalEngine.test.js`
 Expected: 4 tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/signalEngine.js backend/signalEngine.test.js backend/test/fixtures/sample-candles.json
@@ -591,7 +591,7 @@ git commit -m "feat: add multi-indicator signal scoring engine"
 - Produces: `updateOutcome(db, id: number, outcome: string): void`
 - Consumed by: `api.js` (Task 9), `outcomeTracker.js` (Task 6), `server.js` (Task 10).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // backend/db.test.js
@@ -634,12 +634,12 @@ test('getSignalsByDate is scoped to the given date', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test backend/db.test.js`
 Expected: FAIL — `Cannot find module './db'`
 
-- [ ] **Step 3: Write implementation**
+- [x] **Step 3: Write implementation**
 
 ```js
 // backend/db.js
@@ -690,12 +690,12 @@ function updateOutcome(db, id, outcome) {
 module.exports = { openDb, insertSignal, getSignalsByDate, getOpenSignals, updateOutcome };
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test backend/db.test.js`
 Expected: 3 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/db.js backend/db.test.js
@@ -715,7 +715,7 @@ git commit -m "feat: add SQLite persistence for signals"
 - `Candle` shape: `{time, open, high, low, close, volume}`.
 - Consumed by: `server.js` ingestion pipeline (Task 10).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // backend/candleAggregator.test.js
@@ -774,12 +774,12 @@ test('reset clears all state', () => {
 
 Note the deliberately convoluted assertion in test 2 (`closed.close`) resolves to `98` either way — it exists to document that the closed candle's `close` is the **last tick of the finished bucket**, not the tick that triggered rollover.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test backend/candleAggregator.test.js`
 Expected: FAIL — `Cannot find module './candleAggregator'`
 
-- [ ] **Step 3: Write implementation**
+- [x] **Step 3: Write implementation**
 
 ```js
 // backend/candleAggregator.js
@@ -847,12 +847,12 @@ class CandleAggregator {
 module.exports = { CandleAggregator, BUCKET_MS };
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test backend/candleAggregator.test.js`
 Expected: 5 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/candleAggregator.js backend/candleAggregator.test.js
@@ -875,7 +875,7 @@ git commit -m "feat: add tick-to-5min-candle aggregator"
 - Produces: `TARGET_PCT` (0.005), `STOPLOSS_PCT` (0.003)
 - Consumed by: `server.js` ingestion pipeline (Task 10).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // backend/outcomeTracker.test.js
@@ -929,12 +929,12 @@ test('closeRemainingOpenSignals marks all open rows EOD_CLOSE', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test backend/outcomeTracker.test.js`
 Expected: FAIL — `Cannot find module './outcomeTracker'`
 
-- [ ] **Step 3: Write implementation**
+- [x] **Step 3: Write implementation**
 
 ```js
 // backend/outcomeTracker.js
@@ -974,12 +974,12 @@ function closeRemainingOpenSignals(db, tradeDate) {
 module.exports = { evaluateOutcome, checkOpenSignals, closeRemainingOpenSignals, TARGET_PCT, STOPLOSS_PCT };
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test backend/outcomeTracker.test.js`
 Expected: 7 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/outcomeTracker.js backend/outcomeTracker.test.js
@@ -1004,7 +1004,7 @@ git commit -m "feat: add target/stoploss outcome tracking for signals"
 
 **Ground truth for the CSV format:** the column names and NSE-equity filter below (`SEM_EXM_EXCH_ID='NSE'`, `SEM_SEGMENT='E'`, `SEM_SERIES='EQ'`) were confirmed by downloading the real file (`curl https://images.dhan.co/api-data/api-scrip-master.csv`) and inspecting its header and matching rows (e.g. `NSE,E,2885,EQUITY,0,RELIANCE,...,EQ,RELIANCE INDUSTRIES LTD`) — not guessed from prose docs. The file has no quoted/escaped commas, so a plain `split(',')` per line is safe.
 
-- [ ] **Step 1: Write config.js**
+- [x] **Step 1: Write config.js**
 
 ```js
 // backend/config.js
@@ -1026,7 +1026,7 @@ function loadConfig() {
 module.exports = { loadConfig };
 ```
 
-- [ ] **Step 2: Write instrumentMap.js**
+- [x] **Step 2: Write instrumentMap.js**
 
 ```js
 // backend/instrumentMap.js
@@ -1086,7 +1086,7 @@ This function depends on two live external endpoints, so it isn't unit-tested wi
 Run: `node -e "require('./backend/instrumentMap').resolveNifty50InstrumentMap().then(m => console.log(m.size, [...m.entries()].slice(0,3)))"`
 Expected: prints a number close to 50 and a few `[symbol, securityId]` pairs (e.g. `['RELIANCE', '2885']`). If the NSE CSV URL 403s (NSE occasionally blocks non-browser user agents), note the working URL/headers in `docs/dhan-setup.md` and adjust `NIFTY50_CSV_URL`/headers accordingly — this is exactly the kind of drift the live-fetch approach is meant to survive without a code change to a hardcoded list. If Dhan's CSV column names have changed since this plan was written, `parseDhanScripMaster`'s `header.indexOf(...)` calls will return `-1` and every row will be skipped (map ends up empty) rather than crashing — check the CSV's actual header row against the names above if that happens.
 
-- [ ] **Step 4: Write docs/dhan-setup.md**
+- [x] **Step 4: Write docs/dhan-setup.md**
 
 ```markdown
 # Dhan Setup
@@ -1104,7 +1104,7 @@ it's a single-user personal app.
    (`npm start`) before 9:30 IST — there is no in-app refresh flow.
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/config.js backend/instrumentMap.js docs/dhan-setup.md
@@ -1125,7 +1125,7 @@ git commit -m "feat: add config loader and live Nifty50 instrument resolution vi
 
 **Why this replaces an OAuth token store:** Dhan auth for this app is a single manually-generated 24-hour token pasted into `.env` (see Task 7) — there is no in-app login/callback flow to track a token through. What the app actually needs to know is "is the live feed connected right now," which the feed's own connection events answer directly; a disconnect with reason "Access Token is expired" (Dhan's server-side code 807) surfaces to the user as the same "not connected" state as any other disconnect, with the last error message shown for context.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // backend/connectionStatus.test.js
@@ -1170,12 +1170,12 @@ test('setError(null) clears the error', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test backend/connectionStatus.test.js`
 Expected: FAIL — `Cannot find module './connectionStatus'`
 
-- [ ] **Step 3: Write implementation**
+- [x] **Step 3: Write implementation**
 
 ```js
 // backend/connectionStatus.js
@@ -1207,12 +1207,12 @@ function createConnectionStatus() {
 module.exports = { createConnectionStatus };
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test backend/connectionStatus.test.js`
 Expected: 5 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/connectionStatus.js backend/connectionStatus.test.js
@@ -1232,7 +1232,7 @@ git commit -m "feat: add Dhan feed connection status tracker"
 - Produces: `createApiRouter({db, connectionStatus, isMarketOpenFn, getCandles}): express.Router` — mounts `GET /status`, `GET /signals?date=`, `GET /candles/:symbol`.
 - Consumed by: `server.js` (Task 14).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // backend/api.test.js
@@ -1311,12 +1311,12 @@ test('GET /api/candles/:symbol delegates to getCandles', async () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test backend/api.test.js`
 Expected: FAIL — `Cannot find module './api'`
 
-- [ ] **Step 3: Write implementation**
+- [x] **Step 3: Write implementation**
 
 ```js
 // backend/api.js
@@ -1349,12 +1349,12 @@ function createApiRouter({ db, connectionStatus, isMarketOpenFn, getCandles }) {
 module.exports = { createApiRouter };
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test backend/api.test.js`
 Expected: 3 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/api.js backend/api.test.js
@@ -1373,7 +1373,7 @@ git commit -m "feat: add REST API for status/signals/candles"
 - Produces: `createLiveSocketServer(httpServer, path = '/live'): {wss, broadcast(event: object): void}`
 - Consumed by: `server.js` (Task 11), `frontend/app.js` (Task 12).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // backend/liveSocket.test.js
@@ -1409,12 +1409,12 @@ test('broadcast delivers JSON events to connected clients', async () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test backend/liveSocket.test.js`
 Expected: FAIL — `Cannot find module './liveSocket'`
 
-- [ ] **Step 3: Write implementation**
+- [x] **Step 3: Write implementation**
 
 ```js
 // backend/liveSocket.js
@@ -1436,12 +1436,12 @@ function createLiveSocketServer(httpServer, path = '/live') {
 module.exports = { createLiveSocketServer };
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test backend/liveSocket.test.js`
 Expected: 1 test passes.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/liveSocket.js backend/liveSocket.test.js
@@ -1466,7 +1466,7 @@ git commit -m "feat: add WebSocket broadcast server for live dashboard updates"
 - Subscribe message (JSON, sent as a text WS frame): `{"RequestCode": 17, "InstrumentCount": N, "InstrumentList": [{"ExchangeSegment": "NSE_EQ", "SecurityId": "2885"}, ...]}`. `RequestCode: 17` is Quote mode — chosen over Ticker (`15`, no traded quantity) because the candle aggregator (Task 5) needs `ltq` (last traded quantity) for its volume field. Dhan caps each subscribe message at 100 instruments; since the Global Constraints fix the universe at Nifty 50 (50 symbols), a single message always suffices — no batching loop needed.
 - Response packets are binary, little-endian, first byte = packet type. Quote packets have type byte `4` and are exactly 50 bytes, laid out as (offset, size, field): `0,1,code` `1,2,messageLength` `3,1,exchangeSegment` `4,4,securityId(int32)` `8,4,LTP(float32)` `12,2,LTQ(uint16)` `14,4,LTT(uint32, epoch seconds)` `18,4,avgPrice(float32)` `22,4,volume(uint32)` `26,4,totalSellQty` `30,4,totalBuyQty` `34,4,open` `38,4,close` `42,4,high` `46,4,low`. This app only needs `securityId`, `LTP`, `LTQ`, and `LTT` — the rest of the Quote packet is ignored.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // backend/dhanFeed.test.js
@@ -1585,12 +1585,12 @@ test('on close, schedules a reconnect with increasing backoff', async () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test backend/dhanFeed.test.js`
 Expected: FAIL — `Cannot find module './dhanFeed'`
 
-- [ ] **Step 3: Write implementation**
+- [x] **Step 3: Write implementation**
 
 ```js
 // backend/dhanFeed.js
@@ -1667,12 +1667,12 @@ function createDhanFeed({
 module.exports = { createDhanFeed, decodeQuotePacket };
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test backend/dhanFeed.test.js`
 Expected: 5 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/dhanFeed.js backend/dhanFeed.test.js
@@ -1692,7 +1692,7 @@ git commit -m "feat: add Dhan WebSocket feed client with binary Quote-packet dec
 - Consumes: `GET /api/status`, `GET /api/signals?date=`, `WS /live` (all from Tasks 9-10).
 - Produces: global `renderSignalRow(signal)`, `updateCounters(signals)` functions in `app.js`, reused by Task 13.
 
-- [ ] **Step 1: Write frontend/index.html**
+- [x] **Step 1: Write frontend/index.html**
 
 ```html
 <!DOCTYPE html>
@@ -1755,7 +1755,7 @@ git commit -m "feat: add Dhan WebSocket feed client with binary Quote-packet dec
 </html>
 ```
 
-- [ ] **Step 2: Write frontend/style.css**
+- [x] **Step 2: Write frontend/style.css**
 
 ```css
 :root {
@@ -1879,7 +1879,7 @@ body {
 }
 ```
 
-- [ ] **Step 3: Write frontend/app.js**
+- [x] **Step 3: Write frontend/app.js**
 
 ```js
 // frontend/app.js
@@ -2019,7 +2019,7 @@ node -e "require('http').createServer(require('serve-handler')).listen(5000)" 2>
 
 Open `http://localhost:5000` and confirm: header/branding renders, counters show 0/0/0, tabs switch between Live/Track views, no console errors (WS connection error is expected — backend isn't running yet).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/index.html frontend/style.css frontend/app.js
@@ -2037,7 +2037,7 @@ git commit -m "feat: add dashboard skeleton with counters, table, and live WS cl
 - Consumes: `GET /api/candles/:symbol` (Task 9), Chart.js + chartjs-chart-financial (loaded via CDN in Task 12's `index.html`).
 - Produces: `openChartModal(symbol)`, called from `renderSignalRow`'s click handler (Task 12).
 
-- [ ] **Step 1: Append chart modal logic to frontend/app.js**
+- [x] **Step 1: Append chart modal logic to frontend/app.js**
 
 ```js
 // --- appended to frontend/app.js ---
@@ -2096,7 +2096,7 @@ document.getElementById('chart-close').addEventListener('click', () => {
 
 Serve `frontend/` (as in Task 12 Step 4). Temporarily stub `/api/candles/:symbol` in a scratch script or wait for Task 14's real backend, then: click a row in the signal table, confirm the modal opens with a candlestick chart and, if that symbol has signals loaded, triangle/rect markers at the signal price/time.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/app.js
@@ -2114,7 +2114,7 @@ git commit -m "feat: add per-stock candlestick chart modal with signal markers"
 - Consumes every module from Tasks 1-11.
 - Produces: the running application (`npm start`).
 
-- [ ] **Step 1: Write backend/server.js**
+- [x] **Step 1: Write backend/server.js**
 
 ```js
 // backend/server.js
@@ -2216,7 +2216,7 @@ httpServer.listen(config.port, () => {
 7. If the token expires mid-session (Dhan disconnects with "Access Token is expired"), confirm `/api/status` flips to `feedConnected: false` with that message in `lastError`, and the dashboard banner reflects it.
 8. Run `npm test` once more to confirm nothing broke: all backend unit tests should still pass (these don't depend on live market data).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add backend/server.js
