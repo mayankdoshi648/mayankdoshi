@@ -14,6 +14,7 @@ const { createApiRouter } = require('./api');
 const { createLiveSocketServer } = require('./liveSocket');
 const { createDhanFeed } = require('./dhanFeed');
 const { resolveNifty50InstrumentMap } = require('./instrumentMap');
+const { fetchAccessToken } = require('./dhanAuth');
 
 const config = loadConfig();
 const db = openDb();
@@ -38,11 +39,13 @@ function todayTradeDate() {
 }
 
 async function startIngestion() {
+  const { accessToken } = await fetchAccessToken(config);
+
   const instrumentMap = await resolveNifty50InstrumentMap();
   const securityIdToSymbol = new Map();
   for (const [symbol, securityId] of instrumentMap) securityIdToSymbol.set(securityId, symbol);
 
-  const feed = createDhanFeed({ clientId: config.clientId, accessToken: config.accessToken });
+  const feed = createDhanFeed({ clientId: config.clientId, accessToken });
 
   feed.on('connected', () => connectionStatus.setConnected(true));
   feed.on('disconnected', () => connectionStatus.setConnected(false));
@@ -85,7 +88,10 @@ setInterval(() => {
 httpServer.listen(config.port, () => {
   console.log(`PowerBull Pro listening on http://localhost:${config.port}`);
   if (isMarketOpen()) {
-    startIngestion().catch((err) => console.error('Ingestion failed to start:', err));
+    startIngestion().catch((err) => {
+      connectionStatus.setError(err);
+      console.error('Ingestion failed to start:', err);
+    });
   } else {
     console.log('Market closed — ingestion will not start until 9:30 IST on a trading day. Restart the server during market hours.');
   }
