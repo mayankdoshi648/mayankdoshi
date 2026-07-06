@@ -63,8 +63,8 @@ async function loadStatus() {
   const banner = document.getElementById('market-banner');
   if (!status.feedConnected) {
     banner.textContent = status.lastError
-      ? `Dhan feed disconnected (${status.lastError}) — regenerate your token at web.dhan.co, update .env, and restart the server.`
-      : 'Dhan feed not connected — check DHAN_CLIENT_ID/DHAN_ACCESS_TOKEN in .env and restart the server.';
+      ? `Dhan feed disconnected (${status.lastError}) — check DHAN_CLIENT_ID/DHAN_PIN/DHAN_TOTP_SECRET in .env and restart the server.`
+      : 'Dhan feed not connected — check DHAN_CLIENT_ID/DHAN_PIN/DHAN_TOTP_SECRET in .env and restart the server.';
     banner.classList.remove('hidden');
   } else if (!status.marketOpen) {
     banner.textContent = 'Market closed — showing last saved session.';
