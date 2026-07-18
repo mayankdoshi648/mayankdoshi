@@ -36,19 +36,32 @@ chart the EA is attached to.
 One position at a time; every rule above is an input so the numbers can
 be changed later without touching code.
 
+## Files
+
+- `XAUUSD_RenkoSupertrend_EA.mq5` — the EA source. MT5 compiles this to
+  the executable `.ex5` with one keystroke (step 2 below); the `.ex5`
+  cannot be shipped pre-built because only MetaEditor produces it.
+- `XAUUSD_RenkoSupertrend_EA.set` — preset with all default inputs
+  (box $1, Supertrend 7/3.1, slippage $1, SL $6, BE +$3, trail $2/$1)
+  plus sensible optimizer ranges for the Strategy Tester.
+
 ## Installation on XM Global MT5
 
 1. Open MT5 → **File → Open Data Folder** → `MQL5/Experts/` and copy
-   `XAUUSD_RenkoSupertrend_EA.mq5` there.
+   `XAUUSD_RenkoSupertrend_EA.mq5` there. Copy
+   `XAUUSD_RenkoSupertrend_EA.set` to `MQL5/Presets/` in the same data
+   folder.
 2. In MetaEditor (F4) open the file and **Compile** (F7) — it should
-   compile with 0 errors.
+   compile with 0 errors. This creates `XAUUSD_RenkoSupertrend_EA.ex5`,
+   the runnable EA, next to the source file.
 3. In MT5 enable **Tools → Options → Expert Advisors → Allow algorithmic
    trading** (and the *Algo Trading* toolbar button).
 4. Open an **XAUUSD** chart. Timeframe **M1** (the EA warms up from M1
    history; the Renko logic itself is tick-driven, so the chart
    timeframe does not change the strategy).
-5. Drag the EA onto the chart, review the inputs, tick *Allow Algo
-   Trading*, and click OK.
+5. Drag the EA onto the chart. In the **Inputs** tab click **Load** and
+   pick `XAUUSD_RenkoSupertrend_EA.set` to apply the preset, tick
+   *Allow Algo Trading*, and click OK.
 6. Optional, for a cleaner Renko view: right-click the chart →
    Properties → set candles/bars to "Line chart" with the line colour
    equal to the background, so only the drawn Renko bricks are visible.

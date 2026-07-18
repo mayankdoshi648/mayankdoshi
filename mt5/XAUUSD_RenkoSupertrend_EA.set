@@ -1,0 +1,24 @@
+; XAUUSD Renko + Supertrend EA - default preset (XM Global MT5)
+; Load via: EA Inputs tab -> Load  (live chart)  or  Strategy Tester -> Inputs -> Load
+; The ||start||step||stop||Y/N suffix is only used by the Strategy Tester optimizer.
+;
+InpBoxSize=1.0||0.5||0.1||3.0||N
+InpWarmupM1Bars=3000||1000||500||5000||N
+InpAtrPeriod=7||5||1||21||N
+InpAtrMultiplier=3.1||1.5||0.1||5.0||N
+InpLots=0.01||0.01||0.01||1.0||N
+InpMaxSlippage=1.0||0.5||0.25||2.0||N
+InpMaxStopLoss=6.0||3.0||0.5||10.0||N
+InpBreakevenMove=3.0||1.0||0.5||6.0||N
+InpTrailStep=2.0||1.0||0.5||4.0||N
+InpTrailAmount=1.0||0.5||0.25||2.0||N
+InpMagic=20260718
+InpDrawBricks=true
+InpDrawSupertrend=true
+InpMaxBricksDrawn=300||100||50||500||N
+InpBullBrickColor=3329330
+InpBearBrickColor=4678655
+InpStUpColor=65280
+InpStDownColor=255
+InpEntryLineColor=65535
+InpSlLineColor=17919
