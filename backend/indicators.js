@@ -66,4 +66,69 @@ function isVolumeSpike(volumes, index, period = 20, multiplier = 1.5) {
   return avg > 0 && volumes[index] > avg * multiplier;
 }
 
-module.exports = { computeEMA, computeRSI, computeSessionVWAP, isVolumeSpike };
+function computeSMA(values, period) {
+  const result = new Array(values.length).fill(null);
+  if (values.length < period) return result;
+  let sum = 0;
+  for (let i = 0; i < period; i++) sum += values[i];
+  result[period - 1] = sum / period;
+  for (let i = period; i < values.length; i++) {
+    sum += values[i] - values[i - period];
+    result[i] = sum / period;
+  }
+  return result;
+}
+
+function computeATR(candles, period = 14) {
+  const result = new Array(candles.length).fill(null);
+  if (candles.length <= period) return result;
+  const trs = [];
+  for (let i = 0; i < candles.length; i++) {
+    if (i === 0) {
+      trs.push(candles[i].high - candles[i].low);
+    } else {
+      const hl = candles[i].high - candles[i].low;
+      const hc = Math.abs(candles[i].high - candles[i - 1].close);
+      const lc = Math.abs(candles[i].low - candles[i - 1].close);
+      trs.push(Math.max(hl, hc, lc));
+    }
+  }
+  let sum = 0;
+  for (let i = 0; i < period; i++) sum += trs[i];
+  result[period - 1] = sum / period;
+  for (let i = period; i < trs.length; i++) {
+    result[i] = (result[i - 1] * (period - 1) + trs[i]) / period;
+  }
+  return result;
+}
+
+function rollingMax(values, period) {
+  const result = new Array(values.length).fill(null);
+  for (let i = period - 1; i < values.length; i++) {
+    let max = values[i - period + 1];
+    for (let j = i - period + 2; j <= i; j++) max = Math.max(max, values[j]);
+    result[i] = max;
+  }
+  return result;
+}
+
+function rollingMin(values, period) {
+  const result = new Array(values.length).fill(null);
+  for (let i = period - 1; i < values.length; i++) {
+    let min = values[i - period + 1];
+    for (let j = i - period + 2; j <= i; j++) min = Math.min(min, values[j]);
+    result[i] = min;
+  }
+  return result;
+}
+
+module.exports = {
+  computeEMA,
+  computeRSI,
+  computeSessionVWAP,
+  isVolumeSpike,
+  computeSMA,
+  computeATR,
+  rollingMax,
+  rollingMin,
+};

@@ -12,6 +12,11 @@ function loadConfig() {
     pin: process.env.DHAN_PIN,
     totpSecret: process.env.DHAN_TOTP_SECRET,
     port: Number(process.env.PORT || 3000),
+    darvaxAutoTrade: process.env.DARVAX_AUTO_TRADE === 'true',
+    darvaxRiskPct: Number(process.env.DARVAX_RISK_PCT || 1),
+    darvaxCapital: Number(process.env.DARVAX_CAPITAL || 1000000),
+    darvaxMinScore: Number(process.env.DARVAX_MIN_SCORE || 70),
+    darvaxStyle: process.env.DARVAX_STYLE || 'swing',
   };
 }
 

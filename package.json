@@ -5,7 +5,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node backend/server.js",
-    "test": "node --test backend/**/*.test.js"
+    "test": "node --test backend/**/*.test.js",
+    "darvax:scan": "node scripts/darvax-scan.js"
   },
   "engines": {
     "node": ">=22.5.0"

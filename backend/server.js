@@ -28,6 +28,7 @@ app.use('/api', createApiRouter({
   connectionStatus,
   isMarketOpenFn: isMarketOpen,
   getCandles: (symbol) => aggregator.getCandles(symbol),
+  config,
 }));
 
 const httpServer = http.createServer(app);
