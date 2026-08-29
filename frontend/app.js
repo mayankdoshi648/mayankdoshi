@@ -331,17 +331,35 @@ document.getElementById('darvax-market').addEventListener('change', loadDarvaxSc
 document.getElementById('darvax-min-score').addEventListener('change', loadDarvaxScans);
 document.getElementById('darvax-run-scan').addEventListener('click', async () => {
   const statusEl = document.getElementById('darvax-status');
-  statusEl.textContent = 'Running scan (NSE + US)... this may take several minutes.';
+  statusEl.textContent = 'Running scan (Nifty 500 + S&P 500)... this may take ~20 min.';
   document.getElementById('darvax-run-scan').disabled = true;
   try {
     const resp = await fetch('/api/darvax/scan', { method: 'POST' });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
-    statusEl.textContent = `Scan done: NSE ${data.nse.count}, US ${data.us.count}`;
+    const obs = data.obsidian ? ` | Obsidian: ${data.obsidian.exportedCount} notes` : '';
+    statusEl.textContent = `Scan done: NSE ${data.nse.count} [${data.nse.dataSource}], US ${data.us.count} [${data.us.dataSource}]${obs}`;
     loadDarvaxScans();
   } catch (err) {
     statusEl.textContent = `Scan failed: ${err.message}`;
   } finally {
     document.getElementById('darvax-run-scan').disabled = false;
+  }
+});
+
+document.getElementById('darvax-export-obsidian').addEventListener('click', async () => {
+  const statusEl = document.getElementById('darvax-status');
+  statusEl.textContent = 'Exporting to Obsidian...';
+  try {
+    const resp = await fetch('/api/darvax/export-obsidian', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: state.date }),
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    statusEl.textContent = `Obsidian: ${data.exportedCount} stock notes → ${data.dailyPath}`;
+  } catch (err) {
+    statusEl.textContent = `Export failed: ${err.message}`;
   }
 });

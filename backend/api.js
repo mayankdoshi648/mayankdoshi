@@ -9,10 +9,11 @@ const {
   updateOrderStatus,
   saveDarvaxScanResults,
 } = require('./db');
-const { runFullScan } = require('./darvaxScanner');
+const { runFullScan, loadUniverse } = require('./darvaxScanner');
 const { fetchAccessToken } = require('./dhanAuth');
 const { placeDhanOrder, calcPositionSize } = require('./dhanOrders');
-const { resolveNifty50InstrumentMap } = require('./instrumentMap');
+const { resolveNseInstrumentMap } = require('./instrumentMap');
+const { exportFromDb } = require('./obsidianExport');
 
 function createApiRouter({
   db,
@@ -51,17 +52,51 @@ function createApiRouter({
 
   router.post('/darvax/scan', async (req, res) => {
     try {
-      const full = await runFullScan({ style: config?.darvaxStyle || 'swing' });
+      const full = await runFullScan({
+        style: config?.darvaxStyle || 'swing',
+        config,
+        obsidianVaultPath: config?.obsidianVaultPath || null,
+        obsidianMinScore: config?.obsidianMinScore ?? 55,
+      });
       const scanDate = full.scannedAt.slice(0, 10);
       saveDarvaxScanResults(db, scanDate, 'NSE', full.nse.results);
       saveDarvaxScanResults(db, scanDate, 'US', full.us.results);
       res.json({
         scanDate,
-        nse: { count: full.nse.results.length, errors: full.nse.errors.length },
-        us: { count: full.us.results.length, errors: full.us.errors.length },
+        nse: {
+          count: full.nse.results.length,
+          errors: full.nse.errors.length,
+          dataSource: full.nse.dataSource,
+        },
+        us: {
+          count: full.us.results.length,
+          errors: full.us.errors.length,
+          dataSource: full.us.dataSource,
+        },
+        obsidian: full.obsidian,
         topNse: full.nse.results.filter((r) => r.qualifies).slice(0, 10),
         topUs: full.us.results.filter((r) => r.qualifies).slice(0, 10),
       });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/darvax/export-obsidian', (req, res) => {
+    const vaultPath = req.body.vaultPath || config?.obsidianVaultPath;
+    if (!vaultPath) {
+      return res.status(400).json({ error: 'Set OBSIDIAN_VAULT_PATH in .env or pass vaultPath in body' });
+    }
+    try {
+      const scanDate = req.body.date || new Date().toISOString().slice(0, 10);
+      const minScore = Number(req.body.minScore ?? config?.obsidianMinScore ?? 55);
+      const result = exportFromDb(db, {
+        vaultPath,
+        scanDate,
+        minScore,
+        getDarvaxScans,
+      });
+      res.json(result);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -139,7 +174,9 @@ function createApiRouter({
     });
 
     try {
-      if (!instrumentMapCache) instrumentMapCache = await resolveNifty50InstrumentMap();
+      if (!instrumentMapCache) {
+        instrumentMapCache = await resolveNseInstrumentMap(loadUniverse('NSE'));
+      }
       const securityId = instrumentMapCache.get(order.symbol);
       if (!securityId) throw new Error(`No Dhan securityId for ${order.symbol}`);
 

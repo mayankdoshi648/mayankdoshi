@@ -17,6 +17,8 @@ function loadConfig() {
     darvaxCapital: Number(process.env.DARVAX_CAPITAL || 1000000),
     darvaxMinScore: Number(process.env.DARVAX_MIN_SCORE || 70),
     darvaxStyle: process.env.DARVAX_STYLE || 'swing',
+    obsidianVaultPath: process.env.OBSIDIAN_VAULT_PATH || '',
+    obsidianMinScore: Number(process.env.OBSIDIAN_MIN_SCORE || 55),
   };
 }
 

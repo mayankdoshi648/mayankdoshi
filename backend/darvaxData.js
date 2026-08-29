@@ -1,3 +1,5 @@
+const { fetchDhanDailyCandles } = require('./dhanHistorical');
+
 const YAHOO_CHART = 'https://query1.finance.yahoo.com/v8/finance/chart';
 
 function yahooSymbol(symbol, market) {
@@ -5,7 +7,7 @@ function yahooSymbol(symbol, market) {
   return symbol.replace(/\.NS$/, '');
 }
 
-async function fetchDailyCandles(symbol, market, range = '2y', fetchImpl = fetch) {
+async function fetchYahooDailyCandles(symbol, market, range = '2y', fetchImpl = fetch) {
   const ySym = yahooSymbol(symbol, market);
   const url = `${YAHOO_CHART}/${encodeURIComponent(ySym)}?interval=1d&range=${range}`;
   const resp = await fetchImpl(url, {
@@ -28,6 +30,38 @@ async function fetchDailyCandles(symbol, market, range = '2y', fetchImpl = fetch
   })).filter((c) => c.close != null && c.open != null);
 }
 
+/**
+ * Fetch daily candles — NSE via Dhan when credentials/map available, else Yahoo fallback.
+ * US always uses Yahoo.
+ */
+async function fetchDailyCandles(symbol, market, options = {}) {
+  const {
+    range = '2y',
+    fetchImpl = fetch,
+    dhan = null,
+    instrumentMap = null,
+  } = typeof options === 'string' ? { range: options, fetchImpl: arguments[3] } : options;
+
+  if (market === 'NSE' && dhan?.accessToken && dhan?.clientId && instrumentMap) {
+    const securityId = instrumentMap.get(symbol);
+    if (securityId) {
+      try {
+        const years = range === '1y' ? 1 : 2;
+        return await fetchDhanDailyCandles({
+          securityId,
+          accessToken: dhan.accessToken,
+          clientId: dhan.clientId,
+          years,
+        }, fetchImpl);
+      } catch (err) {
+        if (dhan.strict) throw err;
+      }
+    }
+  }
+
+  return fetchYahooDailyCandles(symbol, market, range, fetchImpl);
+}
+
 function computeRsPercentiles(results) {
   const sorted = [...results].sort((a, b) => (b.rsRaw ?? 0) - (a.rsRaw ?? 0));
   const n = sorted.length;
@@ -39,4 +73,9 @@ function computeRsPercentiles(results) {
   return map;
 }
 
-module.exports = { fetchDailyCandles, yahooSymbol, computeRsPercentiles };
+module.exports = {
+  fetchDailyCandles,
+  fetchYahooDailyCandles,
+  yahooSymbol,
+  computeRsPercentiles,
+};

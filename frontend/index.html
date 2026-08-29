@@ -41,6 +41,7 @@
       <input type="number" id="darvax-min-score" value="55" min="0" max="100" title="Min score" />
       <button id="darvax-refresh" class="btn">Refresh</button>
       <button id="darvax-run-scan" class="btn accent">Run Scan</button>
+      <button id="darvax-export-obsidian" class="btn">Export Obsidian</button>
       <span id="darvax-status" class="darvax-status"></span>
     </div>
     <table class="signal-table darvax-table">
@@ -83,7 +84,8 @@
   </div>
 
   <p class="disclaimer">
-    Personal experiment, not investment advice. No order execution. Not affiliated with any SEBI-registered research analyst.
+    Personal experiment, not investment advice. DarvaX orders require manual approval unless DARVAX_AUTO_TRADE=true.
+    Not affiliated with any SEBI-registered research analyst.
   </p>
 
   <audio id="alert-sound" src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=" preload="auto"></audio>
