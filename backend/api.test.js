@@ -21,6 +21,7 @@ test('GET /api/status reports market state and feed connection', async () => {
     connectionStatus: { isConnected: () => true, getLastError: () => null },
     isMarketOpenFn: () => false,
     getCandles: () => [],
+    config: { darvaxMinScore: 55, darvaxAutoTrade: false },
   });
   const { server, port } = await startTestServer(router);
 
@@ -42,6 +43,7 @@ test('GET /api/signals?date= returns rows for that date', async () => {
     connectionStatus: { isConnected: () => true, getLastError: () => null },
     isMarketOpenFn: () => true,
     getCandles: () => [],
+    config: { darvaxMinScore: 55, darvaxAutoTrade: false },
   });
   const { server, port } = await startTestServer(router);
 
@@ -72,6 +74,7 @@ test('GET /api/signals without date param returns rows for today (IST)', async (
     connectionStatus: { isConnected: () => true, getLastError: () => null },
     isMarketOpenFn: () => true,
     getCandles: () => [],
+    config: { darvaxMinScore: 55, darvaxAutoTrade: false },
   });
   const { server, port } = await startTestServer(router);
 
@@ -94,6 +97,7 @@ test('GET /api/candles/:symbol delegates to getCandles', async () => {
     connectionStatus: { isConnected: () => true, getLastError: () => null },
     isMarketOpenFn: () => true,
     getCandles: (symbol) => (symbol === 'TCS' ? [{ time: 0, open: 1, high: 2, low: 0, close: 1, volume: 10 }] : []),
+    config: { darvaxMinScore: 55, darvaxAutoTrade: false },
   });
   const { server, port } = await startTestServer(router);
 

@@ -5,7 +5,11 @@
   "type": "commonjs",
   "scripts": {
     "start": "node backend/server.js",
-    "test": "node --test backend/**/*.test.js"
+    "test": "node --test backend/**/*.test.js",
+    "darvax:scan": "node scripts/darvax-scan.js",
+    "universe:build": "node scripts/build-universe.js",
+    "cron:install": "bash scripts/setup-cron.sh",
+    "cron:remove": "bash scripts/setup-cron.sh --remove"
   },
   "engines": {
     "node": ">=22.5.0"

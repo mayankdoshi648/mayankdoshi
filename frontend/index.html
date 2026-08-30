@@ -10,6 +10,7 @@
     <div class="brand">⚡ <span>PowerBull Pro</span></div>
     <nav class="nav">
       <button id="tab-live" class="tab active">Live Signals</button>
+      <button id="tab-darvax" class="tab">DarvaX Scanner</button>
       <button id="tab-track" class="tab">Track Record</button>
     </nav>
     <input type="date" id="date-picker" />
@@ -30,6 +31,43 @@
     </table>
   </section>
 
+  <section id="view-darvax" class="hidden">
+    <div class="darvax-toolbar">
+      <select id="darvax-market">
+        <option value="">All Markets</option>
+        <option value="NSE">NSE</option>
+        <option value="US">US</option>
+      </select>
+      <input type="number" id="darvax-min-score" value="55" min="0" max="100" title="Min score" />
+      <button id="darvax-refresh" class="btn">Refresh</button>
+      <button id="darvax-run-scan" class="btn accent">Run Scan</button>
+      <button id="darvax-export-obsidian" class="btn">Export Obsidian</button>
+      <span id="darvax-status" class="darvax-status"></span>
+    </div>
+    <table class="signal-table darvax-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Symbol</th>
+          <th>Mkt</th>
+          <th>Score</th>
+          <th>Stage</th>
+          <th>Box Top</th>
+          <th>Box Bottom</th>
+          <th>RS%</th>
+          <th>RVOL</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="darvax-rows"></tbody>
+    </table>
+    <h3 class="darvax-subhead">Pending Orders</h3>
+    <table class="signal-table">
+      <thead><tr><th>ID</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th>Status</th><th></th></tr></thead>
+      <tbody id="darvax-order-rows"></tbody>
+    </table>
+  </section>
+
   <section id="view-track" class="hidden">
     <table class="signal-table">
       <thead><tr><th>Symbol</th><th>Side</th><th>Entry</th><th>Time</th><th>Outcome</th></tr></thead>
@@ -46,7 +84,8 @@
   </div>
 
   <p class="disclaimer">
-    Personal experiment, not investment advice. No order execution. Not affiliated with any SEBI-registered research analyst.
+    Personal experiment, not investment advice. DarvaX orders require manual approval unless DARVAX_AUTO_TRADE=true.
+    Not affiliated with any SEBI-registered research analyst.
   </p>
 
   <audio id="alert-sound" src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=" preload="auto"></audio>
