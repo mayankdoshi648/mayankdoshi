@@ -338,7 +338,9 @@ document.getElementById('darvax-run-scan').addEventListener('click', async () =>
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
     const obs = data.obsidian ? ` | Obsidian: ${data.obsidian.exportedCount} notes` : '';
-    statusEl.textContent = `Scan done: NSE ${data.nse.count} [${data.nse.dataSource}], US ${data.us.count} [${data.us.dataSource}]${obs}`;
+    if (data.telegram?.sent) {
+      statusEl.textContent += ` | Telegram: ${data.telegram.count} alerts`;
+    }
     loadDarvaxScans();
   } catch (err) {
     statusEl.textContent = `Scan failed: ${err.message}`;

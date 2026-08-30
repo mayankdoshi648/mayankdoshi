@@ -5,6 +5,8 @@ const { fetchDailyCandles, computeRsPercentiles } = require('./darvaxData');
 const { resolveNseInstrumentMap } = require('./instrumentMap');
 const { fetchAccessToken } = require('./dhanAuth');
 const { exportToObsidian } = require('./obsidianExport');
+const { enrichResultsWithFundamentals } = require('./screenerFundamentals');
+const { sendDarvaXAlerts } = require('./telegramAlerts');
 
 function loadUniverse(market) {
   const file = market === 'US'
@@ -109,22 +111,46 @@ async function runFullScan(options = {}) {
     ? await prepareDhanContext(loadUniverse('NSE'), options.config, options.fetchImpl)
     : null;
 
-  const nse = await scanMarket('NSE', { ...options, dhanConfig });
+  let nse = await scanMarket('NSE', { ...options, dhanConfig });
   const us = await scanMarket('US', options);
   const scannedAt = new Date().toISOString();
+  const scanDate = scannedAt.slice(0, 10);
+
+  if (options.enrichFundamentals !== false) {
+    nse = {
+      ...nse,
+      results: await enrichResultsWithFundamentals(nse.results, {
+        market: 'NSE',
+        minScore: options.fundamentalsMinScore ?? 55,
+        maxFetch: options.fundamentalsMaxFetch ?? 30,
+        fetchImpl: options.fetchImpl,
+      }),
+    };
+  }
+
+  let telegram = null;
+  if (options.sendTelegram && options.config) {
+    telegram = await sendDarvaXAlerts({
+      scanDate,
+      nseResults: nse.results,
+      usResults: us.results,
+      config: options.config,
+      fetchImpl: options.fetchImpl,
+    });
+  }
 
   let obsidian = null;
   if (options.obsidianVaultPath) {
     obsidian = exportToObsidian({
       vaultPath: options.obsidianVaultPath,
-      scanDate: scannedAt.slice(0, 10),
+      scanDate,
       nseResults: nse.results,
       usResults: us.results,
       minScore: options.obsidianMinScore ?? 55,
     });
   }
 
-  return { nse, us, scannedAt, obsidian };
+  return { nse, us, scannedAt, obsidian, telegram };
 }
 
 module.exports = {

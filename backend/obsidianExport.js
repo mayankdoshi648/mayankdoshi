@@ -58,7 +58,16 @@ ${formatReasonsList(item.reasonsPass, item.reasonsFail)}
 ## Patterns Detected
 ${patterns.length ? patterns.map((p) => `- ${p}`).join('\n') : '- None'}
 
-## Trade Plan
+## Fundamentals (Screener.in)
+${item.fundamentals ? `
+| Metric | Value |
+|--------|-------|
+| ROCE | ${item.fundamentals.roce ?? '—'}% |
+| ROE | ${item.fundamentals.roe ?? '—'}% |
+| Sales TTM | ${item.fundamentals.salesGrowthTtm ?? '—'}% |
+| Profit TTM | ${item.fundamentals.profitGrowthTtm ?? '—'}% |
+| Qtr Profit Var | ${item.fundamentals.qtrProfitVar?.toFixed(0) ?? '—'}% |
+` : '- Not fetched'}
 - **Entry:** above ${boxTop} on confirmed breakout
 - **Stop:** ${stops?.primary?.toFixed(2) ?? boxBottom} (${stops?.primaryKey ?? 'box_bottom'})
 - **Risk/share:** ${stops?.riskPerShare?.toFixed(2) ?? '—'}

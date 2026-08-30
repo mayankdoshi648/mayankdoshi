@@ -57,6 +57,8 @@ function createApiRouter({
         config,
         obsidianVaultPath: config?.obsidianVaultPath || null,
         obsidianMinScore: config?.obsidianMinScore ?? 55,
+        sendTelegram: Boolean(config?.telegramBotToken && config?.telegramChatId),
+        fundamentalsMaxFetch: config?.fundamentalsMaxFetch ?? 30,
       });
       const scanDate = full.scannedAt.slice(0, 10);
       saveDarvaxScanResults(db, scanDate, 'NSE', full.nse.results);
@@ -74,6 +76,7 @@ function createApiRouter({
           dataSource: full.us.dataSource,
         },
         obsidian: full.obsidian,
+        telegram: full.telegram,
         topNse: full.nse.results.filter((r) => r.qualifies).slice(0, 10),
         topUs: full.us.results.filter((r) => r.qualifies).slice(0, 10),
       });
