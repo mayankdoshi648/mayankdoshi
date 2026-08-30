@@ -35,7 +35,17 @@ Use this schedule to map workshop days to concrete reading, notebooks, and exerc
 | 0.4 | Fyers API | [Fyers v3 docs](https://myapi.fyers.in/docsv3), [fyers-skills](https://github.com/FyersDev/fyers-skills) | OAuth login → `history` candles → `quotes` | Fetch 1 year of `NSE:NIFTY50-INDEX` daily bars |
 | 0.5 | Firstock API | [Login docs](https://firstock.in/api/docs/login/), [Python SDK](https://github.com/the-firstock/firstock-developer-sdk-python) | Login with TOTP → order book → time-price series | Same Nifty history via Firstock; compare to Fyers |
 
-**Deliverable:** `.env` with broker credentials; script that saves Nifty/Bank Nifty daily CSV to `data/`.
+**Deliverable:** CSV files in `workshop/data/` — use the starter scripts:
+
+```bash
+cd workshop && pip install -r requirements.txt && cp .env.example .env
+python fetch_nifty_yfinance.py              # no broker account needed
+python fetch_nifty_fyers.py                 # after Fyers OAuth
+python fetch_nifty_firstock.py --totp CODE  # after Firstock login
+python compare_sources.py                   # validate overlapping closes
+```
+
+See [workshop/README.md](../workshop/README.md) for full setup.
 
 ---
 
