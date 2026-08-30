@@ -84,6 +84,13 @@ npm run darvax:scan -- --market=NSE   # NSE only
 npm run darvax:scan -- --market=US    # US only
 ```
 
+## Workshop learning resources
+
+Curated study plan, GitHub repos, PDFs, and week-by-week notebook schedule for the Data Workshop & Algo Trading curriculum:
+
+- [docs/LEARNING_RESOURCES.md](docs/LEARNING_RESOURCES.md) — full curriculum map
+- [workshop/](workshop/) — Week 0 Python scripts (Fyers / Firstock / yfinance Nifty fetch)
+
 ## Architecture (DarvaX)
 
 - `backend/darvaxEngine.js` — Box rules, Wyckoff, patterns, strength score, stops

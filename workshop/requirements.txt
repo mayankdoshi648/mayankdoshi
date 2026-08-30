@@ -1,0 +1,5 @@
+fyers-apiv3>=3.1.0
+firstock>=1.1.10
+python-dotenv>=1.0.0
+pandas>=2.0.0
+yfinance>=0.2.40
