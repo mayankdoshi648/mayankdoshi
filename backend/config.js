@@ -1,5 +1,29 @@
 // backend/config.js
-require('dotenv').config();
+const path = require('node:path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+
+function envAny(names, fallback = '') {
+  for (const name of names) {
+    const v = process.env[name];
+    if (v != null && String(v).trim() !== '') return String(v).trim();
+  }
+  return fallback;
+}
+
+function kotakEnv() {
+  return {
+    kotakNeoConsumerKey: envAny([
+      'KOTAK_NEO_CONSUMER_KEY',
+      'KOTAK_CONSUMER_KEY',
+      'NEO_CONSUMER_KEY',
+      'CONSUMER_KEY',
+    ]),
+    kotakNeoMobile: envAny(['KOTAK_NEO_MOBILE', 'KOTAK_MOBILE', 'MOBILE_NUMBER']),
+    kotakNeoUcc: envAny(['KOTAK_NEO_UCC', 'KOTAK_UCC', 'UCC']),
+    kotakNeoMpin: envAny(['KOTAK_NEO_MPIN', 'KOTAK_MPIN', 'MPIN']),
+    kotakNeoTotpSecret: envAny(['KOTAK_NEO_TOTP_SECRET', 'KOTAK_TOTP_SECRET', 'TOTP_SECRET']),
+  };
+}
 
 function loadConfig() {
   const required = ['DHAN_CLIENT_ID', 'DHAN_PIN', 'DHAN_TOTP_SECRET'];
@@ -24,11 +48,7 @@ function loadConfig() {
     telegramMinScore: Number(process.env.TELEGRAM_MIN_SCORE || 85),
     telegramBreakoutMinScore: Number(process.env.TELEGRAM_BREAKOUT_MIN_SCORE || 70),
     fundamentalsMaxFetch: Number(process.env.FUNDAMENTALS_MAX_FETCH || 30),
-    kotakNeoConsumerKey: process.env.KOTAK_NEO_CONSUMER_KEY || '',
-    kotakNeoMobile: process.env.KOTAK_NEO_MOBILE || '',
-    kotakNeoUcc: process.env.KOTAK_NEO_UCC || '',
-    kotakNeoMpin: process.env.KOTAK_NEO_MPIN || '',
-    kotakNeoTotpSecret: process.env.KOTAK_NEO_TOTP_SECRET || '',
+    ...kotakEnv(),
   };
 }
 
@@ -50,11 +70,7 @@ function loadConfigOptional() {
       telegramMinScore: Number(process.env.TELEGRAM_MIN_SCORE || 85),
       telegramBreakoutMinScore: Number(process.env.TELEGRAM_BREAKOUT_MIN_SCORE || 70),
       fundamentalsMaxFetch: Number(process.env.FUNDAMENTALS_MAX_FETCH || 30),
-      kotakNeoConsumerKey: process.env.KOTAK_NEO_CONSUMER_KEY || '',
-      kotakNeoMobile: process.env.KOTAK_NEO_MOBILE || '',
-      kotakNeoUcc: process.env.KOTAK_NEO_UCC || '',
-      kotakNeoMpin: process.env.KOTAK_NEO_MPIN || '',
-      kotakNeoTotpSecret: process.env.KOTAK_NEO_TOTP_SECRET || '',
+      ...kotakEnv(),
     };
   }
 }

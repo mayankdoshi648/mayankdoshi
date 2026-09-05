@@ -84,8 +84,30 @@ function getEnv(name, fallback = "") {
   return v == null || String(v).trim() === "" ? fallback : String(v).trim();
 }
 
+/** First non-empty env among aliases (supports older/local naming). */
+function getEnvAny(names, fallback = "") {
+  for (const name of names) {
+    const v = getEnv(name);
+    if (v) return v;
+  }
+  return fallback;
+}
+
+const CONSUMER_KEY_ALIASES = [
+  "KOTAK_NEO_CONSUMER_KEY",
+  "KOTAK_CONSUMER_KEY",
+  "NEO_CONSUMER_KEY",
+  "CONSUMER_KEY",
+  "KOTAK_NEO_ACCESS_TOKEN",
+  "KOTAK_ACCESS_TOKEN",
+];
+
+function getConsumerKey() {
+  return getEnvAny(CONSUMER_KEY_ALIASES);
+}
+
 function isKotakConfigured() {
-  return Boolean(getEnv("KOTAK_NEO_CONSUMER_KEY"));
+  return Boolean(getConsumerKey());
 }
 
 function base32Decode(secret) {
@@ -172,10 +194,10 @@ async function neoFetch(url, options = {}) {
  * Needed for orders/WS; quotes only need consumer key.
  */
 async function createKotakSession() {
-  const consumerKey = getEnv("KOTAK_NEO_CONSUMER_KEY");
-  const mobile = getEnv("KOTAK_NEO_MOBILE");
-  const ucc = getEnv("KOTAK_NEO_UCC");
-  const mpin = getEnv("KOTAK_NEO_MPIN");
+  const consumerKey = getConsumerKey();
+  const mobile = getEnvAny(["KOTAK_NEO_MOBILE", "KOTAK_MOBILE", "MOBILE_NUMBER"]);
+  const ucc = getEnvAny(["KOTAK_NEO_UCC", "KOTAK_UCC", "UCC"]);
+  const mpin = getEnvAny(["KOTAK_NEO_MPIN", "KOTAK_MPIN", "MPIN"]);
   if (!consumerKey || !mobile || !ucc || !mpin) {
     throw new Error(
       "Kotak Neo login needs KOTAK_NEO_CONSUMER_KEY, KOTAK_NEO_MOBILE, KOTAK_NEO_UCC, KOTAK_NEO_MPIN"
@@ -330,7 +352,7 @@ async function fetchKotakQuotesByIds(entries, options = {}) {
   if (!isKotakConfigured()) {
     throw new Error("KOTAK_NEO_CONSUMER_KEY is not set");
   }
-  const consumerKey = getEnv("KOTAK_NEO_CONSUMER_KEY");
+  const consumerKey = getConsumerKey();
   const tokens = (entries || [])
     .filter((e) => e?.id && e?.instrument_token)
     .map((e) => ({
@@ -411,10 +433,11 @@ async function fetchKotakOverviewQuotes(options = {}) {
 function getKotakStatus() {
   const configured = isKotakConfigured();
   const hasLogin =
-    Boolean(getEnv("KOTAK_NEO_MOBILE")) &&
-    Boolean(getEnv("KOTAK_NEO_UCC")) &&
-    Boolean(getEnv("KOTAK_NEO_MPIN")) &&
-    (Boolean(getEnv("KOTAK_NEO_TOTP_SECRET")) || Boolean(getEnv("KOTAK_NEO_TOTP")));
+    Boolean(getEnvAny(["KOTAK_NEO_MOBILE", "KOTAK_MOBILE", "MOBILE_NUMBER"])) &&
+    Boolean(getEnvAny(["KOTAK_NEO_UCC", "KOTAK_UCC", "UCC"])) &&
+    Boolean(getEnvAny(["KOTAK_NEO_MPIN", "KOTAK_MPIN", "MPIN"])) &&
+    (Boolean(getEnvAny(["KOTAK_NEO_TOTP_SECRET", "KOTAK_TOTP_SECRET", "TOTP_SECRET"])) ||
+      Boolean(getEnv("KOTAK_NEO_TOTP")));
   return {
     configured,
     quotesReady: configured,

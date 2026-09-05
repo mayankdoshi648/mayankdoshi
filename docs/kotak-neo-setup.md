@@ -7,16 +7,25 @@
 
 ## Minimum setup (quotes only)
 
-1. Create a Neo API app and copy the **consumer access token**.
-2. Put it in `.env`:
+1. In `C:\Darvax Brain\mayankdoshi\.env` set (or keep) the consumer access token:
 
 ```bash
 KOTAK_NEO_CONSUMER_KEY=your_consumer_access_token
 ```
 
-3. Restart the server (`npm start`).
-4. Open http://localhost:3000/?tab=breadth — status should show `quoteSource: kotak-neo` (or `Overview … · kotak-neo` in the UI).
-5. `GET /api/status` includes `kotakNeo.quotesReady: true` when the key is set.
+Also accepted: `KOTAK_CONSUMER_KEY`, `NEO_CONSUMER_KEY`, `CONSUMER_KEY`.
+
+2. Pull/checkout the Kotak branch, then restart:
+
+```bash
+git pull
+npm start
+```
+
+3. Open http://localhost:3000/?tab=breadth — status should show `· kotak-neo`.
+4. `GET /api/status` includes `kotakNeo.quotesReady: true` when the key is set.
+
+**Note:** `.env` is gitignored. Cloud agents cannot read your Windows `.env` — add the same key as a Cursor Cloud secret if you want Neo quotes in the cloud agent.
 
 ## Optional trade session
 
