@@ -24,7 +24,22 @@ const aggregator = new CandleAggregator();
 
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '..', 'frontend')));
+const frontendDir = path.join(__dirname, '..', 'frontend');
+
+// Standalone Market Breadth dashboard (separate from PowerBull Pro)
+app.get(['/breadth', '/breadth/'], (req, res) => {
+  res.sendFile(path.join(frontendDir, 'breadth.html'));
+});
+
+// Old deep-link -> dedicated page
+app.get('/', (req, res, next) => {
+  if (String(req.query.tab || '') === 'breadth') {
+    return res.redirect(302, '/breadth');
+  }
+  next();
+});
+
+app.use(express.static(frontendDir));
 app.use('/api', createApiRouter({
   db,
   connectionStatus,

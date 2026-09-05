@@ -86,9 +86,9 @@ npm run darvax:scan -- --market=NSE   # NSE only
 npm run darvax:scan -- --market=US    # US only
 ```
 
-## Market Breadth dashboard
+## Market Breadth dashboard (separate app)
 
-Open **Market Breadth** in the app (http://localhost:3000/?tab=breadth) to see:
+Open the standalone dashboard at **http://localhost:3000/breadth** (not inside PowerBull Pro) to see:
 
 - Live Nifty / Bank Nifty / India VIX + Large/Mid/Small + sector strips
 - % of Nifty 50 / Nifty 500 stocks above 20 / 50 / 200 DMA

@@ -1,0 +1,55 @@
+/* Standalone Market Breadth app — not part of PowerBull Pro */
+
+.breadth-app .breadth-header {
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+}
+
+.breadth-app .breadth-header .brand {
+  font-size: 1.35rem;
+  letter-spacing: 0.02em;
+}
+
+.breadth-app .breadth-header .breadth-toolbar {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-left: auto;
+  padding: 0;
+}
+
+.breadth-app .breadth-main {
+  padding-top: 1rem;
+}
+
+.breadth-app .btn {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.breadth-app .btn.accent {
+  background: var(--accent);
+  color: #111;
+  border-color: var(--accent);
+}
+
+.breadth-app .btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.breadth-app .darvax-status,
+.breadth-app .disclaimer {
+  color: #8892a0;
+  font-size: 0.85rem;
+}
+
+.breadth-app .disclaimer {
+  padding: 1rem 1.25rem 2rem;
+}
