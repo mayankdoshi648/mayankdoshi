@@ -32,6 +32,7 @@ describe('kotakNeo', () => {
     assert.equal(toNeoSymbol(token), 'nse_cm|Nifty 50');
     const url = buildQuotesUrl([token], 'ltp');
     assert.match(url, /neosymbol\//);
+    assert.match(url, /mis\.kotaksecurities\.com/);
     assert.match(url, /ltp$/);
     assert.ok(url.includes(encodeURIComponent('nse_cm|Nifty 50')));
   });
@@ -42,11 +43,22 @@ describe('kotakNeo', () => {
       per_change: '0.42',
       change: '104.10',
       prev_close: '24746.15',
-      instrument_token: 'Nifty 50',
+      exchange_token: 'Nifty 50',
     });
     assert.equal(q.value, 24850.25);
     assert.equal(q.pChange, 0.42);
     assert.equal(q.change, 104.1);
+  });
+
+  it('normalizeQuoteProps accepts Neo live per_change field', () => {
+    const q = normalizeQuoteProps({
+      exchange_token: 'Nifty 50',
+      ltp: '23897.7',
+      per_change: '0.1016',
+      change: '24.25',
+    });
+    assert.equal(q.value, 23897.7);
+    assert.equal(q.pChange, 0.1016);
   });
 
   it('normalizeQuoteProps derives percent from prev close', () => {

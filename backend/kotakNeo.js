@@ -10,15 +10,16 @@
 const crypto = require("crypto");
 
 const LOGIN_BASE = "https://mis.kotaksecurities.com/login/1.0";
+// gw-napi often fails DNS outside India; mis host serves the same quotes API.
 const QUOTES_BASE =
-  "https://gw-napi.kotaksecurities.com/script-details/1.0/quotes/neosymbol";
+  "https://mis.kotaksecurities.com/script-details/1.0/quotes/neosymbol";
 const NEO_FIN_KEY = "neotradeapi";
 
 /** Default Neo instrument tokens for common NSE indices (exchange_segment: nse_cm). */
 const INDEX_TOKENS = {
   "Nifty 50": { instrument_token: "Nifty 50", exchange_segment: "nse_cm" },
   "Nifty Bank": { instrument_token: "Nifty Bank", exchange_segment: "nse_cm" },
-  "India VIX": { instrument_token: "India VIX", exchange_segment: "nse_cm" },
+  "India VIX": { instrument_token: "INDIA VIX", exchange_segment: "nse_cm" },
   "Nifty 100": { instrument_token: "Nifty 100", exchange_segment: "nse_cm" },
   "Nifty Midcap 150": {
     instrument_token: "NIFTY MIDCAP 150",
@@ -279,6 +280,7 @@ function normalizeQuoteProps(raw) {
   );
   const changePct = asNumber(
     flat.per_change ??
+      flat.perChange ??
       flat.pChange ??
       flat.change_percent ??
       flat.percentChange ??
@@ -326,6 +328,7 @@ function matchQuote(list, token) {
     if (!item || typeof item !== "object") continue;
     const keys = [
       item.instrument_token,
+      item.exchange_token,
       item.trading_symbol,
       item.symbol,
       item.pSymbol,
