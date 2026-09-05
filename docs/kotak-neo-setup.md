@@ -7,7 +7,7 @@
 
 ## Minimum setup (quotes only)
 
-1. In `C:\Darvax Brain\mayankdoshi\.env` set (or keep) the consumer access token:
+1. In your project folder `C:\Darvax Brain`, open `.env` (or `mayankdoshi\.env` if the repo is nested) and set:
 
 ```bash
 KOTAK_NEO_CONSUMER_KEY=your_consumer_access_token
