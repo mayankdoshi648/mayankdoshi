@@ -10,6 +10,7 @@
     <div class="brand">⚡ <span>PowerBull Pro</span></div>
     <nav class="nav">
       <button id="tab-live" class="tab active">Live Signals</button>
+      <button id="tab-breadth" class="tab">Market Breadth</button>
       <button id="tab-darvax" class="tab">DarvaX Scanner</button>
       <button id="tab-track" class="tab">Track Record</button>
     </nav>
@@ -29,6 +30,121 @@
       <thead><tr><th>Symbol</th><th>Side</th><th>Price</th><th>Time</th></tr></thead>
       <tbody id="signal-rows"></tbody>
     </table>
+  </section>
+
+  <section id="view-breadth" class="hidden">
+    <div class="breadth-toolbar">
+      <select id="breadth-universe">
+        <option value="nifty50">Nifty 50</option>
+        <option value="nifty500">Nifty 500</option>
+      </select>
+      <button id="breadth-refresh" class="btn accent">Refresh Breadth</button>
+      <span id="breadth-status" class="darvax-status"></span>
+    </div>
+
+    <div id="overview-headline" class="quote-strip quote-strip-headline" aria-label="Nifty Bank Nifty VIX"></div>
+    <div id="overview-size" class="quote-strip quote-strip-size" aria-label="Large Mid Small Cap"></div>
+
+    <div class="breadth-section-head">
+      <h3>Sector Indices — EMA 20 / 50 / 200</h3>
+      <p>Green chip = index close above that EMA · Red = below</p>
+    </div>
+    <div id="overview-sectors" class="sector-grid" aria-label="Sector EMA dashboard"></div>
+
+    <div class="breadth-hero">
+      <div class="breadth-def">
+        <h2>Market Breadth Decoded</h2>
+        <p>
+          <strong>Breadth</strong> = % of stocks trading above the
+          <em>20 / 50 / 200-day</em> simple moving averages (DMA).
+          Index price is the surface — breadth is the internal health.
+        </p>
+      </div>
+      <div id="breadth-posture" class="breadth-posture tone-neutral">
+        <div class="posture-label">Posture</div>
+        <div id="breadth-posture-value" class="posture-value">—</div>
+        <div id="breadth-diagnosis" class="posture-diagnosis">Load or refresh to diagnose market health.</div>
+      </div>
+    </div>
+
+    <div class="breadth-gauges" id="breadth-gauges">
+      <div class="gauge-card" data-key="dma20">
+        <canvas class="gauge-canvas" width="160" height="160"></canvas>
+        <div class="gauge-meta">
+          <div class="gauge-title">20 DMA — LEADERS</div>
+          <div class="gauge-sub">Short-term health</div>
+          <div class="gauge-readout"><span class="gauge-pct">—</span> <span class="gauge-arrow"></span></div>
+        </div>
+      </div>
+      <div class="gauge-card" data-key="dma50">
+        <canvas class="gauge-canvas" width="160" height="160"></canvas>
+        <div class="gauge-meta">
+          <div class="gauge-title">50 DMA — CORE</div>
+          <div class="gauge-sub">Medium-term health</div>
+          <div class="gauge-readout"><span class="gauge-pct">—</span> <span class="gauge-arrow"></span></div>
+        </div>
+      </div>
+      <div class="gauge-card" data-key="dma200">
+        <canvas class="gauge-canvas" width="160" height="160"></canvas>
+        <div class="gauge-meta">
+          <div class="gauge-title">200 DMA — FOUNDATION</div>
+          <div class="gauge-sub">Long-term health</div>
+          <div class="gauge-readout"><span class="gauge-pct">—</span> <span class="gauge-arrow"></span></div>
+        </div>
+      </div>
+    </div>
+    <p class="breadth-note">Above 50% = majority participating · 50% line marked on each gauge</p>
+
+    <div class="breadth-charts">
+      <div class="chart-panel">
+        <h3>Index (Surface) — Nifty 50</h3>
+        <canvas id="breadth-index-chart" height="120"></canvas>
+      </div>
+      <div class="chart-panel">
+        <h3>Breadth (Internal) — % Above DMA</h3>
+        <canvas id="breadth-pct-chart" height="160"></canvas>
+      </div>
+    </div>
+
+    <div class="breadth-rules">
+      <h3>Market Posture Logic</h3>
+      <table class="signal-table breadth-rules-table">
+        <thead>
+          <tr>
+            <th>Reading</th>
+            <th>What changed</th>
+            <th>Diagnosis</th>
+            <th>Posture</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="tone-warn">
+            <td>20 ↓, 50 →, 200 →</td>
+            <td>Only 20-day breadth drops</td>
+            <td>Leaders are cracking. First warning.</td>
+            <td><strong>STOP PRESSING</strong></td>
+          </tr>
+          <tr class="tone-danger">
+            <td>20 →, 50 ↓, 200 ↓</td>
+            <td>50- and 200-day breadth drop</td>
+            <td>Weaker stocks rolling over. Junk rally ending.</td>
+            <td><strong>REDUCE RISK</strong></td>
+          </tr>
+          <tr class="tone-danger">
+            <td>20 ↓, 50 ↓, 200 ↓</td>
+            <td>All three fall together</td>
+            <td>The rally lacks broad support.</td>
+            <td><strong>SIT OUT</strong></td>
+          </tr>
+          <tr class="tone-good">
+            <td>20, 50, 200 &gt; 50%</td>
+            <td>All three above 50%</td>
+            <td>Participation broad enough for a sustainable move.</td>
+            <td><strong>GREEN LIGHT — PRESS</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <section id="view-darvax" class="hidden">

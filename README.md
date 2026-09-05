@@ -84,6 +84,18 @@ npm run darvax:scan -- --market=NSE   # NSE only
 npm run darvax:scan -- --market=US    # US only
 ```
 
+## Market Breadth dashboard
+
+Open **Market Breadth** in the app (http://localhost:3000) to see:
+
+- % of Nifty 50 / Nifty 500 stocks above 20 / 50 / 200 DMA
+- Index vs breadth line charts (divergence view)
+- Spirit-level gauges + posture diagnosis (STOP PRESSING / REDUCE RISK / SIT OUT / GREEN LIGHT)
+
+Data sources: **Yahoo Finance** (default, no keys) using the NSE Nifty 50/500 universe. If Dhan credentials are set, NSE EOD history is preferred automatically. Kotak Neo is not wired yet — use Yahoo/Dhan path above.
+
+First refresh for Nifty 50 takes ~1–2 minutes; results cache for 6 hours under `data/breadth-cache.json`.
+
 ## Architecture (DarvaX)
 
 - `backend/darvaxEngine.js` — Box rules, Wyckoff, patterns, strength score, stops

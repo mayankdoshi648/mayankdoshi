@@ -14,6 +14,8 @@ const { fetchAccessToken } = require('./dhanAuth');
 const { placeDhanOrder, calcPositionSize } = require('./dhanOrders');
 const { resolveNseInstrumentMap } = require('./instrumentMap');
 const { exportFromDb } = require('./obsidianExport');
+const { getMarketBreadth, readBreadthCache, isRefreshRunning } = require('./marketBreadth');
+const { getMarketOverview } = require('./marketOverview');
 
 function createApiRouter({
   db,
@@ -24,6 +26,7 @@ function createApiRouter({
 }) {
   const router = express.Router();
   let instrumentMapCache = null;
+  let breadthProgress = null;
 
   router.get('/status', (req, res) => {
     res.json({
@@ -31,7 +34,79 @@ function createApiRouter({
       feedConnected: connectionStatus.isConnected(),
       lastError: connectionStatus.getLastError(),
       darvaxAutoTrade: config?.darvaxAutoTrade ?? false,
+      hasDhan: Boolean(config?.clientId && config?.pin && config?.totpSecret),
     });
+  });
+
+  router.get('/overview', async (req, res) => {
+    const force = req.query.refresh === '1' || req.query.refresh === 'true';
+    try {
+      const report = await getMarketOverview({ force, background: true });
+      res.json(report);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/breadth', async (req, res) => {
+    const universe = req.query.universe === 'nifty500' ? 'nifty500' : 'nifty50';
+    const force = req.query.refresh === '1' || req.query.refresh === 'true';
+    try {
+      const report = await getMarketBreadth({
+        universe,
+        force,
+        background: true,
+        config,
+        onProgress: (p) => { breadthProgress = p; },
+      });
+      if (report.refreshing) {
+        breadthProgress = breadthProgress || { done: 0, total: 0, symbol: null };
+      } else if (!isRefreshRunning(universe)) {
+        breadthProgress = null;
+      }
+      res.json(report);
+    } catch (err) {
+      breadthProgress = null;
+      const stale = readBreadthCache();
+      if (stale) {
+        return res.status(200).json({ ...stale, fromCache: true, warning: err.message });
+      }
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/breadth/status', (req, res) => {
+    const cached = readBreadthCache();
+    res.json({
+      scanning: Boolean(breadthProgress) || isRefreshRunning(),
+      progress: breadthProgress,
+      cached: cached
+        ? {
+          universe: cached.universe,
+          scannedAt: cached.scannedAt,
+          asOf: cached.asOf,
+          stockCount: cached.stockCount,
+        }
+        : null,
+    });
+  });
+
+  router.post('/breadth/refresh', async (req, res) => {
+    const universe = (req.body?.universe || req.query.universe) === 'nifty500' ? 'nifty500' : 'nifty50';
+    try {
+      breadthProgress = { done: 0, total: 0, symbol: null };
+      const report = await getMarketBreadth({
+        universe,
+        force: true,
+        background: true,
+        config,
+        onProgress: (p) => { breadthProgress = p; },
+      });
+      res.json(report);
+    } catch (err) {
+      breadthProgress = null;
+      res.status(500).json({ error: err.message });
+    }
   });
 
   router.get('/signals', (req, res) => {
