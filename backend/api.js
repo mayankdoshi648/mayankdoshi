@@ -15,6 +15,7 @@ const { placeDhanOrder, calcPositionSize } = require('./dhanOrders');
 const { resolveNseInstrumentMap } = require('./instrumentMap');
 const { exportFromDb } = require('./obsidianExport');
 const { getMarketBreadth, readBreadthCache } = require('./marketBreadth');
+const { getMarketOverview } = require('./marketOverview');
 
 function createApiRouter({
   db,
@@ -35,6 +36,16 @@ function createApiRouter({
       darvaxAutoTrade: config?.darvaxAutoTrade ?? false,
       hasDhan: Boolean(config?.clientId && config?.pin && config?.totpSecret),
     });
+  });
+
+  router.get('/overview', async (req, res) => {
+    const force = req.query.refresh === '1' || req.query.refresh === 'true';
+    try {
+      const report = await getMarketOverview({ force });
+      res.json(report);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   router.get('/breadth', async (req, res) => {

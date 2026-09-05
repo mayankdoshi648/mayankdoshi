@@ -108,6 +108,7 @@ document.getElementById('tab-live').addEventListener('click', () => {
 
 document.getElementById('tab-breadth').addEventListener('click', () => {
   showView('breadth');
+  loadOverview();
   loadBreadth();
 });
 
@@ -371,6 +372,107 @@ document.getElementById('darvax-export-obsidian').addEventListener('click', asyn
   }
 });
 
+// --- Market Overview (Nifty / VIX / size / sectors) ---
+function fmtNum(n, digits = 2) {
+  if (n == null || Number.isNaN(n)) return '—';
+  return Number(n).toLocaleString('en-IN', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+function fmtPct(n) {
+  if (n == null || Number.isNaN(n)) return '—';
+  const sign = n > 0 ? '+' : '';
+  return `${sign}${Number(n).toFixed(2)}%`;
+}
+
+function emaChipsHtml(ema) {
+  const periods = [20, 50, 200];
+  return periods.map((p) => {
+    const key = `ema${p}`;
+    const cell = ema?.[key];
+    if (!cell || cell.above == null) {
+      return `<span class="ema-chip na">EMA${p} —</span>`;
+    }
+    const cls = cell.above ? 'above' : 'below';
+    const mark = cell.above ? '▲' : '▼';
+    return `<span class="ema-chip ${cls}">EMA${p} ${mark}</span>`;
+  }).join('');
+}
+
+function quoteCardHtml(q, { showEma = false, showSubtitle = false } = {}) {
+  const dir = q.direction || 'flat';
+  const sub = showSubtitle && (q.subtitle || q.subLabel)
+    ? `<div class="q-sub">${escapeHtml(q.subtitle || q.subLabel)}</div>`
+    : '';
+  const ema = showEma
+    ? `<div class="ema-row">${emaChipsHtml(q.ema)}</div>`
+    : '';
+  return `
+    <div class="quote-card dir-${escapeHtml(dir)}" data-id="${escapeHtml(q.id)}">
+      <div class="q-name">${escapeHtml(q.label)}</div>
+      ${sub}
+      <div class="q-row">
+        <span class="q-last">${fmtNum(q.last, 2)}</span>
+        <span class="q-arrow">${escapeHtml(q.arrow || '')}</span>
+        <span class="q-chg">${fmtPct(q.changePct ?? q.changePercent)}</span>
+      </div>
+      ${ema}
+    </div>
+  `;
+}
+
+function sectorCardHtml(q) {
+  const dir = q.direction || 'flat';
+  const bias = q.ema?.bias || '';
+  const biasHtml = bias
+    ? `<div class="bias ${escapeHtml(bias)}">${escapeHtml(bias)}</div>`
+    : `<div class="bias">EMA n/a</div>`;
+  return `
+    <div class="sector-card dir-${escapeHtml(dir)}" data-id="${escapeHtml(q.id)}">
+      <div class="q-name">${escapeHtml(q.label)}</div>
+      <div class="q-row">
+        <span class="q-last">${fmtNum(q.last, 2)}</span>
+        <span class="q-arrow">${escapeHtml(q.arrow || '')}</span>
+        <span class="q-chg">${fmtPct(q.changePct ?? q.changePercent)}</span>
+      </div>
+      <div class="ema-row">${emaChipsHtml(q.ema)}</div>
+      ${biasHtml}
+    </div>
+  `;
+}
+
+function renderOverview(data) {
+  const headlineEl = document.getElementById('overview-headline');
+  const sizeEl = document.getElementById('overview-size');
+  const sectorsEl = document.getElementById('overview-sectors');
+  if (!headlineEl || !sizeEl || !sectorsEl) return;
+
+  headlineEl.innerHTML = (data.headline || []).map((q) => quoteCardHtml(q)).join('');
+  sizeEl.innerHTML = (data.size || [])
+    .map((q) => quoteCardHtml(q, { showEma: true, showSubtitle: true }))
+    .join('');
+  sectorsEl.innerHTML = (data.sectors || []).map((q) => sectorCardHtml(q)).join('');
+}
+
+async function loadOverview({ force = false } = {}) {
+  const statusEl = document.getElementById('breadth-status');
+  try {
+    const url = force ? '/api/overview?refresh=1' : '/api/overview';
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    renderOverview(data);
+    if (statusEl && !statusEl.textContent.includes('Scanning')) {
+      const stamp = data.scannedAt ? new Date(data.scannedAt).toLocaleTimeString() : '';
+      statusEl.textContent = `Overview ${data.fromCache ? 'cached' : 'live'}${stamp ? ` · ${stamp}` : ''}`;
+    }
+  } catch (err) {
+    if (statusEl) statusEl.textContent = `Overview error: ${err.message}`;
+  }
+}
+
 // --- Market Breadth ---
 let breadthIndexChart = null;
 let breadthPctChart = null;
@@ -607,5 +709,8 @@ async function loadBreadth({ force = false } = {}) {
   }
 }
 
-document.getElementById('breadth-refresh').addEventListener('click', () => loadBreadth({ force: true }));
+document.getElementById('breadth-refresh').addEventListener('click', () => {
+  loadOverview({ force: true });
+  loadBreadth({ force: true });
+});
 document.getElementById('breadth-universe').addEventListener('change', () => loadBreadth({ force: false }));
