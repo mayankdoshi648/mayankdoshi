@@ -68,4 +68,32 @@ describe('marketOverview', () => {
     assert.equal(q.changePct, 0.1);
     assert.equal(pickQuote(byName, 'MISSING'), null);
   });
+
+  it('resolveQuote prefers Kotak over NSE', () => {
+    const { resolveQuote } = require('./marketOverview');
+    const kotak = new Map([
+      ['nifty50', { last: 24100, change: 10, changePct: 0.04 }],
+    ]);
+    const nse = new Map([
+      ['NIFTY 50', {
+        index: 'NIFTY 50',
+        last: 24000,
+        previousClose: 23900,
+        variation: 100,
+        percentChange: 0.42,
+      }],
+    ]);
+    const fromKotak = resolveQuote(
+      { id: 'nifty50', nseName: 'NIFTY 50' },
+      kotak,
+      nse,
+    );
+    assert.equal(fromKotak.last, 24100);
+    const fromNse = resolveQuote(
+      { id: 'nifty50', nseName: 'NIFTY 50' },
+      new Map(),
+      nse,
+    );
+    assert.equal(fromNse.last, 24000);
+  });
 });

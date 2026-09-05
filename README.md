@@ -35,6 +35,8 @@ Edit `.env`:
 | Variable | Purpose |
 |----------|---------|
 | `DHAN_CLIENT_ID`, `DHAN_PIN`, `DHAN_TOTP_SECRET` | Dhan login + NSE EOD history |
+| `KOTAK_NEO_CONSUMER_KEY` | Kotak Neo live quotes (Market Breadth overview) |
+| `KOTAK_NEO_MOBILE`, `KOTAK_NEO_UCC`, `KOTAK_NEO_MPIN`, `KOTAK_NEO_TOTP_SECRET` | Optional Neo trade session |
 | `OBSIDIAN_VAULT_PATH` | Full path to your Obsidian vault |
 | `OBSIDIAN_MIN_SCORE` | Min score for Obsidian notes (default 55) |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Alerts via @BotFather + @userinfobot |
@@ -43,7 +45,10 @@ Edit `.env`:
 
 ### 4. Run locally
 
-**Dashboard** (DarvaX Scanner tab at http://localhost:3000):
+**Dashboards** (two separate apps — do not mix):
+
+- **Market Breadth:** http://localhost:3002/
+- **PowerBull Pro (original):** http://localhost:3000/
 
 ```bash
 npm start
@@ -84,17 +89,27 @@ npm run darvax:scan -- --market=NSE   # NSE only
 npm run darvax:scan -- --market=US    # US only
 ```
 
-## Market Breadth dashboard
+## Market Breadth dashboard (separate app)
 
-Open **Market Breadth** in the app (http://localhost:3000) to see:
+Open **http://localhost:3002/** for Market Breadth only.
 
+PowerBull Pro (original Live / DarvaX / Track UI) stays at **http://localhost:3000/** and is not mixed into Market Breadth.
+
+- Live Nifty / Bank Nifty / India VIX + Large/Mid/Small + sector strips
 - % of Nifty 50 / Nifty 500 stocks above 20 / 50 / 200 DMA
 - Index vs breadth line charts (divergence view)
 - Spirit-level gauges + posture diagnosis (STOP PRESSING / REDUCE RISK / SIT OUT / GREEN LIGHT)
 
-Data sources: **Yahoo Finance** (default, no keys) using the NSE Nifty 50/500 universe. If Dhan credentials are set, NSE EOD history is preferred automatically. Kotak Neo is not wired yet — use Yahoo/Dhan path above.
+### Data sources
 
-First refresh for Nifty 50 takes ~1–2 minutes; results cache for 6 hours under `data/breadth-cache.json`.
+| Need | Source |
+|------|--------|
+| Live index / sector CMP + % | **Kotak Neo** when `KOTAK_NEO_CONSUMER_KEY` is set; else NSE `allIndices` |
+| DMA / EMA history (breadth + sector bias) | Yahoo Finance (default); Dhan EOD when Dhan creds are set |
+
+Kotak Neo has **no historical candle API**, so breadth DMA still uses Yahoo/Dhan. Quotes only need the consumer access token (full TOTP/MPIN login is optional and not used for the overview strip).
+
+First breadth refresh for Nifty 50 takes ~1–2 minutes; results cache under `data/breadth-cache.json`. Overview quotes cache under `data/overview-cache.json`.
 
 ## Architecture (DarvaX)
 

@@ -2,14 +2,20 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { computeEMA } = require('./indicators');
 const { fetchYahooDailyCandles } = require('./darvaxData');
+const {
+  INDEX_TOKENS,
+  isKotakConfigured,
+  fetchKotakQuotesByIds,
+  getKotakStatus,
+} = require('./kotakNeo');
 
 const NSE_HOME = 'https://www.nseindia.com';
 const NSE_ALL_INDICES = 'https://www.nseindia.com/api/allIndices';
 
 const HEADLINE = [
-  { id: 'nifty50', nseName: 'NIFTY 50', label: 'Nifty 50' },
-  { id: 'bankNifty', nseName: 'NIFTY BANK', label: 'Bank Nifty' },
-  { id: 'indiaVix', nseName: 'INDIA VIX', label: 'India VIX' },
+  { id: 'nifty50', nseName: 'NIFTY 50', label: 'Nifty 50', kotak: 'Nifty 50' },
+  { id: 'bankNifty', nseName: 'NIFTY BANK', label: 'Bank Nifty', kotak: 'Nifty Bank' },
+  { id: 'indiaVix', nseName: 'INDIA VIX', label: 'India VIX', kotak: 'India VIX' },
 ];
 
 const SIZE_INDICES = [
@@ -19,6 +25,7 @@ const SIZE_INDICES = [
     label: 'Large Cap',
     subtitle: 'Nifty 100',
     yahoo: '^CNX100',
+    kotak: 'Nifty 100',
   },
   {
     id: 'midCap',
@@ -26,6 +33,7 @@ const SIZE_INDICES = [
     label: 'Mid Cap',
     subtitle: 'Nifty Midcap 150',
     yahoo: '^NSMIDCP',
+    kotak: 'Nifty Midcap 150',
   },
   {
     id: 'smallCap',
@@ -33,27 +41,58 @@ const SIZE_INDICES = [
     label: 'Small Cap',
     subtitle: 'Nifty Smallcap 250',
     yahoo: null,
+    kotak: 'Nifty Smallcap 250',
   },
 ];
 
 const SECTOR_INDICES = [
-  { id: 'it', nseName: 'NIFTY IT', label: 'IT', yahoo: '^CNXIT' },
-  { id: 'bank', nseName: 'NIFTY BANK', label: 'Bank', yahoo: '^NSEBANK' },
-  { id: 'fin', nseName: 'NIFTY FINANCIAL SERVICES', label: 'Financial Services', yahoo: null },
-  { id: 'auto', nseName: 'NIFTY AUTO', label: 'Auto', yahoo: '^CNXAUTO' },
-  { id: 'pharma', nseName: 'NIFTY PHARMA', label: 'Pharma', yahoo: '^CNXPHARMA' },
-  { id: 'fmcg', nseName: 'NIFTY FMCG', label: 'FMCG', yahoo: '^CNXFMCG' },
-  { id: 'metal', nseName: 'NIFTY METAL', label: 'Metal', yahoo: '^CNXMETAL' },
-  { id: 'energy', nseName: 'NIFTY ENERGY', label: 'Energy', yahoo: '^CNXENERGY' },
-  { id: 'realty', nseName: 'NIFTY REALTY', label: 'Realty', yahoo: '^CNXREALTY' },
-  { id: 'media', nseName: 'NIFTY MEDIA', label: 'Media', yahoo: '^CNXMEDIA' },
-  { id: 'psuBank', nseName: 'NIFTY PSU BANK', label: 'PSU Bank', yahoo: '^CNXPSUBANK' },
-  { id: 'privateBank', nseName: 'NIFTY PRIVATE BANK', label: 'Private Bank', yahoo: null },
-  { id: 'infra', nseName: 'NIFTY INFRASTRUCTURE', label: 'Infra', yahoo: '^CNXINFRA' },
-  { id: 'healthcare', nseName: 'NIFTY HEALTHCARE INDEX', label: 'Healthcare', yahoo: null },
-  { id: 'consumerDurables', nseName: 'NIFTY CONSUMER DURABLES', label: 'Consumer Durables', yahoo: null },
-  { id: 'oilGas', nseName: 'NIFTY OIL & GAS', label: 'Oil & Gas', yahoo: null },
-  { id: 'chemicals', nseName: 'NIFTY CHEMICALS', label: 'Chemicals', yahoo: null },
+  { id: 'it', nseName: 'NIFTY IT', label: 'IT', yahoo: '^CNXIT', kotak: 'Nifty IT' },
+  { id: 'bank', nseName: 'NIFTY BANK', label: 'Bank', yahoo: '^NSEBANK', kotak: 'Nifty Bank' },
+  {
+    id: 'fin',
+    nseName: 'NIFTY FINANCIAL SERVICES',
+    label: 'Financial Services',
+    yahoo: null,
+    kotak: 'Nifty Financial Services',
+  },
+  { id: 'auto', nseName: 'NIFTY AUTO', label: 'Auto', yahoo: '^CNXAUTO', kotak: 'Nifty Auto' },
+  { id: 'pharma', nseName: 'NIFTY PHARMA', label: 'Pharma', yahoo: '^CNXPHARMA', kotak: 'Nifty Pharma' },
+  { id: 'fmcg', nseName: 'NIFTY FMCG', label: 'FMCG', yahoo: '^CNXFMCG', kotak: 'Nifty FMCG' },
+  { id: 'metal', nseName: 'NIFTY METAL', label: 'Metal', yahoo: '^CNXMETAL', kotak: 'Nifty Metal' },
+  { id: 'energy', nseName: 'NIFTY ENERGY', label: 'Energy', yahoo: '^CNXENERGY', kotak: 'Nifty Energy' },
+  { id: 'realty', nseName: 'NIFTY REALTY', label: 'Realty', yahoo: '^CNXREALTY', kotak: 'Nifty Realty' },
+  { id: 'media', nseName: 'NIFTY MEDIA', label: 'Media', yahoo: '^CNXMEDIA', kotak: 'Nifty Media' },
+  { id: 'psuBank', nseName: 'NIFTY PSU BANK', label: 'PSU Bank', yahoo: '^CNXPSUBANK', kotak: 'Nifty PSU Bank' },
+  {
+    id: 'privateBank',
+    nseName: 'NIFTY PRIVATE BANK',
+    label: 'Private Bank',
+    yahoo: null,
+    kotak: 'Nifty Private Bank',
+  },
+  {
+    id: 'infra',
+    nseName: 'NIFTY INFRASTRUCTURE',
+    label: 'Infra',
+    yahoo: '^CNXINFRA',
+    kotak: 'Nifty Infrastructure',
+  },
+  {
+    id: 'healthcare',
+    nseName: 'NIFTY HEALTHCARE INDEX',
+    label: 'Healthcare',
+    yahoo: null,
+    kotak: 'Nifty Healthcare',
+  },
+  {
+    id: 'consumerDurables',
+    nseName: 'NIFTY CONSUMER DURABLES',
+    label: 'Consumer Durables',
+    yahoo: null,
+    kotak: 'Nifty Consumer Durables',
+  },
+  { id: 'oilGas', nseName: 'NIFTY OIL & GAS', label: 'Oil & Gas', yahoo: null, kotak: 'Nifty Oil & Gas' },
+  { id: 'chemicals', nseName: 'NIFTY CHEMICALS', label: 'Chemicals', yahoo: null, kotak: 'Nifty Chemicals' },
 ];
 
 const EMA_PERIODS = [20, 50, 200];
@@ -229,11 +268,51 @@ async function mapPool(items, concurrency, worker) {
   return out;
 }
 
+function resolveQuote(meta, kotakById, nseByName) {
+  if (kotakById?.has(meta.id)) return kotakById.get(meta.id);
+  return pickQuote(nseByName, meta.nseName);
+}
+
+async function fetchKotakQuoteMap(metas, options = {}) {
+  if (!isKotakConfigured()) return { map: new Map(), used: false, error: null };
+  const entries = [];
+  for (const meta of metas) {
+    if (!meta.kotak) continue;
+    const token = INDEX_TOKENS[meta.kotak];
+    if (!token) continue;
+    entries.push({ id: meta.id, ...token });
+  }
+  try {
+    const map = await fetchKotakQuotesByIds(entries, {
+      timeoutMs: options.timeoutMs,
+      quoteType: options.quoteType,
+      // Tests may inject a Neo-style JSON fetch; do not pass generic HTTP fetchImpl
+      fetchImpl: options.kotakFetchImpl,
+    });
+    return { map, used: map.size > 0, error: null };
+  } catch (err) {
+    return { map: new Map(), used: false, error: err.message };
+  }
+}
+
 async function computeMarketOverview(options = {}) {
   const { fetchImpl = fetch } = options;
-  const byName = await fetchNseAllIndices(fetchImpl);
+  const allMetas = [...HEADLINE, ...SIZE_INDICES, ...SECTOR_INDICES];
 
-  const headline = HEADLINE.map((meta) => formatQuote(meta, pickQuote(byName, meta.nseName)));
+  let nseByName = new Map();
+  let nseError = null;
+  const kotakResult = await fetchKotakQuoteMap(allMetas, options);
+
+  // Prefer Kotak Neo live quotes; fall back to NSE allIndices for gaps / when unset
+  const needNse = !kotakResult.used || allMetas.some((m) => !kotakResult.map.has(m.id));
+  if (needNse) {
+    try {
+      nseByName = await fetchNseAllIndices(fetchImpl);
+    } catch (err) {
+      nseError = err.message;
+      if (!kotakResult.used) throw err;
+    }
+  }
 
   const uniqueYahoo = [...new Set(
     [...SIZE_INDICES, ...SECTOR_INDICES].map((m) => m.yahoo).filter(Boolean),
@@ -245,19 +324,28 @@ async function computeMarketOverview(options = {}) {
   ]);
   for (const [sym, ema] of emaResults) emaByYahoo.set(sym, ema);
 
+  const headline = HEADLINE.map((meta) =>
+    formatQuote(meta, resolveQuote(meta, kotakResult.map, nseByName)),
+  );
+
   const size = SIZE_INDICES.map((meta) => ({
-    ...formatQuote(meta, pickQuote(byName, meta.nseName)),
+    ...formatQuote(meta, resolveQuote(meta, kotakResult.map, nseByName)),
     ema: meta.yahoo ? (emaByYahoo.get(meta.yahoo) || null) : null,
   }));
 
   const sectors = SECTOR_INDICES.map((meta) => ({
-    ...formatQuote(meta, pickQuote(byName, meta.nseName)),
+    ...formatQuote(meta, resolveQuote(meta, kotakResult.map, nseByName)),
     ema: meta.yahoo ? (emaByYahoo.get(meta.yahoo) || null) : null,
   }));
 
+  const quoteSource = kotakResult.used ? 'kotak-neo' : 'nse';
   return {
     scannedAt: new Date().toISOString(),
-    source: 'nse+yahoo',
+    source: `${quoteSource}+yahoo`,
+    quoteSource,
+    emaSource: 'yahoo',
+    kotak: getKotakStatus(),
+    warnings: [kotakResult.error, nseError].filter(Boolean),
     headline,
     size,
     sectors,
@@ -318,6 +406,7 @@ module.exports = {
   formatQuote,
   emaStatusFromCloses,
   pickQuote,
+  resolveQuote,
   computeMarketOverview,
   getMarketOverview,
 };
