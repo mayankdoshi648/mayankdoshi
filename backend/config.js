@@ -24,6 +24,11 @@ function loadConfig() {
     telegramMinScore: Number(process.env.TELEGRAM_MIN_SCORE || 85),
     telegramBreakoutMinScore: Number(process.env.TELEGRAM_BREAKOUT_MIN_SCORE || 70),
     fundamentalsMaxFetch: Number(process.env.FUNDAMENTALS_MAX_FETCH || 30),
+    kotakNeoConsumerKey: process.env.KOTAK_NEO_CONSUMER_KEY || '',
+    kotakNeoMobile: process.env.KOTAK_NEO_MOBILE || '',
+    kotakNeoUcc: process.env.KOTAK_NEO_UCC || '',
+    kotakNeoMpin: process.env.KOTAK_NEO_MPIN || '',
+    kotakNeoTotpSecret: process.env.KOTAK_NEO_TOTP_SECRET || '',
   };
 }
 
@@ -45,6 +50,11 @@ function loadConfigOptional() {
       telegramMinScore: Number(process.env.TELEGRAM_MIN_SCORE || 85),
       telegramBreakoutMinScore: Number(process.env.TELEGRAM_BREAKOUT_MIN_SCORE || 70),
       fundamentalsMaxFetch: Number(process.env.FUNDAMENTALS_MAX_FETCH || 30),
+      kotakNeoConsumerKey: process.env.KOTAK_NEO_CONSUMER_KEY || '',
+      kotakNeoMobile: process.env.KOTAK_NEO_MOBILE || '',
+      kotakNeoUcc: process.env.KOTAK_NEO_UCC || '',
+      kotakNeoMpin: process.env.KOTAK_NEO_MPIN || '',
+      kotakNeoTotpSecret: process.env.KOTAK_NEO_TOTP_SECRET || '',
     };
   }
 }

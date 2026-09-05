@@ -29,12 +29,14 @@ function createApiRouter({
   let breadthProgress = null;
 
   router.get('/status', (req, res) => {
+    const { getKotakStatus } = require('./kotakNeo');
     res.json({
       marketOpen: isMarketOpenFn(),
       feedConnected: connectionStatus.isConnected(),
       lastError: connectionStatus.getLastError(),
       darvaxAutoTrade: config?.darvaxAutoTrade ?? false,
       hasDhan: Boolean(config?.clientId && config?.pin && config?.totpSecret),
+      kotakNeo: getKotakStatus(),
     });
   });
 

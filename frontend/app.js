@@ -482,7 +482,8 @@ async function loadOverview({ force = false } = {}) {
     renderOverview(data);
     if (statusEl && !statusEl.textContent.includes('Scanning')) {
       const stamp = data.scannedAt ? new Date(data.scannedAt).toLocaleTimeString() : '';
-      statusEl.textContent = `Overview ${data.fromCache ? 'cached' : 'live'}${stamp ? ` · ${stamp}` : ''}`;
+      const src = data.quoteSource ? ` · ${data.quoteSource}` : '';
+      statusEl.textContent = `Overview ${data.fromCache ? 'cached' : 'live'}${src}${stamp ? ` · ${stamp}` : ''}`;
     }
   } catch (err) {
     if (statusEl) statusEl.textContent = `Overview error: ${err.message}`;
