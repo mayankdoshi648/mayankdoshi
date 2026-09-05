@@ -3,7 +3,7 @@ const path = require('node:path');
 const express = require('express');
 const http = require('node:http');
 
-const { loadConfig } = require('./config');
+const { loadConfigOptional } = require('./config');
 const { isMarketOpen } = require('./marketWindow');
 const { openDb, insertSignal } = require('./db');
 const { evaluateSignal, MIN_CANDLES } = require('./signalEngine');
@@ -16,12 +16,14 @@ const { createDhanFeed } = require('./dhanFeed');
 const { resolveNifty50InstrumentMap } = require('./instrumentMap');
 const { fetchAccessToken } = require('./dhanAuth');
 
-const config = loadConfig();
+const config = loadConfigOptional();
+const hasDhan = Boolean(config.clientId && config.pin && config.totpSecret);
 const db = openDb();
 const connectionStatus = createConnectionStatus();
 const aggregator = new CandleAggregator();
 
 const app = express();
+app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 app.use('/api', createApiRouter({
   db,
@@ -40,6 +42,9 @@ function todayTradeDate() {
 }
 
 async function startIngestion() {
+  if (!hasDhan) {
+    throw new Error('Dhan credentials not configured — live feed disabled (Market Breadth still works via Yahoo/NSE)');
+  }
   const { accessToken } = await fetchAccessToken(config);
 
   const instrumentMap = await resolveNifty50InstrumentMap();
@@ -88,6 +93,10 @@ setInterval(() => {
 
 httpServer.listen(config.port, () => {
   console.log(`PowerBull Pro listening on http://localhost:${config.port}`);
+  if (!hasDhan) {
+    console.log('Dhan credentials missing — live feed off. Market Breadth uses Yahoo Finance + NSE universe.');
+    return;
+  }
   if (isMarketOpen()) {
     startIngestion().catch((err) => {
       connectionStatus.setError(err);

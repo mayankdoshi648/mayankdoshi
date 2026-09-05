@@ -185,3 +185,172 @@ body {
   font-size: 1rem;
   width: 2rem;
 }
+
+/* Market Breadth */
+.breadth-toolbar {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0 1.25rem 1rem;
+  flex-wrap: wrap;
+}
+
+.breadth-toolbar select {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+}
+
+.breadth-hero {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 1rem;
+  padding: 0 1.25rem 1.25rem;
+}
+
+@media (max-width: 800px) {
+  .breadth-hero { grid-template-columns: 1fr; }
+}
+
+.breadth-def {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+}
+
+.breadth-def h2 {
+  margin: 0 0 0.5rem;
+  color: var(--accent);
+  font-size: 1.15rem;
+}
+
+.breadth-def p {
+  margin: 0;
+  color: #b6c2d0;
+  line-height: 1.55;
+  font-size: 0.95rem;
+}
+
+.breadth-posture {
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.breadth-posture.tone-good { border-color: var(--buy); background: #102218; }
+.breadth-posture.tone-warn { border-color: #f59e0b; background: #2a1f0a; }
+.breadth-posture.tone-danger { border-color: var(--sell); background: #2a1212; }
+.breadth-posture.tone-neutral { border-color: var(--border); }
+
+.posture-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8892a0;
+}
+
+.posture-value {
+  font-size: 1.45rem;
+  font-weight: 800;
+  margin: 0.35rem 0;
+}
+
+.tone-good .posture-value { color: var(--buy); }
+.tone-warn .posture-value { color: #f59e0b; }
+.tone-danger .posture-value { color: var(--sell); }
+
+.posture-diagnosis {
+  color: #c9d4e0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.breadth-gauges {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  padding: 0 1.25rem 0.5rem;
+}
+
+@media (max-width: 900px) {
+  .breadth-gauges { grid-template-columns: 1fr; }
+}
+
+.gauge-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.gauge-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.gauge-sub {
+  color: #8892a0;
+  font-size: 0.8rem;
+  margin: 0.2rem 0 0.5rem;
+}
+
+.gauge-readout {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.gauge-arrow { margin-left: 0.25rem; color: var(--accent); }
+
+.breadth-note {
+  padding: 0 1.25rem 1rem;
+  color: #8892a0;
+  font-size: 0.8rem;
+}
+
+.breadth-charts {
+  padding: 0 1.25rem 1.5rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.chart-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem 0.5rem;
+}
+
+.chart-panel h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  color: #c9d4e0;
+  font-weight: 600;
+}
+
+.breadth-rules {
+  padding: 0 1.25rem 2rem;
+}
+
+.breadth-rules h3 {
+  margin: 0 0 0.75rem;
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+.breadth-rules-table {
+  margin: 0;
+  width: 100%;
+}
+
+.breadth-rules-table tr { cursor: default; }
+.breadth-rules-table tr.tone-warn td:last-child { color: #f59e0b; }
+.breadth-rules-table tr.tone-danger td:last-child { color: var(--sell); }
+.breadth-rules-table tr.tone-good td:last-child { color: var(--buy); }
+

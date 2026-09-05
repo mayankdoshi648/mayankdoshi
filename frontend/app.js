@@ -106,6 +106,11 @@ document.getElementById('tab-live').addEventListener('click', () => {
   showView('live');
 });
 
+document.getElementById('tab-breadth').addEventListener('click', () => {
+  showView('breadth');
+  loadBreadth();
+});
+
 document.getElementById('tab-darvax').addEventListener('click', () => {
   showView('darvax');
   loadDarvaxScans();
@@ -117,13 +122,13 @@ document.getElementById('tab-track').addEventListener('click', () => {
 });
 
 function showView(name) {
-  const views = { live: 'view-live', darvax: 'view-darvax', track: 'view-track' };
-  const tabs = { live: 'tab-live', darvax: 'tab-darvax', track: 'tab-track' };
+  const views = { live: 'view-live', breadth: 'view-breadth', darvax: 'view-darvax', track: 'view-track' };
+  const tabs = { live: 'tab-live', breadth: 'tab-breadth', darvax: 'tab-darvax', track: 'tab-track' };
   Object.values(views).forEach((id) => document.getElementById(id).classList.add('hidden'));
   Object.values(tabs).forEach((id) => document.getElementById(id).classList.remove('active'));
   document.getElementById(views[name]).classList.remove('hidden');
   document.getElementById(tabs[name]).classList.add('active');
-  document.getElementById('counters').classList.toggle('hidden', name === 'darvax');
+  document.getElementById('counters').classList.toggle('hidden', name === 'darvax' || name === 'breadth');
 }
 
 document.getElementById('date-picker').value = state.date;
@@ -365,3 +370,242 @@ document.getElementById('darvax-export-obsidian').addEventListener('click', asyn
     statusEl.textContent = `Export failed: ${err.message}`;
   }
 });
+
+// --- Market Breadth ---
+let breadthIndexChart = null;
+let breadthPctChart = null;
+let breadthPollTimer = null;
+
+function drawGauge(canvas, pct) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  const cx = w / 2;
+  const cy = h / 2;
+  const r = Math.min(w, h) / 2 - 10;
+  ctx.clearRect(0, 0, w, h);
+
+  // track
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = '#223040';
+  ctx.lineWidth = 12;
+  ctx.stroke();
+
+  // value arc
+  const value = Math.max(0, Math.min(100, pct ?? 0));
+  const start = -Math.PI / 2;
+  const end = start + (Math.PI * 2 * value) / 100;
+  const color = value >= 50 ? '#21c55d' : '#ef4444';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, start, end);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 12;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // 50% tick
+  const tickAngle = start + Math.PI;
+  ctx.beginPath();
+  ctx.moveTo(cx + Math.cos(tickAngle) * (r - 16), cy + Math.sin(tickAngle) * (r - 16));
+  ctx.lineTo(cx + Math.cos(tickAngle) * (r + 4), cy + Math.sin(tickAngle) * (r + 4));
+  ctx.strokeStyle = '#8892a0';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // center text
+  ctx.fillStyle = '#e6edf3';
+  ctx.font = 'bold 22px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(pct == null ? '—' : `${value.toFixed(0)}%`, cx, cy);
+}
+
+function renderBreadthGauges(gauges) {
+  const keys = ['dma20', 'dma50', 'dma200'];
+  keys.forEach((key) => {
+    const card = document.querySelector(`.gauge-card[data-key="${key}"]`);
+    if (!card || !gauges?.[key]) return;
+    const g = gauges[key];
+    drawGauge(card.querySelector('.gauge-canvas'), g.value);
+    card.querySelector('.gauge-pct').textContent = g.value == null ? '—' : `${g.value}%`;
+    card.querySelector('.gauge-arrow').textContent = g.arrow || '';
+    card.querySelector('.gauge-title').textContent = g.label;
+    card.querySelector('.gauge-sub').textContent = g.subtitle;
+  });
+}
+
+function renderBreadthPosture(diagnosis) {
+  const box = document.getElementById('breadth-posture');
+  box.className = `breadth-posture tone-${diagnosis?.tone || 'neutral'}`;
+  document.getElementById('breadth-posture-value').textContent = diagnosis?.posture || '—';
+  document.getElementById('breadth-diagnosis').textContent = diagnosis?.diagnosis || '';
+}
+
+function renderBreadthCharts(series) {
+  const labels = (series?.dates || []).map((d) => d.slice(5));
+  const commonOpts = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#c9d4e0' } } },
+    scales: {
+      x: {
+        ticks: { color: '#8892a0', maxTicksLimit: 8 },
+        grid: { color: '#1a2330' },
+      },
+      y: {
+        ticks: { color: '#8892a0' },
+        grid: { color: '#1a2330' },
+      },
+    },
+  };
+
+  const indexCtx = document.getElementById('breadth-index-chart').getContext('2d');
+  if (breadthIndexChart) breadthIndexChart.destroy();
+  document.getElementById('breadth-index-chart').parentElement.style.height = '220px';
+  breadthIndexChart = new Chart(indexCtx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Nifty 50',
+        data: series?.index || [],
+        borderColor: '#f5b400',
+        backgroundColor: 'rgba(245,180,0,0.12)',
+        fill: true,
+        tension: 0.15,
+        pointRadius: 0,
+        borderWidth: 2,
+      }],
+    },
+    options: commonOpts,
+  });
+
+  const pctCtx = document.getElementById('breadth-pct-chart').getContext('2d');
+  if (breadthPctChart) breadthPctChart.destroy();
+  document.getElementById('breadth-pct-chart').parentElement.style.height = '260px';
+  breadthPctChart = new Chart(pctCtx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '20 DMA',
+          data: series?.breadth20 || [],
+          borderColor: '#21c55d',
+          tension: 0.15,
+          pointRadius: 0,
+          borderWidth: 2,
+        },
+        {
+          label: '50 DMA',
+          data: series?.breadth50 || [],
+          borderColor: '#3b82f6',
+          tension: 0.15,
+          pointRadius: 0,
+          borderWidth: 2,
+        },
+        {
+          label: '200 DMA',
+          data: series?.breadth200 || [],
+          borderColor: '#94a3b8',
+          tension: 0.15,
+          pointRadius: 0,
+          borderWidth: 2,
+        },
+      ],
+    },
+    options: {
+      ...commonOpts,
+      scales: {
+        ...commonOpts.scales,
+        y: {
+          ...commonOpts.scales.y,
+          min: 0,
+          max: 100,
+          ticks: {
+            color: '#8892a0',
+            callback: (v) => `${v}%`,
+          },
+        },
+      },
+      plugins: {
+        ...commonOpts.plugins,
+        annotation: undefined,
+      },
+    },
+    plugins: [{
+      id: 'fiftyLine',
+      afterDraw(chart) {
+        const { ctx, chartArea, scales } = chart;
+        if (!scales.y || !chartArea) return;
+        const y = scales.y.getPixelForValue(50);
+        ctx.save();
+        ctx.strokeStyle = '#8892a0';
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(chartArea.left, y);
+        ctx.lineTo(chartArea.right, y);
+        ctx.stroke();
+        ctx.restore();
+      },
+    }],
+  });
+}
+
+function renderBreadthReport(data) {
+  renderBreadthGauges(data.gauges);
+  renderBreadthPosture(data.diagnosis);
+  renderBreadthCharts(data.series);
+  const statusEl = document.getElementById('breadth-status');
+  const src = data.dataSource || 'yahoo';
+  const cache = data.fromCache ? 'cached' : 'fresh';
+  statusEl.textContent = `${data.stockCount} stocks · as of ${data.asOf || '—'} · ${src} · ${cache}`
+    + (data.warning ? ` · warn: ${data.warning}` : '');
+}
+
+async function loadBreadth({ force = false } = {}) {
+  const universe = document.getElementById('breadth-universe').value;
+  const statusEl = document.getElementById('breadth-status');
+  const btn = document.getElementById('breadth-refresh');
+  statusEl.textContent = force
+    ? `Scanning ${universe === 'nifty500' ? 'Nifty 500' : 'Nifty 50'}… this can take a few minutes`
+    : 'Loading…';
+  btn.disabled = true;
+
+  if (breadthPollTimer) {
+    clearInterval(breadthPollTimer);
+    breadthPollTimer = null;
+  }
+
+  breadthPollTimer = setInterval(async () => {
+    try {
+      const s = await fetch('/api/breadth/status').then((r) => r.json());
+      if (s.scanning && s.progress?.total) {
+        statusEl.textContent = `Scanning ${s.progress.done}/${s.progress.total}`
+          + (s.progress.symbol ? ` · ${s.progress.symbol}` : '');
+      }
+    } catch { /* ignore */ }
+  }, 1500);
+
+  try {
+    const url = force
+      ? `/api/breadth?universe=${universe}&refresh=1`
+      : `/api/breadth?universe=${universe}`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    renderBreadthReport(data);
+  } catch (err) {
+    statusEl.textContent = `Error: ${err.message}`;
+  } finally {
+    btn.disabled = false;
+    if (breadthPollTimer) {
+      clearInterval(breadthPollTimer);
+      breadthPollTimer = null;
+    }
+  }
+}
+
+document.getElementById('breadth-refresh').addEventListener('click', () => loadBreadth({ force: true }));
+document.getElementById('breadth-universe').addEventListener('change', () => loadBreadth({ force: false }));
