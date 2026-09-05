@@ -15,9 +15,14 @@ KOTAK_NEO_CONSUMER_KEY=your_consumer_access_token
 
 Also accepted: `KOTAK_CONSUMER_KEY`, `NEO_CONSUMER_KEY`, `CONSUMER_KEY`.
 
-2. Pull/checkout the Kotak branch, then restart:
+2. In PowerShell from that folder, pull the Kotak branch and restart:
 
-```bash
+```powershell
+cd "C:\Darvax Brain"
+# if the repo is nested:
+# cd "C:\Darvax Brain\mayankdoshi"
+git fetch
+git checkout cursor/kotak-neo-api-b028
 git pull
 npm start
 ```
