@@ -147,6 +147,22 @@ loadStatus();
 connectLiveSocket();
 setInterval(loadStatus, 30000);
 
+// Deep-link: ?tab=breadth|darvax|track|live
+(() => {
+  const tab = new URLSearchParams(location.search).get('tab');
+  if (tab === 'breadth') {
+    showView('breadth');
+    loadOverview();
+    loadBreadth();
+  } else if (tab === 'darvax') {
+    showView('darvax');
+    loadDarvaxScans();
+    loadPendingOrders();
+  } else if (tab === 'track') {
+    showView('track');
+  }
+})();
+
 // --- appended to frontend/app.js ---
 let activeChart = null;
 
