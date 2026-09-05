@@ -2,7 +2,7 @@
 
 ## What Neo is used for
 
-- **Live CMP + % change** for Nifty, Bank Nifty, India VIX, size indices, and sector indices on the standalone Market Breadth page (`/breadth`).
+- **Live CMP + % change** for Nifty, Bank Nifty, India VIX, size indices, and sector indices on **http://localhost:3002/**.
 - Neo does **not** provide historical candles, so DMA/EMA breadth still uses Yahoo (or Dhan when configured).
 
 ## Minimum setup (quotes only)
@@ -27,10 +27,10 @@ git pull
 npm start
 ```
 
-3. Open http://localhost:3000/breadth — status should show `· kotak-neo`.
+3. Open http://localhost:3002/ — status should show `· kotak-neo`.
 4. `GET /api/status` includes `kotakNeo.quotesReady: true` when the key is set.
 
-Market Breadth is a **separate page** from PowerBull Pro (`/`), so the two dashboards stay independent.
+Market Breadth is the homepage on port **3002**. PowerBull Pro stays separate at `/powerbull`.
 
 **Note:** `.env` is gitignored. Cloud agents cannot read your Windows `.env` — add the same key as a Cursor Cloud secret if you want Neo quotes in the cloud agent.
 

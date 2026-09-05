@@ -26,17 +26,14 @@ const app = express();
 app.use(express.json());
 const frontendDir = path.join(__dirname, '..', 'frontend');
 
-// Standalone Market Breadth dashboard (separate from PowerBull Pro)
-app.get(['/breadth', '/breadth/'], (req, res) => {
+// Market Breadth is the primary app on this port (http://localhost:3002/)
+app.get(['/', '/breadth', '/breadth/'], (req, res) => {
   res.sendFile(path.join(frontendDir, 'breadth.html'));
 });
 
-// Old deep-link -> dedicated page
-app.get('/', (req, res, next) => {
-  if (String(req.query.tab || '') === 'breadth') {
-    return res.redirect(302, '/breadth');
-  }
-  next();
+// PowerBull Pro kept separate (not mixed into Market Breadth)
+app.get(['/powerbull', '/powerbull/', '/pro', '/pro/'], (req, res) => {
+  res.sendFile(path.join(frontendDir, 'index.html'));
 });
 
 app.use(express.static(frontendDir));
@@ -107,9 +104,10 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 httpServer.listen(config.port, () => {
-  console.log(`PowerBull Pro listening on http://localhost:${config.port}`);
+  console.log(`Market Breadth: http://localhost:${config.port}/`);
+  console.log(`PowerBull Pro:  http://localhost:${config.port}/powerbull`);
   if (!hasDhan) {
-    console.log('Dhan credentials missing — live feed off. Market Breadth uses Yahoo Finance + NSE universe.');
+    console.log('Dhan credentials missing — live feed off. Market Breadth uses Yahoo/Kotak + NSE universe.');
     return;
   }
   if (isMarketOpen()) {

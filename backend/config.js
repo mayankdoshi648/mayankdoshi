@@ -35,7 +35,7 @@ function loadConfig() {
     clientId: process.env.DHAN_CLIENT_ID,
     pin: process.env.DHAN_PIN,
     totpSecret: process.env.DHAN_TOTP_SECRET,
-    port: Number(process.env.PORT || 3000),
+    port: Number(process.env.PORT || 3002),
     darvaxAutoTrade: process.env.DARVAX_AUTO_TRADE === 'true',
     darvaxRiskPct: Number(process.env.DARVAX_RISK_PCT || 1),
     darvaxCapital: Number(process.env.DARVAX_CAPITAL || 1000000),
@@ -57,7 +57,7 @@ function loadConfigOptional() {
     return loadConfig();
   } catch {
     return {
-      port: Number(process.env.PORT || 3000),
+      port: Number(process.env.PORT || 3002),
       darvaxAutoTrade: false,
       darvaxRiskPct: Number(process.env.DARVAX_RISK_PCT || 1),
       darvaxCapital: Number(process.env.DARVAX_CAPITAL || 1000000),
