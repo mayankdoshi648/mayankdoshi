@@ -682,29 +682,46 @@ function renderBreadthReport(data) {
     + (data.warning ? ` · warn: ${data.warning}` : '');
 }
 
-async function loadBreadth({ force = false } = {}) {
-  const universe = document.getElementById('breadth-universe').value;
-  const statusEl = document.getElementById('breadth-status');
-  const btn = document.getElementById('breadth-refresh');
-  statusEl.textContent = force
-    ? `Scanning ${universe === 'nifty500' ? 'Nifty 500' : 'Nifty 50'}… this can take a few minutes`
-    : 'Loading…';
-  btn.disabled = true;
-
+function stopBreadthPoll() {
   if (breadthPollTimer) {
     clearInterval(breadthPollTimer);
     breadthPollTimer = null;
   }
+}
 
+function startBreadthPoll(statusEl) {
+  stopBreadthPoll();
+  let seenScanning = false;
   breadthPollTimer = setInterval(async () => {
     try {
       const s = await fetch('/api/breadth/status').then((r) => r.json());
-      if (s.scanning && s.progress?.total) {
-        statusEl.textContent = `Scanning ${s.progress.done}/${s.progress.total}`
-          + (s.progress.symbol ? ` · ${s.progress.symbol}` : '');
+      if (s.scanning) {
+        seenScanning = true;
+        if (s.progress?.total) {
+          statusEl.textContent = `Refreshing ${s.progress.done}/${s.progress.total}`
+            + (s.progress.symbol ? ` · ${s.progress.symbol}` : '');
+        } else {
+          statusEl.textContent = 'Refreshing breadth in background…';
+        }
+        return;
+      }
+      if (seenScanning) {
+        stopBreadthPoll();
+        // Pull fresh completed cache without forcing another scan
+        loadBreadth({ force: false, quiet: true });
       }
     } catch { /* ignore */ }
-  }, 1500);
+  }, 1200);
+}
+
+async function loadBreadth({ force = false, quiet = false } = {}) {
+  const universe = document.getElementById('breadth-universe').value;
+  const statusEl = document.getElementById('breadth-status');
+  const btn = document.getElementById('breadth-refresh');
+  if (!quiet) {
+    statusEl.textContent = force ? 'Refreshing…' : 'Loading…';
+  }
+  btn.disabled = true;
 
   try {
     const url = force
@@ -714,18 +731,22 @@ async function loadBreadth({ force = false } = {}) {
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
     renderBreadthReport(data);
+    if (data.refreshing) {
+      statusEl.textContent = `${data.stockCount || 0} stocks · showing cache · refreshing in background…`;
+      startBreadthPoll(statusEl);
+    } else {
+      stopBreadthPoll();
+    }
   } catch (err) {
     statusEl.textContent = `Error: ${err.message}`;
+    stopBreadthPoll();
   } finally {
     btn.disabled = false;
-    if (breadthPollTimer) {
-      clearInterval(breadthPollTimer);
-      breadthPollTimer = null;
-    }
   }
 }
 
 document.getElementById('breadth-refresh').addEventListener('click', () => {
+  // Overview is fast; breadth returns cache immediately and refreshes behind the scenes
   loadOverview({ force: true });
   loadBreadth({ force: true });
 });

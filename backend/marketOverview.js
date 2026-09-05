@@ -1,3 +1,5 @@
+const fs = require('node:fs');
+const path = require('node:path');
 const { computeEMA } = require('./indicators');
 const { fetchYahooDailyCandles } = require('./darvaxData');
 
@@ -56,11 +58,39 @@ const SECTOR_INDICES = [
 
 const EMA_PERIODS = [20, 50, 200];
 const OVERVIEW_CACHE_TTL_MS = 5 * 60 * 1000;
+const OVERVIEW_CACHE_FILE = path.join(__dirname, '..', 'data', 'overview-cache.json');
 
 let cookieJar = '';
 let overviewCache = null;
 let overviewCacheAt = 0;
 let overviewInflight = null;
+
+function readOverviewDiskCache() {
+  try {
+    if (!fs.existsSync(OVERVIEW_CACHE_FILE)) return null;
+    return JSON.parse(fs.readFileSync(OVERVIEW_CACHE_FILE, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function writeOverviewDiskCache(report) {
+  try {
+    fs.mkdirSync(path.dirname(OVERVIEW_CACHE_FILE), { recursive: true });
+    fs.writeFileSync(OVERVIEW_CACHE_FILE, JSON.stringify(report));
+  } catch {
+    /* ignore disk errors */
+  }
+}
+
+function loadOverviewCacheFromDisk() {
+  if (overviewCache) return;
+  const disk = readOverviewDiskCache();
+  if (disk?.scannedAt) {
+    overviewCache = disk;
+    overviewCacheAt = new Date(disk.scannedAt).getTime();
+  }
+}
 
 function nseHeaders() {
   return {
@@ -174,7 +204,8 @@ function emaStatusFromCloses(closes) {
 async function fetchEmaStatus(yahooSymbol, fetchImpl = fetch) {
   if (!yahooSymbol) return null;
   try {
-    const candles = await fetchYahooDailyCandles(yahooSymbol, 'US', '2y', fetchImpl);
+    // 1y is enough for EMA200 and much faster than 2y payloads
+    const candles = await fetchYahooDailyCandles(yahooSymbol, 'US', '1y', fetchImpl);
     if (!candles || candles.length < 30) return null;
     const closes = candles.map((c) => c.close).filter((v) => v != null);
     return emaStatusFromCloses(closes);
@@ -208,7 +239,7 @@ async function computeMarketOverview(options = {}) {
     [...SIZE_INDICES, ...SECTOR_INDICES].map((m) => m.yahoo).filter(Boolean),
   )];
   const emaByYahoo = new Map();
-  const emaResults = await mapPool(uniqueYahoo, 6, async (sym) => [
+  const emaResults = await mapPool(uniqueYahoo, 12, async (sym) => [
     sym,
     await fetchEmaStatus(sym, fetchImpl),
   ]);
@@ -234,25 +265,48 @@ async function computeMarketOverview(options = {}) {
 }
 
 async function getMarketOverview(options = {}) {
-  const { force = false, ttlMs = OVERVIEW_CACHE_TTL_MS, ...rest } = options;
-  if (!force && overviewCache && Date.now() - overviewCacheAt < ttlMs) {
-    return { ...overviewCache, fromCache: true };
+  const { force = false, ttlMs = OVERVIEW_CACHE_TTL_MS, background = true, ...rest } = options;
+  loadOverviewCacheFromDisk();
+
+  const fresh = overviewCache && Date.now() - overviewCacheAt < ttlMs;
+  if (!force && fresh) {
+    return { ...overviewCache, fromCache: true, refreshing: Boolean(overviewInflight) };
   }
+
+  // Instant path: serve last overview while a refresh runs in background
+  if (background && overviewCache && (force || !fresh)) {
+    if (!overviewInflight) {
+      overviewInflight = computeMarketOverview(rest)
+        .then((report) => {
+          overviewCache = report;
+          overviewCacheAt = Date.now();
+          writeOverviewDiskCache(report);
+          return report;
+        })
+        .finally(() => {
+          overviewInflight = null;
+        });
+    }
+    return { ...overviewCache, fromCache: true, refreshing: true, stale: !fresh };
+  }
+
   if (overviewInflight) {
     const report = await overviewInflight;
-    return { ...report, fromCache: false };
+    return { ...report, fromCache: false, refreshing: false };
   }
+
   overviewInflight = computeMarketOverview(rest)
     .then((report) => {
       overviewCache = report;
       overviewCacheAt = Date.now();
+      writeOverviewDiskCache(report);
       return report;
     })
     .finally(() => {
       overviewInflight = null;
     });
   const report = await overviewInflight;
-  return { ...report, fromCache: false };
+  return { ...report, fromCache: false, refreshing: false };
 }
 
 module.exports = {

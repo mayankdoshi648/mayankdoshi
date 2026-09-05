@@ -215,9 +215,9 @@ async function fetchUniverseCandles(symbols, options = {}) {
   const {
     fetchImpl = fetch,
     config = null,
-    concurrency = 8,
+    concurrency = 16,
     onProgress = null,
-    range = '2y',
+    range = '1y',
   } = options;
 
   const dhan = await prepareDhanContext(symbols, config, fetchImpl);
@@ -345,12 +345,12 @@ async function computeMarketBreadth(options = {}) {
     universe = 'nifty50',
     fetchImpl = fetch,
     config = null,
-    concurrency = 8,
+    concurrency = 16,
     onProgress = null,
   } = options;
 
   const symbols = await resolveUniverse(universe, fetchImpl);
-  const indexCandles = await fetchYahooDailyCandles(INDEX_YAHOO, 'US', '2y', fetchImpl);
+  const indexCandles = await fetchYahooDailyCandles(INDEX_YAHOO, 'US', '1y', fetchImpl);
   if (indexCandles.length < 200) throw new Error('Insufficient Nifty index history');
 
   const { candlesBySymbol, errors, dataSource } = await fetchUniverseCandles(symbols, {
@@ -399,26 +399,21 @@ function isCacheFresh(cache, universe, ttlMs = DEFAULT_CACHE_TTL_MS) {
 let refreshPromise = null;
 let refreshUniverse = null;
 
-async function getMarketBreadth(options = {}) {
-  const {
-    universe = 'nifty50',
-    force = false,
-    ttlMs = DEFAULT_CACHE_TTL_MS,
-    ...rest
-  } = options;
+function isRefreshRunning(universe = null) {
+  if (!refreshPromise) return false;
+  if (universe == null) return true;
+  return refreshUniverse === universe;
+}
 
-  const cached = readBreadthCache();
-  if (!force && isCacheFresh(cached, universe, ttlMs)) {
-    return { ...cached, fromCache: true };
-  }
-
-  if (refreshPromise && refreshUniverse === universe) {
-    const report = await refreshPromise;
-    return { ...report, fromCache: false };
-  }
-
+/**
+ * Start a breadth recompute without awaiting (shared in-flight promise).
+ * Returns the promise for optional awaiting.
+ */
+function startBreadthRefresh(options = {}) {
+  const { universe = 'nifty50', ...rest } = options;
+  if (refreshPromise && refreshUniverse === universe) return refreshPromise;
   refreshUniverse = universe;
-  refreshPromise = computeMarketBreadth({ universe, ...rest })
+  refreshPromise = computeMarketBreadth({ universe, concurrency: 16, ...rest })
     .then((report) => {
       writeBreadthCache(report);
       return report;
@@ -427,9 +422,54 @@ async function getMarketBreadth(options = {}) {
       refreshPromise = null;
       refreshUniverse = null;
     });
+  return refreshPromise;
+}
 
-  const report = await refreshPromise;
-  return { ...report, fromCache: false };
+/**
+ * Fast path: return cache immediately when possible.
+ * - force=false + fresh cache → cache
+ * - force=false + stale/missing cache → return stale if any, else await compute
+ * - force=true + cache exists → return cache + kick background refresh (non-blocking)
+ * - force=true + no cache → await compute
+ */
+async function getMarketBreadth(options = {}) {
+  const {
+    universe = 'nifty50',
+    force = false,
+    ttlMs = DEFAULT_CACHE_TTL_MS,
+    background = true,
+    ...rest
+  } = options;
+
+  const cached = readBreadthCache();
+  const fresh = isCacheFresh(cached, universe, ttlMs);
+  const sameUniverse = cached && cached.universe === universe;
+
+  if (!force && fresh) {
+    return { ...cached, fromCache: true, refreshing: isRefreshRunning(universe) };
+  }
+
+  // Prefer instant response from any same-universe cache
+  if (sameUniverse && background) {
+    if (force || !fresh) {
+      startBreadthRefresh({ universe, ...rest });
+    }
+    return {
+      ...cached,
+      fromCache: true,
+      refreshing: true,
+      stale: !fresh,
+    };
+  }
+
+  // No usable cache — must wait (first run)
+  if (refreshPromise && refreshUniverse === universe) {
+    const report = await refreshPromise;
+    return { ...report, fromCache: false, refreshing: false };
+  }
+
+  const report = await startBreadthRefresh({ universe, ...rest });
+  return { ...report, fromCache: false, refreshing: false };
 }
 
 module.exports = {
@@ -444,6 +484,8 @@ module.exports = {
   buildBreadthReport,
   computeMarketBreadth,
   getMarketBreadth,
+  startBreadthRefresh,
+  isRefreshRunning,
   readBreadthCache,
   writeBreadthCache,
   isCacheFresh,

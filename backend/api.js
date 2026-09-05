@@ -14,7 +14,7 @@ const { fetchAccessToken } = require('./dhanAuth');
 const { placeDhanOrder, calcPositionSize } = require('./dhanOrders');
 const { resolveNseInstrumentMap } = require('./instrumentMap');
 const { exportFromDb } = require('./obsidianExport');
-const { getMarketBreadth, readBreadthCache } = require('./marketBreadth');
+const { getMarketBreadth, readBreadthCache, isRefreshRunning } = require('./marketBreadth');
 const { getMarketOverview } = require('./marketOverview');
 
 function createApiRouter({
@@ -41,7 +41,7 @@ function createApiRouter({
   router.get('/overview', async (req, res) => {
     const force = req.query.refresh === '1' || req.query.refresh === 'true';
     try {
-      const report = await getMarketOverview({ force });
+      const report = await getMarketOverview({ force, background: true });
       res.json(report);
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -52,42 +52,41 @@ function createApiRouter({
     const universe = req.query.universe === 'nifty500' ? 'nifty500' : 'nifty50';
     const force = req.query.refresh === '1' || req.query.refresh === 'true';
     try {
-      const cached = readBreadthCache();
-      if (!force && cached && cached.universe === universe) {
-        return res.json({ ...cached, fromCache: true, progress: null });
-      }
-      if (!force) {
-        // Return stale cache immediately if present, kick off refresh in background when empty
-        if (cached && cached.universe === universe) {
-          return res.json({ ...cached, fromCache: true });
-        }
-      }
-      breadthProgress = { done: 0, total: 0, phase: null };
       const report = await getMarketBreadth({
         universe,
-        force: true,
+        force,
+        background: true,
         config,
         onProgress: (p) => { breadthProgress = p; },
       });
-      breadthProgress = null;
-      res.json({ ...report, progress: null });
+      if (report.refreshing) {
+        breadthProgress = breadthProgress || { done: 0, total: 0, symbol: null };
+      } else if (!isRefreshRunning(universe)) {
+        breadthProgress = null;
+      }
+      res.json(report);
     } catch (err) {
       breadthProgress = null;
       const stale = readBreadthCache();
       if (stale) {
         return res.status(200).json({ ...stale, fromCache: true, warning: err.message });
       }
-      res.status(500).json({ error: err.message, progress: breadthProgress });
+      res.status(500).json({ error: err.message });
     }
   });
 
   router.get('/breadth/status', (req, res) => {
     const cached = readBreadthCache();
     res.json({
-      scanning: Boolean(breadthProgress),
+      scanning: Boolean(breadthProgress) || isRefreshRunning(),
       progress: breadthProgress,
       cached: cached
-        ? { universe: cached.universe, scannedAt: cached.scannedAt, asOf: cached.asOf, stockCount: cached.stockCount }
+        ? {
+          universe: cached.universe,
+          scannedAt: cached.scannedAt,
+          asOf: cached.asOf,
+          stockCount: cached.stockCount,
+        }
         : null,
     });
   });
@@ -99,10 +98,10 @@ function createApiRouter({
       const report = await getMarketBreadth({
         universe,
         force: true,
+        background: true,
         config,
         onProgress: (p) => { breadthProgress = p; },
       });
-      breadthProgress = null;
       res.json(report);
     } catch (err) {
       breadthProgress = null;

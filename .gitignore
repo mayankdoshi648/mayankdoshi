@@ -7,3 +7,4 @@ data/*.db-shm
 data/screener-cache/
 data/darvax-cron.log
 data/breadth-cache.json
+data/overview-cache.json
