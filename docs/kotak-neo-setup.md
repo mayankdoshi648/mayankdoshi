@@ -28,9 +28,14 @@ npm start
 ```
 
 3. Open http://localhost:3002/ — status should show `· kotak-neo`.
-4. `GET /api/status` includes `kotakNeo.quotesReady: true` when the key is set.
+4. `GET http://localhost:3002/api/status` includes `kotakNeo.quotesReady: true` when the key is set.
 
-Market Breadth is the homepage on port **3002**. PowerBull Pro stays separate at `/powerbull`.
+| App | URL |
+|-----|-----|
+| Market Breadth | http://localhost:3002/ |
+| PowerBull Pro (original) | http://localhost:3000/ |
+
+Set `PORT=3002` and `POWERBULL_PORT=3000` in `.env` (defaults if omitted).
 
 **Note:** `.env` is gitignored. Cloud agents cannot read your Windows `.env` — add the same key as a Cursor Cloud secret if you want Neo quotes in the cloud agent.
 

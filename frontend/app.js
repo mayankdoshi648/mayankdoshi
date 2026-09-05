@@ -141,7 +141,7 @@ loadStatus();
 connectLiveSocket();
 setInterval(loadStatus, 30000);
 
-// Deep-link: ?tab=darvax|track|live (Market Breadth lives at /breadth)
+// Deep-link: ?tab=darvax|track|live (Market Breadth is a separate app on :3002)
 (() => {
   const tab = new URLSearchParams(location.search).get('tab');
   if (tab === 'darvax') {

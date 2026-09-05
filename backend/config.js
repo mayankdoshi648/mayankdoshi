@@ -36,6 +36,7 @@ function loadConfig() {
     pin: process.env.DHAN_PIN,
     totpSecret: process.env.DHAN_TOTP_SECRET,
     port: Number(process.env.PORT || 3002),
+    powerbullPort: Number(process.env.POWERBULL_PORT || 3000),
     darvaxAutoTrade: process.env.DARVAX_AUTO_TRADE === 'true',
     darvaxRiskPct: Number(process.env.DARVAX_RISK_PCT || 1),
     darvaxCapital: Number(process.env.DARVAX_CAPITAL || 1000000),
@@ -58,6 +59,7 @@ function loadConfigOptional() {
   } catch {
     return {
       port: Number(process.env.PORT || 3002),
+      powerbullPort: Number(process.env.POWERBULL_PORT || 3000),
       darvaxAutoTrade: false,
       darvaxRiskPct: Number(process.env.DARVAX_RISK_PCT || 1),
       darvaxCapital: Number(process.env.DARVAX_CAPITAL || 1000000),

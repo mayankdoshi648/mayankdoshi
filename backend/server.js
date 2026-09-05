@@ -17,23 +17,42 @@ const { resolveNifty50InstrumentMap } = require('./instrumentMap');
 const { fetchAccessToken } = require('./dhanAuth');
 
 const config = loadConfigOptional();
+const breadthPort = Number(config.port || 3002);
+const powerbullPort = Number(config.powerbullPort || 3000);
 const hasDhan = Boolean(config.clientId && config.pin && config.totpSecret);
 const db = openDb();
 const connectionStatus = createConnectionStatus();
 const aggregator = new CandleAggregator();
 
-const app = express();
-app.use(express.json());
 const frontendDir = path.join(__dirname, '..', 'frontend');
 
-// Market Breadth is the primary app on this port (http://localhost:3002/)
-app.get(['/', '/breadth', '/breadth/'], (req, res) => {
-  res.sendFile(path.join(frontendDir, 'breadth.html'));
+function isPowerBullRequest(req) {
+  return Number(req.socket.localPort) === powerbullPort;
+}
+
+const app = express();
+app.use(express.json());
+
+// Homepage by port — PowerBull Pro stays original; Market Breadth stays on 3002.
+app.get('/', (req, res) => {
+  if (isPowerBullRequest(req)) {
+    return res.sendFile(path.join(frontendDir, 'index.html'));
+  }
+  return res.sendFile(path.join(frontendDir, 'breadth.html'));
 });
 
-// PowerBull Pro kept separate (not mixed into Market Breadth)
+app.get(['/breadth', '/breadth/'], (req, res) => {
+  if (isPowerBullRequest(req)) {
+    return res.redirect(302, `http://localhost:${breadthPort}/`);
+  }
+  return res.sendFile(path.join(frontendDir, 'breadth.html'));
+});
+
 app.get(['/powerbull', '/powerbull/', '/pro', '/pro/'], (req, res) => {
-  res.sendFile(path.join(frontendDir, 'index.html'));
+  if (!isPowerBullRequest(req)) {
+    return res.redirect(302, `http://localhost:${powerbullPort}/`);
+  }
+  return res.sendFile(path.join(frontendDir, 'index.html'));
 });
 
 app.use(express.static(frontendDir));
@@ -45,8 +64,12 @@ app.use('/api', createApiRouter({
   config,
 }));
 
-const httpServer = http.createServer(app);
-const { broadcast } = createLiveSocketServer(httpServer, '/live');
+const breadthServer = http.createServer(app);
+const powerbullServer = http.createServer(app);
+
+// Live WS for PowerBull Pro signals
+const { broadcast } = createLiveSocketServer(powerbullServer, '/live');
+createLiveSocketServer(breadthServer, '/live');
 
 function todayTradeDate() {
   const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
@@ -103,9 +126,7 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-httpServer.listen(config.port, () => {
-  console.log(`Market Breadth: http://localhost:${config.port}/`);
-  console.log(`PowerBull Pro:  http://localhost:${config.port}/powerbull`);
+function afterBothPortsUp() {
   if (!hasDhan) {
     console.log('Dhan credentials missing — live feed off. Market Breadth uses Yahoo/Kotak + NSE universe.');
     return;
@@ -118,4 +139,14 @@ httpServer.listen(config.port, () => {
   } else {
     console.log('Market closed — ingestion will not start until 9:30 IST on a trading day. Restart the server during market hours.');
   }
-});
+}
+
+let portsReady = 0;
+function onReady(label, port) {
+  console.log(`${label}: http://localhost:${port}/`);
+  portsReady += 1;
+  if (portsReady === 2) afterBothPortsUp();
+}
+
+breadthServer.listen(breadthPort, () => onReady('Market Breadth', breadthPort));
+powerbullServer.listen(powerbullPort, () => onReady('PowerBull Pro (original)', powerbullPort));

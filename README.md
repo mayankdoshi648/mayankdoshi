@@ -45,10 +45,10 @@ Edit `.env`:
 
 ### 4. Run locally
 
-**Dashboards** (default port **3002**):
+**Dashboards** (two separate apps — do not mix):
 
-- Market Breadth: http://localhost:3002/
-- PowerBull Pro / DarvaX: http://localhost:3002/powerbull
+- **Market Breadth:** http://localhost:3002/
+- **PowerBull Pro (original):** http://localhost:3000/
 
 ```bash
 npm start
@@ -91,7 +91,9 @@ npm run darvax:scan -- --market=US    # US only
 
 ## Market Breadth dashboard (separate app)
 
-Open **http://localhost:3002/** (Market Breadth only — separate from PowerBull Pro) to see:
+Open **http://localhost:3002/** for Market Breadth only.
+
+PowerBull Pro (original Live / DarvaX / Track UI) stays at **http://localhost:3000/** and is not mixed into Market Breadth.
 
 - Live Nifty / Bank Nifty / India VIX + Large/Mid/Small + sector strips
 - % of Nifty 50 / Nifty 500 stocks above 20 / 50 / 200 DMA
