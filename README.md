@@ -76,6 +76,8 @@ When `OBSIDIAN_VAULT_PATH` is set, scans write:
     YYYY-MM-DD-NSE-SYMBOL.md
 ```
 
+**Daily Loop productivity pack:** paste-ready vault templates and the 15-workflow guide live in [`docs/obsidian-workflows/`](docs/obsidian-workflows/README.md). With the dashboard running, open the visual guide at [http://localhost:3000/obsidian-workflows.html](http://localhost:3000/obsidian-workflows.html).
+
 ### 6. Useful commands
 
 ```bash
