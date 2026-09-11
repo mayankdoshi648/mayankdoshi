@@ -311,11 +311,29 @@
     const env = await api(`/api/fno/smart-money/${encodeURIComponent(symbol)}`);
     const d = env.data;
     if (!d) return;
+    state.smartDetailSymbol = symbol;
     const panel = $('#smart-detail');
     const body = $('#smart-detail-body');
     $('#smart-detail-title').textContent = `${d.symbol} — Smart Money Proxy`;
     const comps = d.components || {};
+    const q = d.quote || {};
     const list = (arr, cls) => (arr || []).map((f) => `<li class="${cls}">${escapeHtml(f.text || f)}</li>`).join('') || '<li>—</li>';
+    const compBlock = (id, title) => {
+      const c = comps[id];
+      if (!c) return '';
+      const avail = c.available ? '' : ' <em class="muted">(unavailable — confidence reduced)</em>';
+      return `<div class="analysis-block">
+        <h3 class="section-label">${escapeHtml(title)}${avail}</h3>
+        <p><span class="${clsDir(c.score)}">${c.score >= 0 ? '+' : ''}${c.score}</span> / ${c.max}</p>
+        <ul>${(c.reasons || []).map((r) => `<li>${escapeHtml(r)}</li>`).join('') || '<li>—</li>'}</ul>
+      </div>`;
+    };
+    const tfLabels = d.timeframes?.labels || {};
+    const tfChips = Object.entries(tfLabels).map(([k, v]) => {
+      const cls = /Bullish/i.test(v) ? 'up' : /Bearish/i.test(v) ? 'down' : '';
+      return `<span class="tf-chip ${cls}"><strong>${escapeHtml(k)}</strong> ${escapeHtml(v)}</span>`;
+    }).join('');
+
     body.innerHTML = `
       <p class="disclaimer-inline">${escapeHtml(d.disclaimer || '')}</p>
       <div class="smart-detail-scoreline">
@@ -328,27 +346,104 @@
       ${d.conflicting ? '<p class="conflict-banner">CONFLICTING SIGNALS — confidence reduced</p>' : ''}
       <h3 class="section-label">WHY?</h3>
       <pre class="smart-why">${escapeHtml(d.explanation || (d.why || []).join('\n'))}</pre>
-      <h3 class="section-label">Components</h3>
-      <ul class="smart-comps">
-        ${Object.entries(comps).map(([id, c]) => `
-          <li><strong>${escapeHtml(id)}</strong>: <span class="${clsDir(c.score)}">${c.score}</span>/${c.max}
-          ${c.available ? '' : ' <em>(unavailable)</em>'}
-          — ${escapeHtml((c.reasons || []).join('; '))}</li>
-        `).join('')}
-      </ul>
+
+      <h3 class="section-label">Quote snapshot</h3>
+      <div class="metrics-row">
+        <div class="metric"><div class="k">LTP</div><div class="v">${fmt(q.ltp)}</div></div>
+        <div class="metric"><div class="k">Price%</div><div class="v ${clsDir(q.priceChangePct)}">${fmtPct(q.priceChangePct)}</div></div>
+        <div class="metric"><div class="k">OI%</div><div class="v ${clsDir(q.oiChangePct)}">${fmtPct(q.oiChangePct)}</div></div>
+        <div class="metric"><div class="k">RVol</div><div class="v">${q.relativeVolume != null ? `${fmt(q.relativeVolume)}×` : '—'}</div></div>
+        <div class="metric"><div class="k">VWAP</div><div class="v">${escapeHtml(q.vwapRelation || (q.vwap != null ? fmt(q.vwap) : '—'))}</div></div>
+        <div class="metric"><div class="k">Sector</div><div class="v">${escapeHtml(q.sector || '—')}</div></div>
+      </div>
+
+      ${compBlock('priceOi', 'Price / OI analysis')}
+      ${compBlock('volume', 'Volume analysis')}
+      ${compBlock('vwap', 'VWAP analysis')}
+      ${compBlock('options', 'Options analysis')}
+      ${compBlock('sector', 'Sector analysis')}
+      ${compBlock('fii', 'FII / institutional (index-level)')}
+      ${compBlock('momentum', 'Momentum / persistence')}
+
       <h3 class="section-label">Multi-timeframe</h3>
-      <p>${escapeHtml(d.timeframes?.overall || 'N/A')} · ${escapeHtml(JSON.stringify(d.timeframes?.labels || {}))}</p>
+      <p><strong>${escapeHtml(d.timeframes?.overall || 'NEUTRAL')}</strong></p>
+      <div class="tf-row">${tfChips || '<span class="muted">Timeframe history limited</span>'}</div>
+
       <div class="factor-grid">
         <div><h3 class="section-label">Bullish factors</h3><ul>${list(d.bullishFactors, 'up')}</ul></div>
         <div><h3 class="section-label">Bearish factors</h3><ul>${list(d.bearishFactors, 'down')}</ul></div>
         <div><h3 class="section-label">Conflicting factors</h3><ul>${list(d.conflictingFactors, 'warn')}</ul></div>
       </div>
+
+      <h3 class="section-label">Score history</h3>
+      <div class="smart-tabs" id="smart-hist-tabs" role="tablist">
+        ${['1D', '5D', '10D', '1M'].map((r) => `<button type="button" data-hist="${r}" class="${r === '5D' ? 'active' : ''}">${r}</button>`).join('')}
+      </div>
+      <p class="muted" id="smart-hist-trend">Trend: ${escapeHtml(d.history?.trend || '—')}</p>
+      <div class="table-wrap">
+        <table id="smart-hist-table" class="dense-table">
+          <thead><tr><th>Time</th><th>Score</th><th>Conf%</th><th>Price%</th><th>OI%</th><th>RVol</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="smart-hist-spark" class="smart-spark" aria-hidden="true"></div>
+
       <h3 class="section-label">Final interpretation</h3>
       <p>${escapeHtml(d.interpretation || '')}</p>
       <p class="muted">Positioning proxy only — not a BUY/SELL recommendation and not proof of institutional intent.</p>
     `;
+
+    paintSmartHistory(d.history);
+    const histTabs = $('#smart-hist-tabs');
+    histTabs?.querySelectorAll('[data-hist]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        histTabs.querySelectorAll('[data-hist]').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const hist = await api(`/api/fno/smart-money/${encodeURIComponent(symbol)}/history?range=${btn.dataset.hist}`);
+        paintSmartHistory(hist.data || hist);
+      });
+    });
+
     panel.classList.remove('hidden');
     panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function paintSmartHistory(history) {
+    const h = history || { points: [], trend: '—' };
+    const trendEl = $('#smart-hist-trend');
+    if (trendEl) trendEl.textContent = `Trend: ${h.trend || '—'} · ${h.points?.length || 0} point(s)${!(h.points?.length) ? ' — accumulates as market data refreshes' : ''}`;
+    const tbody = $('#smart-hist-table tbody');
+    if (!tbody) return;
+    const pts = [...(h.points || [])].reverse().slice(0, 40);
+    tbody.innerHTML = pts.length
+      ? pts.map((p) => {
+        const t = p.at ? new Date(p.at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—';
+        return `<tr>
+          <td>${escapeHtml(t)}</td>
+          <td class="${clsDir(p.score)}">${p.score >= 0 ? '+' : ''}${p.score}</td>
+          <td>${p.confidence != null ? `${p.confidence}%` : '—'}</td>
+          <td class="${clsDir(p.priceChangePct)}">${fmtPct(p.priceChangePct)}</td>
+          <td class="${clsDir(p.oiChangePct)}">${fmtPct(p.oiChangePct)}</td>
+          <td>${p.relativeVolume != null ? `${fmt(p.relativeVolume)}×` : '—'}</td>
+        </tr>`;
+      }).join('')
+      : '<tr><td colspan="6">No stored proxy scores yet for this range</td></tr>';
+
+    const spark = $('#smart-hist-spark');
+    if (spark) {
+      const series = (h.points || []).map((p) => Number(p.score)).filter((n) => Number.isFinite(n));
+      if (series.length >= 2) {
+        const min = Math.min(...series, -100);
+        const max = Math.max(...series, 100);
+        const span = Math.max(1, max - min);
+        spark.innerHTML = series.map((s) => {
+          const hgt = Math.round(((s - min) / span) * 100);
+          return `<i style="height:${Math.max(4, hgt)}%" class="${s >= 0 ? 'up' : 'down'}" title="${s}"></i>`;
+        }).join('');
+      } else {
+        spark.innerHTML = '';
+      }
+    }
   }
 
   async function renderSectors() {
@@ -471,24 +566,40 @@
         <td>${escapeHtml((a.reasons || []).join(' · '))}</td>
         <td>${escapeHtml((a.buildup || '').replace(/_/g, ' '))}</td>
         <td class="${clsDir(a.score)}">${a.score}</td>
+        <td class="${clsDir(a.smartMoneyScore)}">${a.smartMoneyScore != null ? `${a.smartMoneyScore >= 0 ? '+' : ''}${a.smartMoneyScore}` : '—'}</td>
+        <td>${a.smartMoneyConfidence != null ? `${a.smartMoneyConfidence}%` : '—'}</td>
       </tr>
-    `).join('') || '<tr><td colspan="4">No alerts fired</td></tr>';
+    `).join('') || '<tr><td colspan="6">No alerts fired</td></tr>';
   }
 
   async function renderWatch() {
     const env = await api('/api/fno/watchlist');
-    $('#watch-table tbody').innerHTML = (env.data || []).map((r) => `
-      <tr>
+    $('#watch-table tbody').innerHTML = (env.data || []).map((r) => {
+      const sm = r.smartMoney || {};
+      const smScore = sm.score ?? r.smartMoneyScore ?? null;
+      const smConf = sm.confidence ?? r.smartMoneyConfidence ?? null;
+      return `
+      <tr class="smart-row" data-symbol="${escapeHtml(r.symbol)}">
         <td>${escapeHtml(r.symbol)}</td>
         <td>${fmt(r.ltp)}</td>
         <td class="${clsDir(r.priceChangePct)}">${fmtPct(r.priceChangePct)}</td>
         <td class="${clsDir(r.oiChangePct)}">${fmtPct(r.oiChangePct)}</td>
         <td>${fmt(r.volume, 0)}</td>
         <td>${escapeHtml((r.buildup || '').replace(/_/g, ' '))}</td>
-        <td class="${clsDir(r.score)}">${r.score ?? '—'}</td>
+        <td class="${clsDir(smScore)}">${smScore != null ? `${smScore >= 0 ? '+' : ''}${smScore}` : '—'}</td>
+        <td>${smConf != null ? `${smConf}%` : '—'}</td>
         <td><button class="btn watch-del" data-sym="${escapeHtml(r.symbol)}">✕</button></td>
-      </tr>
-    `).join('');
+      </tr>`;
+    }).join('');
+    $$('#watch-table tbody tr[data-symbol]').forEach((tr) => {
+      tr.addEventListener('click', async () => {
+        state.view = 'smart';
+        $$('.view').forEach((v) => v.classList.toggle('active', v.dataset.view === 'smart'));
+        $$('.bottom-nav [data-nav]').forEach((b) => b.classList.toggle('active', b.dataset.nav === 'smart'));
+        await renderSmart();
+        await openSmartDetail(tr.dataset.symbol);
+      });
+    });
     $$('.watch-del').forEach((btn) => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
