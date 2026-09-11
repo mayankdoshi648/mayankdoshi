@@ -83,7 +83,15 @@
   function showView(name) {
     state.view = name;
     $$('.view').forEach((v) => v.classList.toggle('active', v.dataset.view === name));
-    $$('.bottom-nav [data-nav]').forEach((b) => b.classList.toggle('active', b.dataset.nav === name));
+    const primary = new Set(['overview', 'intel', 'opportunity', 'smart']);
+    $$('.bottom-nav [data-nav]').forEach((b) => {
+      const nav = b.dataset.nav;
+      if (nav === 'more') {
+        b.classList.toggle('active', !primary.has(name));
+      } else {
+        b.classList.toggle('active', nav === name);
+      }
+    });
     $('#more-sheet')?.classList.add('hidden');
     loadView(name);
   }
