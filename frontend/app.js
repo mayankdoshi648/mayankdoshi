@@ -148,10 +148,17 @@ loadStatus();
 connectLiveSocket();
 setInterval(loadStatus, 30000);
 
-// Deep-link: ?tab=darvax|track|live|legacy — optional; prefers FnoTerminal when present
+// Deep-link: ?tab=darvax|track|live|legacy|markets — optional; prefers FnoTerminal when present
 (() => {
   const tab = new URLSearchParams(location.search).get('tab');
   if (!tab) return;
+  if (tab === 'markets') {
+    // terminal.js boot also handles ?tab=markets; keep as fallback if boot already ran
+    const tryShow = () => window.FnoTerminal?.showView?.('markets');
+    if (window.FnoTerminal) tryShow();
+    else document.addEventListener('DOMContentLoaded', () => setTimeout(tryShow, 0));
+    return;
+  }
   if (tab === 'darvax' || tab === 'track' || tab === 'live' || tab === 'futures' || tab === 'legacy') {
     window.FnoTerminal?.showView?.('legacy');
     const legacyName = tab === 'legacy' ? 'live' : tab;

@@ -27,6 +27,32 @@
     return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
   }
 
+  function prettyLabel(value) {
+    return String(value || '')
+      .replace(/_/g, ' ')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  function miniSpark(q) {
+    const high = Number(q.high);
+    const low = Number(q.low);
+    const ltp = Number(q.ltp);
+    const open = Number(q.open);
+    if (![high, low, ltp].every(Number.isFinite) || high <= low) return '';
+    const w = 54, h = 18, pad = 1;
+    const x = (i, n) => pad + (i / Math.max(1, n - 1)) * (w - pad * 2);
+    const y = (v) => {
+      const t = (v - low) / (high - low);
+      return h - pad - t * (h - pad * 2);
+    };
+    const pts = [open || low, (open + ltp) / 2 || ltp, ltp].map((v, i, arr) => `${x(i, arr.length).toFixed(1)},${y(v).toFixed(1)}`);
+    const dir = Number(q.changePct) >= 0 ? 'up' : 'down';
+    return `<svg class="mini-spark ${dir}" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true"><polyline fill="none" points="${pts.join(' ')}" /></svg>`;
+  }
+
   function clsDir(n) {
     if (n == null || Number.isNaN(Number(n))) return '';
     return Number(n) >= 0 ? 'up' : 'down';
@@ -83,7 +109,18 @@
   function showView(name) {
     state.view = name;
     $$('.view').forEach((v) => v.classList.toggle('active', v.dataset.view === name));
-    $$('.bottom-nav [data-nav]').forEach((b) => b.classList.toggle('active', b.dataset.nav === name));
+    const primary = new Set(['overview', 'intel', 'opportunity', 'smart']);
+    $$('.bottom-nav [data-nav]').forEach((b) => {
+      const nav = b.dataset.nav;
+      if (nav === 'more') {
+        b.classList.toggle('active', !primary.has(name));
+      } else {
+        b.classList.toggle('active', nav === name);
+      }
+    });
+    $$('#desktop-nav [data-nav]').forEach((b) => {
+      b.classList.toggle('active', b.dataset.nav === name);
+    });
     $('#more-sheet')?.classList.add('hidden');
     loadView(name);
   }
@@ -102,6 +139,7 @@
       if (name === 'watch') await renderWatch();
       if (name === 'settings') await renderSettings();
       if (name === 'opportunity') await renderOpportunity();
+      if (name === 'markets') await window.MarketsBoard?.render?.();
       if (name === 'legacy') await renderFuturesTable();
     } catch (err) {
       console.error(err);
@@ -152,14 +190,17 @@
   async function renderTicker() {
     const env = await api('/api/fno/ticker');
     const root = $('#ticker');
-    root.innerHTML = (env.data || []).map((q) => `
-      <div class="tick">
-        <div class="sym">${escapeHtml(q.symbol)}</div>
-        <div class="ltp">${fmt(q.ltp, q.symbol === 'INDIAVIX' ? 2 : 2)}</div>
-        <div class="chg ${clsDir(q.changePct)}">${fmtPct(q.changePct)} (${fmt(q.change)})</div>
+    root.innerHTML = (env.data || []).map((q) => {
+      const dir = clsDir(q.changePct);
+      const arrow = dir === 'up' ? '↗' : dir === 'down' ? '↘' : '→';
+      return `
+      <div class="tick ${dir}" title="${escapeHtml(q.symbol)}">
+        <div class="tick-top"><span class="sym">${escapeHtml(q.symbol)}</span><span class="tick-arrow ${dir}" aria-hidden="true">${arrow}</span></div>
+        <div class="tick-mid"><div class="ltp">${fmt(q.ltp, 2)}</div>${miniSpark(q)}</div>
+        <div class="chg ${dir}">${fmtPct(q.changePct)}</div>
         <div class="hi-lo">H ${fmt(q.high)} · L ${fmt(q.low)}${q.futuresPrice != null ? ` · F ${fmt(q.futuresPrice)}` : ''}</div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   }
 
   async function renderOverview() {
@@ -175,13 +216,30 @@
     const label = $('#regime-label');
     label.textContent = (regime.label || '—').replace(/_/g, ' ');
     label.className = `regime-label ${regime.label || ''}`;
-    $('#regime-score').textContent = regime.score != null ? `${regime.score >= 0 ? '+' : ''}${regime.score}` : '—';
-    $('#regime-conf').textContent = regime.confidence != null
-      ? `${regime.confidence <= 1 ? Math.round(regime.confidence * 100) : Math.round(regime.confidence)}%`
-      : '—';
+    const scoreNum = regime.score != null ? Number(regime.score) : null;
+    const scoreAbs = scoreNum == null ? 0 : Math.max(0, Math.min(100, Math.abs(scoreNum)));
+    $('#regime-score').textContent = scoreNum != null ? String(Math.round(Math.abs(scoreNum))) : '—';
+    const confPct = regime.confidence != null
+      ? (regime.confidence <= 1 ? Math.round(regime.confidence * 100) : Math.round(regime.confidence))
+      : null;
+    $('#regime-conf').textContent = confPct != null ? `${confPct}%` : '—';
+    const ring = $('#regime-ring');
+    if (ring) {
+      const tone = /BULL|RISK_ON/i.test(regime.label || '') ? 'var(--up)'
+        : /BEAR|RISK_OFF/i.test(regime.label || '') ? 'var(--down)' : 'var(--warn)';
+      ring.style.background = `conic-gradient(${tone} ${scoreAbs * 3.6}deg, var(--panel-2) 0deg)`;
+      ring.dataset.tone = tone;
+    }
     $('#regime-factors').innerHTML = (regime.factors || []).map((f) => {
       const ok = !/missing|unavailable|null|unknown/i.test(String(f.evidence || ''));
-      return `<div class="factor check"><span class="n">${escapeHtml(f.name)}</span>${whyMark(ok)}<span class="e">${escapeHtml(f.evidence)}</span></div>`;
+      const soft = /caution|mixed|neutral|elevated/i.test(String(f.evidence || ''));
+      const st = ok ? (soft ? 'warn' : 'ok') : 'bad';
+      const icon = st === 'ok' ? '🟢' : st === 'warn' ? '🟡' : '🔴';
+      const evidence = String(f.evidence ?? '').replace(/(\d+\.\d{3,})/g, (m) => {
+        const n = Number(m);
+        return Number.isFinite(n) ? n.toFixed(2) : m;
+      });
+      return `<div class="factor check factor-${st}"><span class="factor-ico" aria-hidden="true">${icon}</span><span class="n">${escapeHtml(prettyLabel(f.name))}</span><span class="e">${escapeHtml(evidence)}</span></div>`;
     }).join('') || '<div class="muted">No factors available</div>';
 
     const snap = env.data?.optionSnapshot;
@@ -190,16 +248,31 @@
       opt.innerHTML = '<div class="muted">Option snapshot unavailable</div>';
       $('#overview-interp').innerHTML = '';
     } else {
+      const support = snap.interpretation?.putSupport || snap.atm?.strike || null;
+      const resist = snap.interpretation?.callResistance || null;
+      const em = snap.expectedMove;
+      const spot = em?.spot ?? snap.atm?.spot ?? null;
       opt.innerHTML = [
         ['PCR', fmt(snap.pcr)],
         ['Max Pain', fmt(snap.maxPain, 0)],
         ['ATM IV', snap.atm?.iv != null ? `${fmt(snap.atm.iv)}%` : '—'],
-        ['Support', snap.interpretation?.putSupport || snap.atm?.strike || '—'],
-        ['Resistance', snap.interpretation?.callResistance || '—'],
-        ['Exp Move', snap.expectedMove ? `±${fmt(snap.expectedMove.move, 0)}` : '—'],
+        ['Support', support ?? '—'],
+        ['Resistance', resist ?? '—'],
+        ['Exp Move', em ? `±${fmt(em.move, 0)}` : '—'],
       ].map(([k, v]) => `<div class="metric"><div class="k">${k}</div><div class="v">${escapeHtml(String(v))}</div></div>`).join('');
+      let rangeHtml = '';
+      if (em && (em.lower != null || em.upper != null || spot != null)) {
+        const lo = em.lower ?? (spot != null && em.move != null ? spot - em.move : null);
+        const hi = em.upper ?? (spot != null && em.move != null ? spot + em.move : null);
+        rangeHtml = `<div class="expected-move" aria-label="Expected move range">
+          <span class="em-end">${lo != null ? fmt(lo, 0) : '—'}</span>
+          <div class="em-track"><i class="em-spot" style="left:${spot != null && lo != null && hi != null && hi !== lo ? (((spot - lo) / (hi - lo)) * 100).toFixed(1) : 50}%"></i></div>
+          <span class="em-end">${hi != null ? fmt(hi, 0) : '—'}</span>
+          <div class="em-spot-label">Spot ${spot != null ? fmt(spot, 0) : '—'}</div>
+        </div>`;
+      }
       const ev = snap.interpretation?.evidence || [];
-      $('#overview-interp').innerHTML = `<strong>${escapeHtml(snap.interpretation?.summary || '')}</strong><ul>${ev.slice(0, 3).map((e) => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`;
+      $('#overview-interp').innerHTML = `${rangeHtml}<strong>${escapeHtml(snap.interpretation?.summary || '')}</strong><ul>${ev.slice(0, 3).map((e) => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`;
     }
 
     const indices = sm.data?.indices || [];
@@ -219,14 +292,27 @@
     bindSymbolButtons($('#home-top-shorts'));
 
     const chips = [
-      ['LONG BUILDUP', 'LONG_BUILDUP'],
-      ['SHORT BUILDUP', 'SHORT_BUILDUP'],
-      ['SHORT COVERING', 'SHORT_COVERING'],
-      ['LONG UNWINDING', 'LONG_UNWINDING'],
+      ['LONG BUILDUP', 'LONG_BUILDUP', 'bull'],
+      ['SHORT BUILDUP', 'SHORT_BUILDUP', 'bear'],
+      ['SHORT COVERING', 'SHORT_COVERING', 'cover'],
+      ['LONG UNWINDING', 'LONG_UNWINDING', 'unwind'],
     ];
-    $('#home-fo-chips').innerHTML = chips.map(([labelText, sig]) => `
-      <button type="button" class="fo-chip" data-signal="${sig}">${labelText}</button>
-    `).join('');
+    let counts = {};
+    try {
+      const scan = await api('/api/fno/scanner');
+      for (const row of scan.data || []) {
+        const key = row.buildup || row.signal || '';
+        if (!key) continue;
+        counts[key] = (counts[key] || 0) + 1;
+      }
+    } catch (_) { /* decorative counts only */ }
+    $('#home-fo-chips').innerHTML = chips.map(([labelText, sig, tone]) => {
+      const n = counts[sig];
+      return `<button type="button" class="fo-chip fo-${tone}" data-signal="${sig}">
+        <span class="fo-chip-label">${labelText}</span>
+        <span class="fo-chip-count">${n != null ? `${n} stocks` : 'View'}</span>
+      </button>`;
+    }).join('');
     $('#home-fo-chips').querySelectorAll('[data-signal]').forEach((btn) => {
       btn.addEventListener('click', () => {
         state.buildupSignal = btn.dataset.signal;
@@ -234,14 +320,18 @@
       });
     });
 
-    $('#overview-sectors').innerHTML = (sectors.data || []).slice(0, 5).map((s) => `
-      <button type="button" class="sector-rank-row" data-sector="${escapeHtml(s.sector)}">
-        <span class="rk">${s.rank}</span>
+    const secRows = (sectors.data || []).slice(0, 5);
+    const maxAbs = Math.max(0.01, ...secRows.map((s) => Math.abs(Number(s.returnPct) || 0)));
+    $('#overview-sectors').innerHTML = secRows.map((s) => {
+      const pct = Math.abs(Number(s.returnPct) || 0) / maxAbs * 100;
+      const dir = clsDir(s.returnPct);
+      return `<button type="button" class="sector-rank-row" data-sector="${escapeHtml(s.sector)}">
+        <span class="rk">#${s.rank}</span>
         <span class="nm">${escapeHtml(s.sector)}</span>
-        <span class="${clsDir(s.returnPct)}">${fmtPct(s.returnPct)}</span>
-        <span class="sc">${s.score}</span>
-      </button>
-    `).join('') || '<div class="muted">No sector data</div>';
+        <span class="sector-bar"><i class="${dir}" style="width:${pct.toFixed(1)}%"></i></span>
+        <span class="${dir}">${fmtPct(s.returnPct)}</span>
+      </button>`;
+    }).join('') || '<div class="muted">No sector data</div>';
     $('#overview-sectors').querySelectorAll('[data-sector]').forEach((btn) => {
       btn.addEventListener('click', () => {
         showView('heatmap');
@@ -271,14 +361,14 @@
     const body = $('#intel-table tbody');
     body.innerHTML = (env.data || []).map((r) => `
       <tr data-why="${escapeHtml((r.why || []).join(' | '))}">
-        <td>${escapeHtml(r.symbol)}</td>
-        <td>${fmt(r.ltp)}</td>
+        <td><strong>${escapeHtml(r.symbol)}</strong></td>
+        <td class="mono">${fmt(r.ltp)}</td>
         <td class="${clsDir(r.priceChangePct)}">${fmtPct(r.priceChangePct)}</td>
         <td class="${clsDir(r.oiChangePct)}">${fmtPct(r.oiChangePct)}</td>
         <td>${fmt(r.relativeVolume)}</td>
         <td>${fmt(r.iv)}</td>
-        <td>${escapeHtml((r.buildup || '').replace(/_/g, ' '))}</td>
-        <td class="${clsDir(r.score)}">${r.score ?? '—'}</td>
+        <td><span class="setup-badge">${escapeHtml(prettyLabel(r.buildup || ''))}</span></td>
+        <td><span class="score-pill ${clsDir(r.score)}">${r.score ?? '—'}</span></td>
       </tr>
     `).join('');
     body.querySelectorAll('tr').forEach((tr) => {
@@ -328,6 +418,7 @@
     $('#chain-metrics').innerHTML = metricsHtml;
     $('#oi-metrics').innerHTML = metricsHtml;
     const ev = env.data?.interpretation?.evidence || [];
+    $('#chain-interp').classList.add('options-insight');
     $('#chain-interp').innerHTML = `<strong>${escapeHtml(env.data?.interpretation?.summary || '')}</strong><ul>${ev.map((e) => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`;
 
     const hiCall = env.data?.highlights?.highestCallOi?.strike;
@@ -424,10 +515,10 @@
     $('#smart-table tbody').innerHTML = (rows || []).map((r, i) => `
       <tr data-symbol="${escapeHtml(r.symbol)}" class="smart-row">
         <td>${i + 1}</td>
-        <td>${escapeHtml(r.symbol)}</td>
-        <td class="${clsDir(r.score)}">${r.score != null ? `${r.score >= 0 ? '+' : ''}${r.score}` : '—'}</td>
+        <td><strong>${escapeHtml(r.symbol)}</strong></td>
+        <td><span class="score-pill ${clsDir(r.score)}">${r.score != null ? `${r.score >= 0 ? '+' : ''}${r.score}` : '—'}</span></td>
         <td>${r.confidence != null ? `${r.confidence}%` : '—'}</td>
-        <td>${escapeHtml(r.setup || r.signal || '')}</td>
+        <td><span class="setup-badge">${escapeHtml(prettyLabel(r.setup || r.signal || ''))}</span></td>
         <td class="${clsDir(r.priceChangePct)}">${fmtPct(r.priceChangePct)}</td>
         <td class="${clsDir(r.oiChangePct)}">${fmtPct(r.oiChangePct)}</td>
         <td>${r.relativeVolume != null ? `${fmt(r.relativeVolume)}×` : '—'}</td>
@@ -931,11 +1022,40 @@
     }
   }
 
+
+  function gradeClass(grade) {
+    const g = String(grade || '').replace(/\+/g, '-plus');
+    return `grade-${g || 'na'}`;
+  }
+
+  function scoreBar(label, value, max, conf) {
+    const n = Number(value);
+    const pct = Number.isFinite(n) ? Math.max(0, Math.min(100, (n / (max || 100)) * 100)) : 0;
+    const shown = Number.isFinite(n) ? (max === 100 ? `${Math.round(n)}` : `${n}`) : '—';
+    const suffix = max === 100 && label.toLowerCase().includes('conf') ? '%' : (max === 100 ? '/100' : '');
+    return `<div class="score-meter ${conf ? 'is-conf' : ''}">
+      <div class="score-meter-top"><span class="k">${label}</span><span class="v">${shown}${suffix}</span></div>
+      <div class="score-bar ${conf ? 'conf' : ''}"><i style="width:${pct.toFixed(1)}%"></i></div>
+    </div>`;
+  }
+
+  function contribBar(label, score, max) {
+    const s = Number(score);
+    const m = Number(max) || 1;
+    const pct = Number.isFinite(s) ? Math.max(0, Math.min(100, (Math.abs(s) / m) * 100)) : 0;
+    const dir = Number.isFinite(s) ? (s >= 0 ? 'up' : 'down') : '';
+    return `<div class="contrib-row">
+      <span class="contrib-label">${escapeHtml(label)}</span>
+      <div class="contrib-track"><i class="${dir}" style="width:${pct.toFixed(1)}%"></i></div>
+      <span class="contrib-val ${dir}">${Number.isFinite(s) ? `${s >= 0 ? '+' : ''}${s}/${m}` : 'n/a'}</span>
+    </div>`;
+  }
+
   function statusIcon(st) {
-    if (st === 'PASS') return '<span class="st-pass">✅ PASS</span>';
-    if (st === 'CAUTION') return '<span class="st-caution">⚠️ CAUTION</span>';
-    if (st === 'FAIL') return '<span class="st-fail">❌ FAIL</span>';
-    return '<span class="st-na">— UNAVAILABLE</span>';
+    if (st === 'PASS') return '<span class="st-pass" title="Pass"><span aria-hidden="true">✓</span> PASS</span>';
+    if (st === 'CAUTION') return '<span class="st-caution" title="Caution"><span aria-hidden="true">!</span> CAUTION</span>';
+    if (st === 'FAIL') return '<span class="st-fail" title="Fail"><span aria-hidden="true">✕</span> FAIL</span>';
+    return '<span class="st-na" title="Unavailable"><span aria-hidden="true">—</span> N/A</span>';
   }
 
   function readinessClass(status) {
@@ -965,31 +1085,46 @@
     $$('#opp-buckets .opp-bucket').forEach((b) => b.classList.toggle('active', b.dataset.bucket === bucket));
     const shown = bucket === 'all' ? rows : rows.filter((r) => r.bucket === bucket || (bucket === 'AVOID' && r.grade === 'AVOID'));
 
-    const card = (r) => `
-      <button type="button" class="opp-card" data-opp-sym="${escapeHtml(r.symbol)}">
-        <div class="sym">${escapeHtml(r.symbol)} · <span class="${clsDir(r.opportunityScore)}">${escapeHtml(r.grade)}</span></div>
-        <div class="meta">
-          <span>${r.opportunityScore}/100</span>
-          <span>${r.confidence}%</span>
-          <span class="${readinessClass(r.readiness?.status)}">${readinessLabel(r.readiness)}</span>
-          <span>${escapeHtml((r.setup || '').replace(/_/g, ' '))}</span>
+    const card = (r, opts = {}) => {
+      const early = opts.early;
+      const waits = (r.waitFor?.triggers || []).slice(0, 3);
+      return `
+      <button type="button" class="opp-card ${gradeClass(r.grade)} ${early ? 'opp-card-early' : ''}" data-opp-sym="${escapeHtml(r.symbol)}">
+        <div class="opp-card-head">
+          <div class="sym">${escapeHtml(r.symbol)}</div>
+          <span class="grade-badge ${gradeClass(r.grade)}">${escapeHtml(r.grade)}</span>
         </div>
+        <div class="opp-card-price">
+          <span class="ltp">₹${fmt(r.ltp)}</span>
+          <span class="${clsDir(r.priceChangePct)}">${fmtPct(r.priceChangePct)}</span>
+        </div>
+        <div class="setup-badge">${escapeHtml((r.setup || r.oiSignal || '').replace(/_/g, ' ') || '—')}</div>
+        <div class="opp-scores">
+          ${scoreBar('Opportunity', r.opportunityScore, 100, false)}
+          ${scoreBar('Confidence', r.confidence, 100, true)}
+        </div>
+        <div class="meta">
+          <span class="pill ${readinessClass(r.readiness?.status)}">${readinessLabel(r.readiness)}</span>
+          ${r.relativeVolume != null ? `<span class="pill">Vol ${fmt(r.relativeVolume)}x</span>` : ''}
+          ${r.vwapRelation ? `<span class="pill">VWAP ${escapeHtml(r.vwapRelation)}</span>` : ''}
+        </div>
+        ${early && waits.length ? `<ul class="opp-wait-list">${waits.map((t) => `<li>${escapeHtml(t.label)}</li>`).join('')}</ul>` : ''}
       </button>`;
+    };
+
+    const readyNow = rankings.readyNow || [];
+    if ($('#opp-ready-now')) {
+      $('#opp-ready-now').innerHTML = readyNow.slice(0, 6).map((r) => card(r)).join('') || '<p class="muted">No READY setups right now</p>';
+    }
 
     $('#opp-top').innerHTML = `
-      <div><h3 class="section-label">Bullish</h3>${(rankings.topBullish || []).slice(0, 5).map(card).join('') || '<p class="muted">None</p>'}</div>
-      <div><h3 class="section-label">Bearish</h3>${(rankings.topBearish || []).slice(0, 5).map(card).join('') || '<p class="muted">None</p>'}</div>
-      <div><h3 class="section-label">Ready now</h3>${(rankings.readyNow || []).slice(0, 5).map(card).join('') || '<p class="muted">None</p>'}</div>
-      <div><h3 class="section-label">Short covering</h3>${(rankings.topShortCovering || []).slice(0, 5).map(card).join('') || '<p class="muted">None</p>'}</div>
+      <div><h3 class="section-label">Bullish</h3>${(rankings.topBullish || []).slice(0, 5).map((r) => card(r)).join('') || '<p class="muted">None</p>'}</div>
+      <div><h3 class="section-label">Bearish</h3>${(rankings.topBearish || []).slice(0, 5).map((r) => card(r)).join('') || '<p class="muted">None</p>'}</div>
+      <div><h3 class="section-label">Short covering</h3>${(rankings.topShortCovering || []).slice(0, 5).map((r) => card(r)).join('') || '<p class="muted">None</p>'}</div>
     `;
 
-    $('#opp-watch').innerHTML = (rankings.watchlist || []).slice(0, 8).map((r) => {
-      const wait = (r.waitFor?.triggers || []).slice(0, 2).map((t) => t.label).join(' · ') || 'confirmation';
-      return `<button type="button" class="opp-card" data-opp-sym="${escapeHtml(r.symbol)}">
-        <div class="sym">${escapeHtml(r.symbol)} · ${r.opportunityScore} · ${r.confidence}%</div>
-        <div class="meta">Waiting: ${escapeHtml(wait)}</div>
-      </button>`;
-    }).join('') || '<p class="muted">No early watch items</p>';
+    $('#opp-watch').innerHTML = (rankings.watchlist || rankings.early || []).slice(0, 8).map((r) => card(r, { early: true })).join('')
+      || '<p class="muted">No early watch items</p>';
 
     $('#opp-table tbody').innerHTML = shown.map((r) => `
       <tr class="smart-row" data-opp-sym="${escapeHtml(r.symbol)}">
@@ -1005,9 +1140,9 @@
         <td>${escapeHtml(r.vwapRelation || '—')}</td>
         <td>${escapeHtml(r.optionsAlignment || '—')}</td>
         <td>${r.momentum != null ? fmt(r.momentum, 1) : '—'}</td>
-        <td><strong>${r.opportunityScore}</strong></td>
-        <td>${escapeHtml(r.grade)}</td>
-        <td class="${readinessClass(r.readiness?.status)}">${readinessLabel(r.readiness)}</td>
+        <td><span class="score-pill">${r.opportunityScore}</span></td>
+        <td><span class="grade-badge ${gradeClass(r.grade)}">${escapeHtml(r.grade)}</span></td>
+        <td><span class="pill ${readinessClass(r.readiness?.status)}">${readinessLabel(r.readiness)}</span></td>
       </tr>
     `).join('') || '<tr><td colspan="15">No rows</td></tr>';
 
@@ -1046,22 +1181,26 @@
       </div>
     `).join('');
 
-    const trig = (d.waitFor?.triggers || []).map((t) => `
-      <div class="opp-trig">
-        <div>${escapeHtml(t.label)}</div>
-        <div>Now: ${escapeHtml(String(t.current))}</div>
-        <div>Need: ${escapeHtml(String(t.required))}</div>
-        <div class="opp-wait">WAIT</div>
-      </div>
-    `).join('') || '<p class="muted">No outstanding measurable triggers</p>';
+    const trig = (d.waitFor?.triggers || []).map((t, idx) => {
+      const done = /pass|met|yes|true|ok/i.test(String(t.status || ''));
+      return `<div class="opp-trig ${done ? 'is-done' : ''}">
+        <div class="opp-trig-num">${idx + 1}</div>
+        <div class="opp-trig-body">
+          <div class="opp-trig-label">${escapeHtml(t.label)}</div>
+          <div class="muted tiny">Current: ${escapeHtml(String(t.current))} · Need: ${escapeHtml(String(t.required))}</div>
+        </div>
+        <div class="${done ? 'opp-ready' : 'opp-wait'}">${done ? '✓ CONFIRMED' : '⚠ WAIT'}</div>
+      </div>`;
+    }).join('') || '<p class="muted">No outstanding measurable triggers</p>';
 
     const inv = (d.invalidation?.items || []).map((i) => `<li>${escapeHtml(i.text)}</li>`).join('');
     const strong = (d.strongestFactors || []).map((s) => `<li>${escapeHtml(s.text)}</li>`).join('') || '<li class="muted">—</li>';
     const weak = (d.weakestFactors || []).map((s) => `<li>${escapeHtml(s.text)}</li>`).join('') || '<li class="muted">—</li>';
     const comps = d.components || {};
-    const compHtml = Object.entries(comps).map(([k, v]) => `
-      <div class="metric"><div class="k">${escapeHtml(k)}</div><div class="v">${v.available ? `${v.score}/${v.max}` : 'n/a'}</div></div>
-    `).join('');
+    const compHtml = Object.entries(comps).map(([k, v]) => {
+      if (!v || v.available === false) return contribBar(k, null, v?.max || 1);
+      return contribBar(k, v.score, v.max || 1);
+    }).join('');
 
     const mobileStrip = ['MARKET', 'SECTOR', 'PRICE', 'OI', 'VOLUME', 'VWAP', 'OPTIONS', 'MTF', 'RISK'].map((cat) => {
       const list = cats[cat] || [];
@@ -1072,6 +1211,7 @@
     }).join('');
 
     $('#opp-detail').classList.remove('hidden');
+    $('#opp-detail').classList.add('opp-drawer');
     $('#opp-detail').innerHTML = `
       <div class="opp-detail-head">
         <div>
@@ -1080,22 +1220,26 @@
         </div>
         <button type="button" id="opp-detail-close" class="ghost-btn" aria-label="Close">×</button>
       </div>
-      <div class="opp-kpis">
-        <div class="metric"><div class="k">Opportunity</div><div class="v">${d.opportunityScore}/100</div></div>
-        <div class="metric"><div class="k">Confidence</div><div class="v">${d.confidence}%</div></div>
-        <div class="metric"><div class="k">Grade</div><div class="v">${escapeHtml(d.grade)}</div></div>
-        <div class="metric"><div class="k">Setup</div><div class="v">${escapeHtml(d.setup || '')}</div></div>
-        <div class="metric"><div class="k">Readiness</div><div class="v ${readinessClass(d.readiness?.status)}">${readinessLabel(d.readiness)}</div></div>
-        <div class="metric"><div class="k">Conflict</div><div class="v">${escapeHtml(d.conflict?.level || '—')}</div></div>
+      <div class="opp-detail-hero">
+        <div class="opp-scores opp-scores-lg">
+          ${scoreBar('Opportunity', d.opportunityScore, 100, false)}
+          ${scoreBar('Confidence', d.confidence, 100, true)}
+        </div>
+        <div class="opp-detail-badges">
+          <span class="grade-badge ${gradeClass(d.grade)}">${escapeHtml(d.grade)}</span>
+          <span class="pill ${readinessClass(d.readiness?.status)}">${readinessLabel(d.readiness)}</span>
+          <span class="setup-badge">${escapeHtml((d.setup || '').replace(/_/g, ' '))}</span>
+          <span class="pill">Conflict ${escapeHtml(d.conflict?.level || '—')}</span>
+        </div>
       </div>
       <div class="opp-mobile-strip">${mobileStrip}</div>
       <h3 class="section-label">Why this opportunity?</h3>
       <p>${escapeHtml(d.why || '')}</p>
-      <h3 class="section-label">Score components</h3>
-      <div class="opp-kpis">${compHtml}</div>
-      <h3 class="section-label">What to wait for</h3>
+      <h3 class="section-label">Smart Money / score components</h3>
+      <div class="contrib-list">${compHtml}</div>
+      <h3 class="section-label">🟡 What to wait for</h3>
       ${d.readiness?.status === 'READY'
-        ? '<p class="opp-ready">Major confirmation conditions satisfied. READY is checklist confirmation only — not a trade guarantee.</p>'
+        ? '<div class="confirm-complete"><div class="confirm-title">🎯 CONFIRMATION COMPLETE</div><p class="opp-ready">🟢 READY — all predefined dashboard confirmation conditions are currently satisfied. This is checklist confirmation only — not a profit guarantee.</p></div>' + trig
         : trig}
       ${d.waitFor?.topTrigger ? `<p class="muted tiny">Top trigger: ${escapeHtml(d.waitFor.topTrigger.label)} — ${escapeHtml(d.waitFor.topTrigger.why || '')}</p>` : ''}
       ${d.waitFor?.scenario ? `<p class="muted tiny">If conditions improve (scenario estimate): score ~${d.waitFor.scenario.potentialScore}, confidence ~${d.waitFor.scenario.potentialConfidence}%. Not a prediction.</p>` : ''}
@@ -1120,7 +1264,7 @@
   }
 
   function initTheme() {
-    const saved = localStorage.getItem('fno-theme') || 'auto';
+    const saved = localStorage.getItem('fno-theme') || 'light';
     document.documentElement.dataset.theme = saved;
     const sel = $('#theme-select');
     if (sel) sel.value = saved;
@@ -1215,20 +1359,47 @@
     });
   }
 
-  // Desktop: expand bottom nav with more destinations
+  // Desktop: dedicated secondary nav (do not pollute mobile bottom nav)
   function expandDesktopNav() {
-    if (window.matchMedia('(min-width: 900px)').matches) {
-      const nav = $('.bottom-nav');
-      const extras = ['chain', 'heatmap', 'oi', 'sectors', 'scanner', 'fii', 'alerts', 'watch', 'settings', 'opportunity', 'legacy'];
-      extras.forEach((id) => {
-        if (nav.querySelector(`[data-nav="${id}"]`)) return;
-        const b = document.createElement('button');
-        b.dataset.nav = id;
-        b.innerHTML = `<span>·</span>${id}`;
-        b.addEventListener('click', () => showView(id));
-        nav.appendChild(b);
+    const bar = $('#desktop-nav');
+    if (!bar) return;
+    const mq = window.matchMedia('(min-width: 900px)');
+    const items = [
+      ['overview', 'Home'],
+      ['opportunity', 'Opportunity'],
+      ['smart', 'Smart Money'],
+      ['intel', 'F&O'],
+      ['chain', 'Options'],
+      ['sectors', 'Sectors'],
+      ['scanner', 'Scanner'],
+      ['heatmap', 'Heatmap'],
+      ['watch', 'Watchlist'],
+      ['alerts', 'Alerts'],
+      ['markets', 'Markets'],
+      ['settings', 'Settings'],
+    ];
+    const render = () => {
+      const desktop = mq.matches;
+      bar.hidden = !desktop;
+      document.body.classList.toggle('has-desktop-nav', desktop);
+      if (!desktop) {
+        bar.innerHTML = '';
+        return;
+      }
+      if (bar.dataset.ready === '1') return;
+      bar.innerHTML = items.map(([id, label]) =>
+        `<button type="button" data-nav="${id}" class="${state.view === id ? 'active' : ''}">${label}</button>`
+      ).join('');
+      bar.querySelectorAll('[data-nav]').forEach((btn) => {
+        btn.addEventListener('click', () => showView(btn.dataset.nav));
       });
-    }
+      bar.dataset.ready = '1';
+    };
+    render();
+    mq.addEventListener?.('change', () => {
+      bar.dataset.ready = '0';
+      render();
+    });
   }
 
   async function boot() {
@@ -1238,7 +1409,10 @@
     wireNav();
     expandDesktopNav();
     await renderTicker();
-    await showView('overview');
+    const tab = new URLSearchParams(location.search).get('tab')
+      || new URLSearchParams(location.search).get('view');
+    const initial = tab === 'markets' ? 'markets' : 'overview';
+    await showView(initial);
     setInterval(renderTicker, 60_000);
   }
 
