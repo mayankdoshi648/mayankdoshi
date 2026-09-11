@@ -22,6 +22,7 @@ const connectionStatus = createConnectionStatus();
 const aggregator = new CandleAggregator();
 
 const app = express();
+app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 app.use('/api', createApiRouter({
   db,
@@ -87,13 +88,17 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 httpServer.listen(config.port, () => {
-  console.log(`PowerBull Pro listening on http://localhost:${config.port}`);
+  console.log(`F&O Intelligence Terminal listening on http://localhost:${config.port}`);
+  if (!config.hasDhan) {
+    console.log('Dhan credentials not set — F&O uses NSE public / labeled MOCK. Set DHAN_* for live option chain + equity feed.');
+    return;
+  }
   if (isMarketOpen()) {
     startIngestion().catch((err) => {
       connectionStatus.setError(err);
       console.error('Ingestion failed to start:', err);
     });
   } else {
-    console.log('Market closed — ingestion will not start until 9:30 IST on a trading day. Restart the server during market hours.');
+    console.log('Market closed — equity ingestion waits for 9:30 IST. F&O APIs remain available.');
   }
 });
