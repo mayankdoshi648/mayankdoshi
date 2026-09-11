@@ -85,6 +85,16 @@ describe('mock provider + service', () => {
     assert.ok(detail.data.score != null);
     assert.ok(detail.data.explanation);
     assert.ok(detail.data.components?.priceOi);
+    assert.ok(detail.data.history);
+  });
+
+  it('watchlist includes smart money fields when available', async () => {
+    const service = new FnoService({ provider: new MockProvider() });
+    const wl = await service.getWatchlistQuotes();
+    const row = (wl.data || []).find((r) => r.symbol === 'HDFCBANK');
+    assert.ok(row);
+    assert.equal(typeof row.smartMoneyScore, 'number');
+    assert.equal(typeof row.smartMoneyConfidence, 'number');
   });
 
   it('watchlist add/remove', async () => {

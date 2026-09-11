@@ -628,19 +628,41 @@ class FnoService {
     const scan = await this.getFoScanner();
     const bySym = new Map((scan.data || []).map((r) => [r.symbol, r]));
     const ticker = await this.getTicker();
-    for (const q of ticker.data || []) bySym.set(q.symbol, {
-      symbol: q.symbol,
-      ltp: q.ltp,
-      priceChangePct: q.changePct,
-      oiChangePct: null,
-      volume: q.volume,
-      relativeVolume: null,
-      vwap: q.vwap,
-      iv: null,
-      buildup: 'NEUTRAL',
-      score: 0,
+    for (const q of ticker.data || []) {
+      const existing = bySym.get(q.symbol);
+      if (existing) {
+        bySym.set(q.symbol, {
+          ...existing,
+          ltp: q.ltp ?? existing.ltp,
+          priceChangePct: q.changePct ?? existing.priceChangePct,
+          volume: q.volume ?? existing.volume,
+          vwap: q.vwap ?? existing.vwap,
+        });
+      } else {
+        bySym.set(q.symbol, {
+          symbol: q.symbol,
+          ltp: q.ltp,
+          priceChangePct: q.changePct,
+          oiChangePct: null,
+          volume: q.volume,
+          relativeVolume: null,
+          vwap: q.vwap,
+          iv: null,
+          buildup: 'NEUTRAL',
+          score: 0,
+          smartMoney: null,
+        });
+      }
+    }
+    const rows = symbols.map((symbol) => {
+      const row = bySym.get(symbol) || { symbol, ltp: null, buildup: 'NEUTRAL', score: null };
+      return {
+        ...row,
+        smartMoneyScore: row.smartMoney?.score ?? null,
+        smartMoneyConfidence: row.smartMoney?.confidence ?? null,
+        smartMoneySetup: row.smartMoney?.setup ?? null,
+      };
     });
-    const rows = symbols.map((symbol) => bySym.get(symbol) || { symbol, ltp: null, buildup: 'NEUTRAL', score: null });
     return dataEnvelope(rows, { asOf: new Date().toISOString(), source: scan.meta.source, isMock: scan.meta.isMock });
   }
 

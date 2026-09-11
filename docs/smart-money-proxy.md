@@ -40,6 +40,13 @@ Additive layer on the existing F&O terminal. No new market-data fetches.
 - `GET /api/fno/smart-money/:symbol` — explainable detail panel
 - `GET /api/fno/smart-money/:symbol/history?range=1D|5D|10D|1M` — in-memory history
 
+## UI
+
+- Smart view: market strip, index cards, ranking tabs, stock table
+- Detail drawer: component analysis blocks, multi-TF chips, factors, interpretation
+- Score history ranges (1D / 5D / 10D / 1M) + sparkline
+- Watchlist + Alerts show Smart Money score/confidence
+
 ## Safeguards
 
 - Explicit proxy disclaimer on every payload / UI surface
