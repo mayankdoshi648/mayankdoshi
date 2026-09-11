@@ -25,8 +25,8 @@ On static hosts the app runs in **labeled MOCK / static-demo mode** (full UI + S
 | Heatmap | Sector Smart Money → stock drill-down |
 | Dhan API | In-app Client ID / PIN / TOTP → live option chain (Node server only) |
 | WHY drawer | Explainable positioning checklist |
+| Markets | Equity board: sector filter, rankings, 52-week range |
 | Equity / DarvaX | Preserved live EMA/RSI + DarvaX scanner |
-| Markets API | Equity board: sector filter, rankings, 52-week range (`/api/dashboard`) |
 
 ## Architecture
 
@@ -98,6 +98,6 @@ OI buildup classification, PCR, max pain, expected move
 
 ## Legacy DarvaX
 
-DarvaX scan, Obsidian export, Telegram alerts, and manual-approval orders remain under **Equity / DarvaX** in the terminal.
+DarvaX scan, Obsidian export, Telegram alerts, and manual-approval orders remain under **More → Legacy Desk**.
 
-> **Note:** The standalone Markets UI shell from the equity-dashboard branch is not yet wired into this F&O terminal chrome. Backend Markets APIs above are available; UI integration into More / Legacy Desk is a follow-up.
+**Equity Markets:** **More → Equity Markets** (or `/?tab=markets`) — sector filters, rankings, and 52-week range via `/api/dashboard`.
