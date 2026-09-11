@@ -3,23 +3,27 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>NSE F&O Intelligence Terminal</title>
+  <meta name="theme-color" content="#f4f7fb" />
+  <title>PowerBull Pro — India F&amp;O Trading Terminal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="topbar">
-    <div class="brand" aria-label="Brand">F&amp;O TERMINAL</div>
-    <div id="market-session" class="market-session">SESSION · —</div>
+    <div class="brand" aria-label="Brand">
+      <span class="brand-mark">PB</span>
+      <span class="brand-text">PowerBull Pro</span>
+    </div>
+    <div id="market-session" class="market-session live-dot">SESSION · —</div>
     <div id="data-meta" class="data-meta">—</div>
     <label class="theme-toggle" title="Theme">
       <span class="sr-only">Theme</span>
       <select id="theme-select" aria-label="Color theme">
+        <option value="light" selected>Light</option>
         <option value="auto">Auto</option>
         <option value="night">Night</option>
-        <option value="light">Light</option>
       </select>
     </label>
     <button type="button" id="btn-refresh" class="btn btn-refresh" title="Refresh">↻</button>
@@ -30,6 +34,8 @@
 
   <div id="ticker" class="ticker" aria-label="Index ticker"></div>
 
+  <nav id="desktop-nav" class="desktop-nav" aria-label="Desktop sections" hidden></nav>
+
   <main class="main">
     <!-- HOME -->
     <section class="view active" data-view="overview">
@@ -37,13 +43,17 @@
         <article class="home-block regime-panel">
           <h1 class="block-title">Market Regime</h1>
           <div class="regime-hero">
-            <div id="regime-label" class="regime-label">—</div>
-            <div class="regime-hero-metrics">
-              <div class="metric"><div class="k">Score</div><div class="v" id="regime-score">—</div></div>
-              <div class="metric"><div class="k">Confidence</div><div class="v" id="regime-conf">—</div></div>
+            <div class="regime-gauge" aria-hidden="true">
+              <div id="regime-ring" class="regime-ring">
+                <div class="regime-ring-inner">
+                  <div id="regime-label" class="regime-label">—</div>
+                  <div class="regime-ring-score"><span id="regime-score">—</span><small>/100</small></div>
+                </div>
+              </div>
+              <div class="regime-conf-pill">Confidence <strong id="regime-conf">—</strong></div>
             </div>
+            <div id="regime-factors" class="regime-factors check-row"></div>
           </div>
-          <div id="regime-factors" class="regime-factors check-row"></div>
         </article>
 
         <article class="home-block">
@@ -235,24 +245,31 @@
     <!-- OPPORTUNITY / TRADE READINESS -->
     <section class="view" data-view="opportunity">
       <h1 class="view-title">Opportunity</h1>
-      <p class="disclaimer-inline tiny">Decision-support checklist — not buy/sell advice. READY means confirmations passed, not guaranteed profit.</p>
+      <p class="disclaimer-inline tiny">Decision-support checklist — not buy/sell advice. READY means confirmations passed, not guaranteed profit. Opportunity Score and Confidence are separate metrics.</p>
 
       <div class="opp-buckets" id="opp-buckets">
         <button type="button" class="opp-bucket active" data-bucket="all">All</button>
-        <button type="button" class="opp-bucket" data-bucket="READY_NOW">Ready now</button>
-        <button type="button" class="opp-bucket" data-bucket="EARLY">Early</button>
+        <button type="button" class="opp-bucket" data-bucket="READY_NOW">🔥 Ready now</button>
+        <button type="button" class="opp-bucket" data-bucket="EARLY">👀 Early</button>
         <button type="button" class="opp-bucket" data-bucket="CONFLICTED">Conflicted</button>
         <button type="button" class="opp-bucket" data-bucket="AVOID">Avoid</button>
       </div>
 
-      <div class="home-block">
-        <h2 class="section-label">Top opportunities</h2>
-        <div id="opp-top" class="opp-top-grid"></div>
+      <div class="home-block opp-hero-block">
+        <h2 class="section-label section-label-hero">🔥 Ready now</h2>
+        <p class="tiny muted opp-hero-note">Confirmations currently satisfied — not a profit guarantee.</p>
+        <div id="opp-ready-now" class="opp-top-grid opp-ready-grid"></div>
+      </div>
+
+      <div class="home-block opp-early-block">
+        <h2 class="section-label section-label-hero">👀 Early opportunities</h2>
+        <p class="tiny muted opp-hero-note">High potential — waiting on confirmation.</p>
+        <div id="opp-watch" class="opp-top-grid opp-early-grid"></div>
       </div>
 
       <div class="home-block">
-        <h2 class="section-label">Opportunities to watch</h2>
-        <div id="opp-watch" class="signal-list"></div>
+        <h2 class="section-label">Top by direction</h2>
+        <div id="opp-top" class="opp-top-grid"></div>
       </div>
 
       <div class="filters opp-filters">
@@ -597,9 +614,9 @@
 
   <nav class="bottom-nav" aria-label="Primary">
     <button type="button" data-nav="overview" class="active"><span>⌂</span>Home</button>
-    <button type="button" data-nav="intel"><span>▣</span>F&amp;O</button>
     <button type="button" data-nav="opportunity"><span>◎</span>Opp</button>
-    <button type="button" data-nav="smart"><span>◆</span>Scan</button>
+    <button type="button" data-nav="smart"><span>◆</span>Smart</button>
+    <button type="button" data-nav="intel"><span>▣</span>F&amp;O</button>
     <button type="button" data-nav="more"><span>⋯</span>More</button>
   </nav>
 
