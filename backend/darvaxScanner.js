@@ -16,9 +16,13 @@ function loadUniverse(market) {
 }
 
 async function prepareDhanContext(symbols, config, fetchImpl) {
-  if (!config?.clientId || !config?.pin || !config?.totpSecret) return null;
+  const hasStatic = Boolean(config?.clientId && config?.accessToken);
+  const hasLogin = Boolean(config?.clientId && config?.pin && config?.totpSecret);
+  if (!hasStatic && !hasLogin) return null;
   try {
-    const { accessToken } = await fetchAccessToken(config, fetchImpl);
+    const accessToken = hasStatic
+      ? config.accessToken
+      : (await fetchAccessToken(config, fetchImpl)).accessToken;
     const instrumentMap = await resolveNseInstrumentMap(symbols, fetchImpl);
     return { accessToken, clientId: config.clientId, instrumentMap, strict: false };
   } catch {

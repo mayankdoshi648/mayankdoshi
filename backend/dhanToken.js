@@ -1,5 +1,6 @@
 // backend/dhanToken.js — cached Dhan access-token manager
 const { fetchAccessToken } = require('./dhanAuth');
+const { hasDhanCredentials, hasLoginCredentials, hasStaticAccessToken } = require('./config');
 
 function createTokenManager({ config, fetchImpl = fetch, fetchTokenFn = fetchAccessToken }) {
   let cached = null;
@@ -7,7 +8,7 @@ function createTokenManager({ config, fetchImpl = fetch, fetchTokenFn = fetchAcc
   let lastError = null;
 
   function hasCredentials() {
-    return Boolean(config?.clientId && config?.pin && config?.totpSecret);
+    return hasDhanCredentials(config);
   }
 
   function isExpired(entry, now = Date.now()) {
@@ -19,9 +20,35 @@ function createTokenManager({ config, fetchImpl = fetch, fetchTokenFn = fetchAcc
     return !Number.isFinite(expiryMs) || now >= expiryMs - 5 * 60 * 1000;
   }
 
+  function staticTokenEntry() {
+    return {
+      accessToken: config.accessToken,
+      expiryTime: config.accessTokenExpiry || null,
+      fetchedAt: Date.now(),
+      source: 'static',
+    };
+  }
+
   async function getAccessToken({ force = false } = {}) {
     if (!hasCredentials()) {
-      const err = new Error('Dhan credentials not configured (DHAN_CLIENT_ID / DHAN_PIN / DHAN_TOTP_SECRET)');
+      const err = new Error(
+        'Dhan credentials not configured (DHAN_CLIENT_ID + DHAN_ACCESS_TOKEN, or PIN + TOTP secret)'
+      );
+      lastError = err.message;
+      throw err;
+    }
+
+    // Preferred path: paste a ready-made access token (no PIN/TOTP needed).
+    if (hasStaticAccessToken(config)) {
+      if (force || !cached || cached.accessToken !== config.accessToken || isExpired(cached)) {
+        cached = staticTokenEntry();
+      }
+      lastError = null;
+      return cached;
+    }
+
+    if (!hasLoginCredentials(config)) {
+      const err = new Error('Dhan credentials incomplete');
       lastError = err.message;
       throw err;
     }
@@ -46,6 +73,7 @@ function createTokenManager({ config, fetchImpl = fetch, fetchTokenFn = fetchAcc
           accessToken: result.accessToken,
           expiryTime: result.expiryTime || null,
           fetchedAt: Date.now(),
+          source: 'login',
         };
         lastError = null;
         return cached;
@@ -68,6 +96,7 @@ function createTokenManager({ config, fetchImpl = fetch, fetchTokenFn = fetchAcc
       expiryTime: cached?.expiryTime || null,
       lastError,
       mode: hasCredentials() ? (authenticated ? 'live' : 'connecting') : 'demo',
+      authMode: hasStaticAccessToken(config) ? 'access_token' : (hasLoginCredentials(config) ? 'pin_totp' : null),
     };
   }
 

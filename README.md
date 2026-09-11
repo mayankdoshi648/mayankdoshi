@@ -61,7 +61,8 @@ Open **http://localhost:3000**
 
 | Variable | Purpose |
 |----------|---------|
-| `DHAN_CLIENT_ID`, `DHAN_PIN`, `DHAN_TOTP_SECRET` | Live Dhan option chain + equity feed + Markets quotes |
+| `DHAN_CLIENT_ID` + `DHAN_ACCESS_TOKEN` | **Preferred** live path — paste access token from Dhan (no PIN/TOTP) |
+| `DHAN_CLIENT_ID` + `DHAN_PIN` + `DHAN_TOTP_SECRET` | Alternate — auto-generate access tokens via TOTP |
 | `DEMO_MODE=true` | Force synthetic Markets equity quotes |
 | `FNO_FORCE_MOCK=1` | Force labeled mock F&O data (UI/dev) |
 | `PORT` | Default 3000 |
@@ -69,7 +70,7 @@ Open **http://localhost:3000**
 
 **Server boots without Dhan** — terminal uses NSE public + labeled mock; Markets API falls back to demo quotes. Set `DHAN_*` in `.env` **or** enter them in **More → Dhan API** (optional write-back to `.env`).
 
-Never commit `.env`. PIN / TOTP are never returned by `GET /api/fno/credentials/dhan` (masked client id only).
+Never commit `.env`. PIN / TOTP / access token are never returned by `GET /api/fno/credentials/dhan` (masked client id only).
 
 ## Key API routes
 

@@ -444,17 +444,22 @@
       </div>
       <div id="dhan-status" class="dhan-status muted">Checking credentials…</div>
       <form id="dhan-form" class="dhan-form" autocomplete="off">
+        <p class="tiny muted">Use <strong>Client ID + Access token</strong> (simplest), or Client ID + PIN + TOTP secret.</p>
         <label>
           <span>Client ID</span>
           <input id="dhan-client-id" name="clientId" type="text" inputmode="numeric" placeholder="Dhan client id" required>
         </label>
         <label>
-          <span>PIN</span>
-          <input id="dhan-pin" name="pin" type="password" placeholder="App PIN" required>
+          <span>Access token <em>(optional if using PIN+TOTP)</em></span>
+          <input id="dhan-access-token" name="accessToken" type="password" placeholder="Paste Dhan access token">
         </label>
         <label>
-          <span>TOTP secret</span>
-          <input id="dhan-totp" name="totpSecret" type="password" placeholder="Base32 TOTP secret" required>
+          <span>PIN <em>(optional if using access token)</em></span>
+          <input id="dhan-pin" name="pin" type="password" placeholder="App PIN">
+        </label>
+        <label>
+          <span>TOTP secret <em>(optional if using access token)</em></span>
+          <input id="dhan-totp" name="totpSecret" type="password" placeholder="Base32 TOTP secret">
         </label>
         <label class="dhan-check">
           <input id="dhan-persist" type="checkbox" checked>
