@@ -71,6 +71,7 @@
       if (name === 'intel') await renderIntel();
       if (name === 'chain' || name === 'oi') await renderChain(name === 'oi');
       if (name === 'smart') await renderSmart();
+      if (name === 'heatmap') await renderHeatmap();
       if (name === 'sectors') await renderSectors();
       if (name === 'scanner') await renderScanner();
       if (name === 'fii') await renderFii();
@@ -81,6 +82,46 @@
       console.error(err);
       $('#data-meta').textContent = `Error: ${err.message}`;
     }
+  }
+
+  function updateMarketSession() {
+    const el = $('#market-session');
+    if (!el) return;
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(now);
+    const map = Object.fromEntries(parts.filter((p) => p.type !== 'literal').map((p) => [p.type, p.value]));
+    const mins = Number(map.hour) * 60 + Number(map.minute);
+    const weekday = map.weekday;
+    const isWeekend = weekday === 'Sat' || weekday === 'Sun';
+    const open = !isWeekend && mins >= 9 * 60 + 15 && mins <= 15 * 60 + 30;
+    el.textContent = open ? 'MARKET OPEN ●' : 'MARKET CLOSED ○';
+    el.className = `market-session ${open ? 'open' : 'closed'}`;
+  }
+
+  function whyMark(ok) {
+    return ok ? '<span class="why-ok">✓</span>' : '<span class="why-na">·</span>';
+  }
+
+  function signalListHtml(rows, limit = 5) {
+    return (rows || []).slice(0, limit).map((r) => `
+      <button type="button" class="signal-row" data-symbol="${escapeHtml(r.symbol)}">
+        <span class="sym">${escapeHtml(r.symbol)}</span>
+        <span class="sc ${clsDir(r.score)}">${r.score >= 0 ? '+' : ''}${r.score ?? '—'}</span>
+        <span class="cf">${r.confidence != null ? `${r.confidence}%` : ''}</span>
+      </button>
+    `).join('') || '<div class="muted">No signals</div>';
+  }
+
+  function bindSymbolButtons(root) {
+    root?.querySelectorAll('[data-symbol]').forEach((btn) => {
+      btn.addEventListener('click', () => openSmartDetail(btn.dataset.symbol));
+    });
   }
 
   async function renderTicker() {
@@ -97,16 +138,26 @@
   }
 
   async function renderOverview() {
-    const env = await api('/api/fno/overview');
+    updateMarketSession();
+    const [env, sm, sectors, alerts] = await Promise.all([
+      api('/api/fno/overview'),
+      api('/api/fno/smart-money?limit=8'),
+      api('/api/fno/sectors').catch(() => ({ data: [] })),
+      api('/api/fno/alerts').catch(() => ({ data: { alerts: [] } })),
+    ]);
+
     const regime = env.data?.regime || {};
     const label = $('#regime-label');
     label.textContent = (regime.label || '—').replace(/_/g, ' ');
     label.className = `regime-label ${regime.label || ''}`;
-    $('#regime-score').textContent = regime.score ?? '—';
-    $('#regime-conf').textContent = regime.confidence != null ? `${Math.round(regime.confidence * 100)}%` : '—';
-    $('#regime-factors').innerHTML = (regime.factors || []).map((f) => `
-      <div class="factor"><span class="n">${escapeHtml(f.name)}</span><span class="e">${escapeHtml(f.evidence)}</span></div>
-    `).join('') || '<div class="muted">No factors available</div>';
+    $('#regime-score').textContent = regime.score != null ? `${regime.score >= 0 ? '+' : ''}${regime.score}` : '—';
+    $('#regime-conf').textContent = regime.confidence != null
+      ? `${regime.confidence <= 1 ? Math.round(regime.confidence * 100) : Math.round(regime.confidence)}%`
+      : '—';
+    $('#regime-factors').innerHTML = (regime.factors || []).map((f) => {
+      const ok = !/missing|unavailable|null|unknown/i.test(String(f.evidence || ''));
+      return `<div class="factor check"><span class="n">${escapeHtml(f.name)}</span>${whyMark(ok)}<span class="e">${escapeHtml(f.evidence)}</span></div>`;
+    }).join('') || '<div class="muted">No factors available</div>';
 
     const snap = env.data?.optionSnapshot;
     const opt = $('#overview-opt');
@@ -115,28 +166,79 @@
       $('#overview-interp').innerHTML = '';
     } else {
       opt.innerHTML = [
-        ['OI PCR', fmt(snap.pcr)],
+        ['PCR', fmt(snap.pcr)],
         ['Max Pain', fmt(snap.maxPain, 0)],
-        ['ATM', snap.atm?.strike ?? '—'],
         ['ATM IV', snap.atm?.iv != null ? `${fmt(snap.atm.iv)}%` : '—'],
-        ['Exp Move', snap.expectedMove ? `±${fmt(snap.expectedMove.move)}` : '—'],
-        ['1σ Range', snap.expectedMove ? `${fmt(snap.expectedMove.lower1sd)} – ${fmt(snap.expectedMove.upper1sd)}` : '—'],
-      ].map(([k, v]) => `<div class="metric"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+        ['Support', snap.interpretation?.putSupport || snap.atm?.strike || '—'],
+        ['Resistance', snap.interpretation?.callResistance || '—'],
+        ['Exp Move', snap.expectedMove ? `±${fmt(snap.expectedMove.move, 0)}` : '—'],
+      ].map(([k, v]) => `<div class="metric"><div class="k">${k}</div><div class="v">${escapeHtml(String(v))}</div></div>`).join('');
       const ev = snap.interpretation?.evidence || [];
-      $('#overview-interp').innerHTML = `<strong>${escapeHtml(snap.interpretation?.summary || '')}</strong><ul>${ev.map((e) => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`;
+      $('#overview-interp').innerHTML = `<strong>${escapeHtml(snap.interpretation?.summary || '')}</strong><ul>${ev.slice(0, 3).map((e) => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`;
     }
 
-    try {
-      const sectors = await api('/api/fno/sectors');
-      $('#overview-sectors').innerHTML = (sectors.data || []).slice(0, 8).map((s) => `
-        <div class="sector-chip">
-          <div class="s">#${s.rank} ${escapeHtml(s.sector)}</div>
-          <div class="v ${clsDir(s.returnPct)}">${fmtPct(s.returnPct)} · score ${s.score}</div>
-        </div>
-      `).join('');
-    } catch {
-      $('#overview-sectors').innerHTML = '';
-    }
+    const indices = sm.data?.indices || [];
+    $('#home-sm-indices').innerHTML = indices.map((ix) => `
+      <button type="button" class="home-ix" data-symbol="${escapeHtml(ix.symbol)}">
+        <span class="sym">${escapeHtml(ix.symbol)}</span>
+        <span class="sc ${clsDir(ix.score)}">${ix.score >= 0 ? '+' : ''}${ix.score ?? '—'}</span>
+        <span class="setup">${escapeHtml(ix.setup || ix.signal || '')}</span>
+        <span class="cf">${ix.confidence != null ? `${ix.confidence}%` : ''}</span>
+      </button>
+    `).join('') || '<div class="muted">Index proxy unavailable</div>';
+    bindSymbolButtons($('#home-sm-indices'));
+
+    $('#home-top-longs').innerHTML = signalListHtml(sm.data?.rankings?.topLongs);
+    $('#home-top-shorts').innerHTML = signalListHtml(sm.data?.rankings?.topShorts);
+    bindSymbolButtons($('#home-top-longs'));
+    bindSymbolButtons($('#home-top-shorts'));
+
+    const chips = [
+      ['LONG BUILDUP', 'LONG_BUILDUP'],
+      ['SHORT BUILDUP', 'SHORT_BUILDUP'],
+      ['SHORT COVERING', 'SHORT_COVERING'],
+      ['LONG UNWINDING', 'LONG_UNWINDING'],
+    ];
+    $('#home-fo-chips').innerHTML = chips.map(([labelText, sig]) => `
+      <button type="button" class="fo-chip" data-signal="${sig}">${labelText}</button>
+    `).join('');
+    $('#home-fo-chips').querySelectorAll('[data-signal]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.buildupSignal = btn.dataset.signal;
+        showView('intel');
+      });
+    });
+
+    $('#overview-sectors').innerHTML = (sectors.data || []).slice(0, 5).map((s) => `
+      <button type="button" class="sector-rank-row" data-sector="${escapeHtml(s.sector)}">
+        <span class="rk">${s.rank}</span>
+        <span class="nm">${escapeHtml(s.sector)}</span>
+        <span class="${clsDir(s.returnPct)}">${fmtPct(s.returnPct)}</span>
+        <span class="sc">${s.score}</span>
+      </button>
+    `).join('') || '<div class="muted">No sector data</div>';
+    $('#overview-sectors').querySelectorAll('[data-sector]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        showView('heatmap');
+        state.pendingHeatSector = btn.dataset.sector;
+      });
+    });
+
+    const feed = (alerts.data?.alerts || []).slice(0, 5);
+    $('#home-alerts').innerHTML = feed.length
+      ? feed.map((a) => `
+        <button type="button" class="alert-row" data-symbol="${escapeHtml(a.symbol)}">
+          <span class="sym">${escapeHtml(a.symbol)}</span>
+          <span class="msg">${escapeHtml((a.reasons || []).slice(0, 2).join(' · '))}</span>
+          <span class="sc ${clsDir(a.smartMoneyScore ?? a.score)}">${a.smartMoneyScore != null ? `${a.smartMoneyScore >= 0 ? '+' : ''}${a.smartMoneyScore}` : (a.score ?? '')}</span>
+        </button>
+      `).join('')
+      : '<div class="muted">No alerts fired yet — run from Alerts</div>';
+    bindSymbolButtons($('#home-alerts'));
+
+    $$('[data-jump]').forEach((btn) => {
+      btn.onclick = () => showView(btn.dataset.jump);
+    });
   }
 
   async function renderIntel() {
@@ -156,6 +258,8 @@
     `).join('');
     body.querySelectorAll('tr').forEach((tr) => {
       tr.addEventListener('click', () => {
+        const sym = tr.querySelector('td')?.textContent?.trim();
+        if (sym) openSmartDetail(sym);
         const why = $('#intel-why');
         why.classList.remove('hidden');
         why.innerHTML = `<strong>WHY?</strong><div>${escapeHtml(tr.dataset.why)}</div>`;
@@ -269,8 +373,12 @@
       btn.addEventListener('click', () => openSmartDetail(btn.dataset.symbol));
     });
     $('#smart-detail-close')?.addEventListener('click', () => {
-      $('#smart-detail')?.classList.add('hidden');
-    }, { once: true });
+      const panel = $('#smart-detail');
+      panel?.classList.add('hidden');
+      panel?.classList.remove('floating-drawer');
+      const host = $('#smart-detail-host');
+      if (panel && host && panel.parentElement === document.body) host.appendChild(panel);
+    });
   }
 
   function bindSmartRankTabs() {
@@ -314,67 +422,83 @@
     state.smartDetailSymbol = symbol;
     const panel = $('#smart-detail');
     const body = $('#smart-detail-body');
-    $('#smart-detail-title').textContent = `${d.symbol} — Smart Money Proxy`;
+    const host = $('#smart-detail-host') || panel.parentElement;
+    if (panel.parentElement !== document.body && state.view !== 'smart') {
+      document.body.appendChild(panel);
+      panel.classList.add('floating-drawer');
+    } else if (state.view === 'smart' && host && panel.parentElement === document.body) {
+      host.appendChild(panel);
+      panel.classList.remove('floating-drawer');
+    }
+    $('#smart-detail-title').textContent = d.symbol;
     const comps = d.components || {};
     const q = d.quote || {};
-    const list = (arr, cls) => (arr || []).map((f) => `<li class="${cls}">${escapeHtml(f.text || f)}</li>`).join('') || '<li>—</li>';
-    const compBlock = (id, title) => {
-      const c = comps[id];
-      if (!c) return '';
-      const avail = c.available ? '' : ' <em class="muted">(unavailable — confidence reduced)</em>';
-      return `<div class="analysis-block">
-        <h3 class="section-label">${escapeHtml(title)}${avail}</h3>
-        <p><span class="${clsDir(c.score)}">${c.score >= 0 ? '+' : ''}${c.score}</span> / ${c.max}</p>
-        <ul>${(c.reasons || []).map((r) => `<li>${escapeHtml(r)}</li>`).join('') || '<li>—</li>'}</ul>
-      </div>`;
-    };
+    const list = (arr, empty) => (arr || []).length
+      ? (arr || []).map((f) => `<li>✓ ${escapeHtml(f.text || f)}</li>`).join('')
+      : `<li class="muted">${escapeHtml(empty)}</li>`;
+
+    const whyRows = [
+      ['Price', q.priceChangePct != null ? fmtPct(q.priceChangePct) : '—', comps.priceOi?.available && Math.abs(comps.priceOi.score) >= 2],
+      ['OI', q.oiChangePct != null ? fmtPct(q.oiChangePct) : '—', comps.priceOi?.available && Math.abs(Number(comps.priceOi.detail?.oiChangePct || 0)) >= 0.5],
+      ['Relative Volume', q.relativeVolume != null ? `${fmt(q.relativeVolume)}×` : '—', comps.volume?.available && comps.volume.detail?.bucket !== 'weak'],
+      ['VWAP', q.vwapRelation || (comps.vwap?.detail?.distancePct != null ? (comps.vwap.detail.distancePct >= 0 ? 'Above' : 'Below') : '—'), comps.vwap?.available && Math.abs(comps.vwap.score) >= 1],
+      ['Sector', (comps.sector?.reasons?.[0] || '—').replace(/^Sector:\s*/i, ''), comps.sector?.available && comps.sector.detail?.aligned],
+      ['Options', comps.options?.available ? (comps.options.reasons?.[0] || 'Present') : 'Unavailable', comps.options?.available && Math.abs(comps.options.score) >= 1],
+      ['FII', comps.fii?.available ? (comps.fii.reasons?.[0] || 'Present') : 'Unavailable / not applied', comps.fii?.available && Math.abs(comps.fii.score) >= 1],
+    ];
+
     const tfLabels = d.timeframes?.labels || {};
-    const tfChips = Object.entries(tfLabels).map(([k, v]) => {
+    const tfList = Object.entries(tfLabels).map(([k, v]) => {
       const cls = /Bullish/i.test(v) ? 'up' : /Bearish/i.test(v) ? 'down' : '';
-      return `<span class="tf-chip ${cls}"><strong>${escapeHtml(k)}</strong> ${escapeHtml(v)}</span>`;
+      const mark = /Bullish/i.test(v) ? '🟢' : /Bearish/i.test(v) ? '🔴' : '⚪';
+      return `<div class="tf-line ${cls}"><span>${escapeHtml(k)}</span><span>${mark} ${escapeHtml(v)}</span></div>`;
     }).join('');
 
     body.innerHTML = `
-      <p class="disclaimer-inline">${escapeHtml(d.disclaimer || '')}</p>
-      <div class="smart-detail-scoreline">
-        <div><span class="k">Score</span><span class="v ${clsDir(d.score)}">${d.score >= 0 ? '+' : ''}${d.score}</span></div>
-        <div><span class="k">Confidence</span><span class="v">${d.confidence}%</span></div>
-        <div><span class="k">Signal</span><span class="v">${escapeHtml(d.signal || '')}</span></div>
-        <div><span class="k">Setup</span><span class="v">${escapeHtml(d.setup || '')}</span></div>
-        <div><span class="k">Quality</span><span class="v">${escapeHtml(d.quality || '')}</span></div>
+      <p class="disclaimer-inline tiny">${escapeHtml(d.disclaimer || '')}</p>
+      <div class="drill-hero">
+        <div>
+          <div class="drill-ltp">${fmt(q.ltp)}</div>
+          <div class="drill-chg ${clsDir(q.priceChangePct)}">${fmtPct(q.priceChangePct)}</div>
+        </div>
+        <div class="drill-sm">
+          <div class="k">Smart Money</div>
+          <div class="v ${clsDir(d.score)}">${d.score >= 0 ? '+' : ''}${d.score}</div>
+          <div class="cf">Confidence ${d.confidence}%</div>
+        </div>
+      </div>
+      <div class="analysis-block setup-block">
+        <div class="k">Primary setup</div>
+        <div class="v ${clsDir(d.score)}">${escapeHtml(d.signal || '')} · ${escapeHtml(d.setup || '')}</div>
+        <div class="muted">Quality ${escapeHtml(d.quality || '—')}</div>
       </div>
       ${d.conflicting ? '<p class="conflict-banner">CONFLICTING SIGNALS — confidence reduced</p>' : ''}
       <h3 class="section-label">WHY?</h3>
-      <pre class="smart-why">${escapeHtml(d.explanation || (d.why || []).join('\n'))}</pre>
-
-      <h3 class="section-label">Quote snapshot</h3>
-      <div class="metrics-row">
-        <div class="metric"><div class="k">LTP</div><div class="v">${fmt(q.ltp)}</div></div>
-        <div class="metric"><div class="k">Price%</div><div class="v ${clsDir(q.priceChangePct)}">${fmtPct(q.priceChangePct)}</div></div>
-        <div class="metric"><div class="k">OI%</div><div class="v ${clsDir(q.oiChangePct)}">${fmtPct(q.oiChangePct)}</div></div>
-        <div class="metric"><div class="k">RVol</div><div class="v">${q.relativeVolume != null ? `${fmt(q.relativeVolume)}×` : '—'}</div></div>
-        <div class="metric"><div class="k">VWAP</div><div class="v">${escapeHtml(q.vwapRelation || (q.vwap != null ? fmt(q.vwap) : '—'))}</div></div>
-        <div class="metric"><div class="k">Sector</div><div class="v">${escapeHtml(q.sector || '—')}</div></div>
+      <div class="why-table">
+        ${whyRows.map(([name, val, ok]) => `
+          <div class="why-row">
+            <span class="n">${escapeHtml(name)}</span>
+            <span class="val">${escapeHtml(String(val))}</span>
+            ${whyMark(Boolean(ok))}
+          </div>
+        `).join('')}
       </div>
-
-      ${compBlock('priceOi', 'Price / OI analysis')}
-      ${compBlock('volume', 'Volume analysis')}
-      ${compBlock('vwap', 'VWAP analysis')}
-      ${compBlock('options', 'Options analysis')}
-      ${compBlock('sector', 'Sector analysis')}
-      ${compBlock('fii', 'FII / institutional (index-level)')}
-      ${compBlock('momentum', 'Momentum / persistence')}
-
-      <h3 class="section-label">Multi-timeframe</h3>
-      <p><strong>${escapeHtml(d.timeframes?.overall || 'NEUTRAL')}</strong></p>
-      <div class="tf-row">${tfChips || '<span class="muted">Timeframe history limited</span>'}</div>
-
+      <h3 class="section-label">Timeframe</h3>
+      <div class="tf-list">${tfList || '<div class="muted">Multi-timeframe history limited — session proxy only</div>'}</div>
+      <p><strong>MULTI-TIMEFRAME: ${escapeHtml(d.timeframes?.overall || 'NEUTRAL')}</strong></p>
       <div class="factor-grid">
-        <div><h3 class="section-label">Bullish factors</h3><ul>${list(d.bullishFactors, 'up')}</ul></div>
-        <div><h3 class="section-label">Bearish factors</h3><ul>${list(d.bearishFactors, 'down')}</ul></div>
-        <div><h3 class="section-label">Conflicting factors</h3><ul>${list(d.conflictingFactors, 'warn')}</ul></div>
+        <div><h3 class="section-label">Bullish factors</h3><ul>${list(d.bullishFactors, 'None significant')}</ul></div>
+        <div><h3 class="section-label">Bearish factors</h3><ul>${list(d.bearishFactors, 'None significant')}</ul></div>
+        <div><h3 class="section-label">Conflicts</h3><ul>${list(d.conflictingFactors, 'None significant')}</ul></div>
       </div>
-
+      <h3 class="section-label">Component breakdown</h3>
+      <ul class="smart-comps">
+        ${Object.entries(comps).map(([id, c]) => `
+          <li><strong>${escapeHtml(id)}</strong>: <span class="${clsDir(c.score)}">${c.score}</span>/${c.max}
+          ${c.available ? '' : ' <em>(unavailable)</em>'}
+          — ${escapeHtml((c.reasons || []).slice(0, 1).join('; '))}</li>
+        `).join('')}
+      </ul>
       <h3 class="section-label">Score history</h3>
       <div class="smart-tabs" id="smart-hist-tabs" role="tablist">
         ${['1D', '5D', '10D', '1M'].map((r) => `<button type="button" data-hist="${r}" class="${r === '5D' ? 'active' : ''}">${r}</button>`).join('')}
@@ -387,10 +511,9 @@
         </table>
       </div>
       <div id="smart-hist-spark" class="smart-spark" aria-hidden="true"></div>
-
       <h3 class="section-label">Final interpretation</h3>
       <p>${escapeHtml(d.interpretation || '')}</p>
-      <p class="muted">Positioning proxy only — not a BUY/SELL recommendation and not proof of institutional intent.</p>
+      <p class="muted">Positioning proxy only — not a BUY/SELL recommendation.</p>
     `;
 
     paintSmartHistory(d.history);
@@ -444,6 +567,70 @@
         spark.innerHTML = '';
       }
     }
+  }
+
+  async function renderHeatmap() {
+    const [sectorsEnv, smEnv] = await Promise.all([
+      api('/api/fno/sectors'),
+      api('/api/fno/smart-money?limit=80'),
+    ]);
+    const rows = smEnv.data?.rows || [];
+    const bySector = new Map();
+    for (const r of rows) {
+      const sector = r.sector || 'OTHER';
+      if (!bySector.has(sector)) bySector.set(sector, []);
+      bySector.get(sector).push(r);
+    }
+
+    const sectors = (sectorsEnv.data || []).map((s) => {
+      const stocks = bySector.get(s.sector) || [];
+      const avgSm = stocks.length
+        ? Math.round(stocks.reduce((a, x) => a + (x.score || 0), 0) / stocks.length)
+        : Math.round(((s.score || 50) - 50) * 2);
+      return { ...s, smartScore: avgSm, stocks: stocks.sort((a, b) => (b.score || 0) - (a.score || 0)) };
+    }).sort((a, b) => b.smartScore - a.smartScore);
+
+    state.heatmapSectors = sectors;
+    const maxAbs = Math.max(1, ...sectors.map((s) => Math.abs(s.smartScore)));
+    $('#heatmap-list').innerHTML = `
+      <div class="hm-axis">VERY BULLISH ↑</div>
+      ${sectors.map((s) => {
+        const width = Math.round((Math.abs(s.smartScore) / maxAbs) * 100);
+        const dir = s.smartScore >= 0 ? 'bull' : 'bear';
+        return `<button type="button" class="hm-row ${dir}" data-sector="${escapeHtml(s.sector)}">
+          <span class="nm">${escapeHtml(s.sector)}</span>
+          <span class="bar-wrap"><span class="bar" style="width:${width}%"></span></span>
+          <span class="sc ${clsDir(s.smartScore)}">${s.smartScore >= 0 ? '+' : ''}${s.smartScore}</span>
+        </button>`;
+      }).join('')}
+      <div class="hm-axis">↓ VERY BEARISH</div>
+    `;
+
+    $('#heatmap-list').querySelectorAll('[data-sector]').forEach((btn) => {
+      btn.addEventListener('click', () => openHeatmapSector(btn.dataset.sector));
+    });
+
+    $('#heatmap-sector-close')?.addEventListener('click', () => {
+      $('#heatmap-sector')?.classList.add('hidden');
+    }, { once: true });
+
+    if (state.pendingHeatSector) {
+      const sec = state.pendingHeatSector;
+      state.pendingHeatSector = null;
+      openHeatmapSector(sec);
+    }
+  }
+
+  function openHeatmapSector(sector) {
+    const s = (state.heatmapSectors || []).find((x) => x.sector === sector);
+    const panel = $('#heatmap-sector');
+    if (!s || !panel) return;
+    $('#heatmap-sector-title').textContent = sector;
+    $('#heatmap-sector-score').textContent = `Sector Smart Money avg ${s.smartScore >= 0 ? '+' : ''}${s.smartScore} · strength score ${s.score}`;
+    $('#heatmap-sector-stocks').innerHTML = signalListHtml(s.stocks, 20);
+    bindSymbolButtons($('#heatmap-sector-stocks'));
+    panel.classList.remove('hidden');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   async function renderSectors() {
@@ -686,7 +873,7 @@
   function expandDesktopNav() {
     if (window.matchMedia('(min-width: 900px)').matches) {
       const nav = $('.bottom-nav');
-      const extras = ['oi', 'sectors', 'scanner', 'fii', 'alerts', 'watch', 'legacy'];
+      const extras = ['heatmap', 'oi', 'sectors', 'scanner', 'fii', 'alerts', 'watch', 'legacy'];
       extras.forEach((id) => {
         if (nav.querySelector(`[data-nav="${id}"]`)) return;
         const b = document.createElement('button');
@@ -699,6 +886,8 @@
   }
 
   async function boot() {
+    updateMarketSession();
+    setInterval(updateMarketSession, 30_000);
     wireNav();
     expandDesktopNav();
     await renderTicker();

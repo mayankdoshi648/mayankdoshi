@@ -11,7 +11,8 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand" aria-label="Brand">FOTERMINAL</div>
+    <div class="brand" aria-label="Brand">F&amp;O TERMINAL</div>
+    <div id="market-session" class="market-session">SESSION · —</div>
     <div id="data-meta" class="data-meta">—</div>
     <button type="button" id="btn-refresh" class="btn btn-refresh" title="Refresh">↻</button>
   </header>
@@ -22,29 +23,79 @@
   <div id="ticker" class="ticker" aria-label="Index ticker"></div>
 
   <main class="main">
-    <!-- OVERVIEW -->
+    <!-- HOME -->
     <section class="view active" data-view="overview">
-      <h1 class="view-title">Market Regime</h1>
-      <div class="regime-panel">
-        <div class="regime-head">
-          <div id="regime-label" class="regime-label">—</div>
-          <div class="regime-stats">
-            <div class="metric"><div class="k">Score</div><div class="v" id="regime-score">—</div></div>
-            <div class="metric"><div class="k">Confidence</div><div class="v" id="regime-conf">—</div></div>
+      <div class="home-stack">
+        <article class="home-block regime-panel">
+          <h1 class="block-title">Market Regime</h1>
+          <div class="regime-hero">
+            <div id="regime-label" class="regime-label">—</div>
+            <div class="regime-hero-metrics">
+              <div class="metric"><div class="k">Score</div><div class="v" id="regime-score">—</div></div>
+              <div class="metric"><div class="k">Confidence</div><div class="v" id="regime-conf">—</div></div>
+            </div>
           </div>
-        </div>
-        <div id="regime-factors" class="regime-factors"></div>
+          <div id="regime-factors" class="regime-factors check-row"></div>
+        </article>
+
+        <article class="home-block">
+          <div class="block-head">
+            <h2 class="block-title">Smart Money Proxy</h2>
+            <button type="button" class="linkish" data-jump="smart">Open scanner →</button>
+          </div>
+          <p class="disclaimer-inline tiny">Positioning proxy — not actual institutional order flow.</p>
+          <div id="home-sm-indices" class="home-sm-indices"></div>
+          <div class="home-two-col">
+            <div>
+              <h3 class="section-label">Top Longs</h3>
+              <div id="home-top-longs" class="signal-list"></div>
+            </div>
+            <div>
+              <h3 class="section-label">Top Shorts</h3>
+              <div id="home-top-shorts" class="signal-list"></div>
+            </div>
+          </div>
+          <button type="button" class="btn accent block-cta" data-jump="heatmap">Smart Money Heatmap →</button>
+        </article>
+
+        <article class="home-block">
+          <div class="block-head">
+            <h2 class="block-title">F&amp;O Intelligence</h2>
+            <button type="button" class="linkish" data-jump="intel">View all →</button>
+          </div>
+          <div id="home-fo-chips" class="fo-chip-row"></div>
+        </article>
+
+        <article class="home-block">
+          <div class="block-head">
+            <h2 class="block-title">Options Intelligence · NIFTY</h2>
+            <button type="button" class="linkish" data-jump="chain">Option chain →</button>
+          </div>
+          <div id="overview-opt" class="metrics-row"></div>
+          <div id="overview-interp" class="interp"></div>
+        </article>
+
+        <article class="home-block">
+          <div class="block-head">
+            <h2 class="block-title">Sector Ranking</h2>
+            <button type="button" class="linkish" data-jump="sectors">View all →</button>
+          </div>
+          <div id="overview-sectors" class="sector-rank-list"></div>
+        </article>
+
+        <article class="home-block">
+          <div class="block-head">
+            <h2 class="block-title">Alerts</h2>
+            <button type="button" class="linkish" data-jump="alerts">Open →</button>
+          </div>
+          <div id="home-alerts" class="alert-feed"></div>
+        </article>
       </div>
-      <h2 class="section-label">Option Snapshot · NIFTY</h2>
-      <div id="overview-opt" class="metrics-row"></div>
-      <div id="overview-interp" class="interp"></div>
-      <h2 class="section-label">Sector Heat</h2>
-      <div id="overview-sectors" class="sector-chips"></div>
     </section>
 
     <!-- INTEL -->
     <section class="view" data-view="intel">
-      <h1 class="view-title">Buildup Intelligence</h1>
+      <h1 class="view-title">F&amp;O · Buildup Intelligence</h1>
       <div id="buildup-seg" class="seg" role="tablist">
         <button type="button" class="active" data-signal="LONG_BUILDUP">Long Buildup</button>
         <button type="button" data-signal="SHORT_BUILDUP">Short Buildup</button>
@@ -66,7 +117,7 @@
 
     <!-- CHAIN -->
     <section class="view" data-view="chain">
-      <h1 class="view-title">Option Chain</h1>
+      <h1 class="view-title">Options · Chain &amp; Positioning</h1>
       <div class="chain-controls">
         <label>
           <span class="sr-only">Underlying</span>
@@ -109,7 +160,7 @@
 
     <!-- SMART -->
     <section class="view" data-view="smart">
-      <h1 class="view-title">Smart Money Proxy</h1>
+      <h1 class="view-title">Scan · Smart Money Proxy</h1>
       <p class="disclaimer-inline" id="smart-disclaimer">
         Smart Money Proxy — A quantitative positioning signal based on price, OI, volume, VWAP, options positioning, sector strength and institutional positioning. It does not identify actual institutional trades.
       </p>
@@ -161,12 +212,34 @@
         </table>
       </div>
 
+      <div id="smart-detail-host">
       <div id="smart-detail" class="smart-detail hidden" aria-live="polite">
         <div class="smart-detail-head">
           <h2 id="smart-detail-title" class="section-label">Signal Explanation</h2>
           <button type="button" id="smart-detail-close" class="ghost-btn" aria-label="Close">×</button>
         </div>
         <div id="smart-detail-body"></div>
+      </div>
+      </div>
+    </section>
+
+    <!-- HEATMAP -->
+    <section class="view" data-view="heatmap">
+      <h1 class="view-title">Smart Money Heatmap</h1>
+      <p class="disclaimer-inline tiny">Sector positioning proxy from aggregated Smart Money scores — not institutional order flow.</p>
+      <div class="heatmap-legend">
+        <span>VERY BEARISH</span>
+        <span class="hm-bar"></span>
+        <span>VERY BULLISH</span>
+      </div>
+      <div id="heatmap-list" class="heatmap-list"></div>
+      <div id="heatmap-sector" class="heatmap-sector hidden">
+        <div class="block-head">
+          <h2 id="heatmap-sector-title" class="section-label">—</h2>
+          <button type="button" id="heatmap-sector-close" class="ghost-btn" aria-label="Close">×</button>
+        </div>
+        <p id="heatmap-sector-score" class="muted"></p>
+        <div id="heatmap-sector-stocks" class="signal-list"></div>
       </div>
     </section>
 
@@ -368,10 +441,10 @@
   </main>
 
   <nav class="bottom-nav" aria-label="Primary">
-    <button type="button" data-nav="overview" class="active"><span>◉</span>Overview</button>
-    <button type="button" data-nav="intel"><span>▣</span>Intel</button>
-    <button type="button" data-nav="chain"><span>☰</span>Chain</button>
-    <button type="button" data-nav="smart"><span>◆</span>Smart</button>
+    <button type="button" data-nav="overview" class="active"><span>⌂</span>Home</button>
+    <button type="button" data-nav="intel"><span>▣</span>F&amp;O</button>
+    <button type="button" data-nav="chain"><span>☰</span>Options</button>
+    <button type="button" data-nav="smart"><span>◆</span>Scan</button>
     <button type="button" data-nav="more"><span>⋯</span>More</button>
   </nav>
 
@@ -381,12 +454,13 @@
         <span>More</span>
         <button type="button" id="sheet-close" class="btn">Close</button>
       </div>
-      <button type="button" data-nav="oi">OI Profile</button>
+      <button type="button" data-nav="heatmap">Smart Money Heatmap</button>
       <button type="button" data-nav="sectors">Sectors</button>
-      <button type="button" data-nav="scanner">Scanner</button>
       <button type="button" data-nav="fii">FII / DII</button>
       <button type="button" data-nav="alerts">Alerts</button>
       <button type="button" data-nav="watch">Watchlist</button>
+      <button type="button" data-nav="oi">OI Profile</button>
+      <button type="button" data-nav="scanner">Classic Scanner</button>
       <button type="button" data-nav="legacy">Legacy Desk</button>
     </div>
   </div>
