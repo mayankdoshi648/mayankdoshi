@@ -873,6 +873,13 @@ class FnoService {
     } else if (has) {
       note = 'Dhan credentials configured — hybrid provider can pull live option chain / quotes';
     }
+    const runtime = process.env.POWERBULL_RUNTIME || 'node';
+    const cloudflare = runtime === 'cloudflare';
+    if (cloudflare && !has) {
+      note = 'No Dhan credentials — enter Client ID + Access Token (encrypted session cookie). PIN/TOTP is Node-only.';
+    } else if (cloudflare && hasStatic) {
+      note = 'Dhan Client ID + Access Token active (Cloudflare session or Pages secret). Token is never returned by GET.';
+    }
     return {
       hasDhan: has,
       liveCapable: has && !forceMock,
@@ -882,6 +889,10 @@ class FnoService {
       forceMock,
       provider: this.provider?.name || null,
       note,
+      runtime,
+      staticOnly: false,
+      persistSupported: !cloudflare,
+      pinTotpSupported: !cloudflare,
     };
   }
 

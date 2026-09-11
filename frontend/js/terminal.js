@@ -75,11 +75,11 @@
     }
   }
 
-  async function api(path, options) {
-    // Prefer live Express API; fall back to labeled static demo for GitHub Pages / Vercel.
+  async function api(path, options = {}) {
+    // Prefer live Express / Cloudflare API; fall back to labeled static demo for GitHub Pages / Vercel.
     if (!state.forceStaticDemo) {
       try {
-        const resp = await fetch(path, options);
+        const resp = await fetch(path, { credentials: 'include', ...options });
         const ct = resp.headers.get('content-type') || '';
         if (ct.includes('application/json')) {
           const json = await resp.json();
@@ -949,8 +949,9 @@
     setDhanMsg('');
     try {
       const env = await api('/api/fno/credentials/dhan');
-      paintDhanStatus(env.data || env);
-      const staticOnly = Boolean(state.forceStaticDemo || env.data?.staticOnly);
+      const status = env.data || env;
+      paintDhanStatus(status);
+      const staticOnly = Boolean(state.forceStaticDemo || status.staticOnly);
       $('#dhan-static-block')?.classList.toggle('hidden', !staticOnly);
       if (staticOnly) {
         $('#dhan-form')?.classList.add('hidden');
@@ -959,6 +960,17 @@
         $('#dhan-form')?.classList.remove('hidden');
         $('#dhan-form')?.classList.remove('disabled');
         $$('#dhan-form input, #dhan-form button').forEach((n) => { n.disabled = false; });
+        const pinOk = status.pinTotpSupported !== false;
+        const persistOk = status.persistSupported !== false;
+        $('#dhan-pin')?.closest('label')?.classList.toggle('hidden', !pinOk);
+        $('#dhan-totp')?.closest('label')?.classList.toggle('hidden', !pinOk);
+        $('#dhan-persist')?.closest('label')?.classList.toggle('hidden', !persistOk);
+        const hint = $('#dhan-auth-hint');
+        if (hint) {
+          hint.textContent = pinOk
+            ? 'Use Client ID + Access token (simplest), or Client ID + PIN + TOTP secret.'
+            : 'Cloudflare host: use Client ID + Access token only. Token is stored in an encrypted httpOnly cookie — never in the shareable URL.';
+        }
       }
     } catch (err) {
       paintDhanStatus({ hasDhan: false, liveCapable: false, note: err.message, source: 'error' });

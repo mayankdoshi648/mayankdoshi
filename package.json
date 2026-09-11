@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node backend/server.js",
     "build": "node -e \"console.log('Static frontend — no compile step (output: frontend/)')\"",
-    "test": "node --test backend/**/*.test.js",
+    "build:cloudflare": "node scripts/build-cloudflare.mjs",
+    "test": "node --test --test-timeout=30000 'backend/**/*.test.js'",
     "darvax:scan": "node scripts/darvax-scan.js",
     "universe:build": "node scripts/build-universe.js",
     "cron:install": "bash scripts/setup-cron.sh",
@@ -20,5 +21,8 @@
     "express": "^4.21.0",
     "otplib": "^12.0.1",
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
   }
 }

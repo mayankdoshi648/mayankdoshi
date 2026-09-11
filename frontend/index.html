@@ -468,15 +468,15 @@
     <!-- SETTINGS / DHAN -->
     <section class="view" data-view="settings">
       <h1 class="view-title">Dhan API</h1>
-      <p class="disclaimer-inline tiny">Connect with Client ID + Access token. On a permanent host, prefer platform env secrets. Tokens are never shown after save, never put in the shareable URL, and never returned by GET APIs.</p>
+      <p class="disclaimer-inline tiny">Connect with Client ID + Access token. On Cloudflare Pages, prefer Worker secrets for a shared host token, or connect per-browser via encrypted session cookie. Tokens are never shown after save, never left in the shareable URL, and never returned by GET APIs.</p>
       <div id="dhan-static-block" class="dhan-static-block hidden" role="status">
         <strong>Live Dhan input is off on this link</strong>
         <p>GitHub Pages / Vercel are static demo only — they cannot safely store secrets or call Dhan from the browser.</p>
-        <p>Use the permanent Node host URL (Render / Railway / VPS with <code>npm start</code>), then open More → Dhan API.</p>
+        <p>Use the permanent Cloudflare Pages URL (free) or local <code>npm start</code>, then open More → Dhan API.</p>
       </div>
       <div id="dhan-status" class="dhan-status muted">Checking credentials…</div>
       <form id="dhan-form" class="dhan-form" autocomplete="off">
-        <p class="tiny muted">Use <strong>Client ID + Access token</strong> (simplest), or Client ID + PIN + TOTP secret.</p>
+        <p id="dhan-auth-hint" class="tiny muted">Use <strong>Client ID + Access token</strong> (simplest), or Client ID + PIN + TOTP secret.</p>
         <p id="dhan-connected-badge" class="dhan-connected-badge hidden" role="status">DHAN CONNECTED ✓</p>
         <label>
           <span>Client ID</span>

@@ -78,6 +78,25 @@ function createFnoRouter({ config, credentialSession = null, dataSources = null 
   router.get('/alerts', wrap(() => service.evaluateAlerts()));
   router.get('/alerts/history', wrap(() => ({ alerts: service.getAlertHistory() })));
 
+  router.get('/instruments/resolve', wrap(async (req) => {
+    const { resolveInstrument, listKinds } = require('./instrumentMapping');
+    const symbol = String(req.query.symbol || '').trim();
+    if (!symbol) {
+      const err = new Error('symbol required');
+      err.status = 400;
+      throw err;
+    }
+    const kind = String(req.query.kind || 'FUTURES').trim();
+    const resolved = await resolveInstrument(symbol, { kind, config });
+    return {
+      ok: true,
+      symbol: symbol.toUpperCase(),
+      kind: kind.toUpperCase(),
+      kinds: listKinds(),
+      resolved,
+    };
+  }));
+
   router.get('/credentials/dhan', wrap(() => ({ data: service.getDhanStatus() })));
   router.put('/credentials/dhan', express.json(), wrap((req, res) => {
     assertSetupAllowed(req);

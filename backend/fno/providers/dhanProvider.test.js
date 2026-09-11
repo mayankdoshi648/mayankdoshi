@@ -197,6 +197,7 @@ describe('DhanProvider', () => {
         ['RELIANCE', { securityId: 222, segment: 'NSE_FNO' }],
       ]),
       defaultSymbols: ['RELIANCE'],
+      oiCache: { get: () => null, setMany: () => {} },
     });
 
     const first = await hybrid.getFuturesQuotes();

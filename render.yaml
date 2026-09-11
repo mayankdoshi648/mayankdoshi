@@ -1,5 +1,6 @@
-# Permanent live host for Express + SQLite + WebSocket.
-# GitHub Pages / Vercel remain static demo only.
+# Permanent live host — OPTIONAL (paid starter plan).
+# Preferred FREE permanent host: Cloudflare Pages — see docs/cloudflare-deploy.md
+# Keep this file only if you deliberately choose Render later.
 services:
   - type: web
     name: powerbull-pro

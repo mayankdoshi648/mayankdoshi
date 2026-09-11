@@ -150,7 +150,7 @@
       });
       if (force) params.set('refresh', '1');
 
-      const resp = await fetch(`/api/dashboard?${params}`);
+      const resp = await fetch(`/api/dashboard?${params}`, { credentials: 'include' });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) {
         throw new Error(data.error || `HTTP ${resp.status} — run npm start for Markets (needs Node API)`);
