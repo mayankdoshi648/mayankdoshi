@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#f4f7fb" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="PowerBull Pro" />
+  <link rel="manifest" href="manifest.webmanifest" />
   <title>PowerBull Pro — India F&amp;O Trading Terminal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -17,6 +21,7 @@
       <span class="brand-text">PowerBull Pro</span>
     </div>
     <div id="market-session" class="market-session live-dot">SESSION · —</div>
+    <button type="button" id="conn-pill" class="conn-pill" title="Data connections">● …</button>
     <div id="data-meta" class="data-meta">—</div>
     <label class="theme-toggle" title="Theme">
       <span class="sr-only">Theme</span>
@@ -31,6 +36,33 @@
 
   <div id="mock-banner" class="banner mock-banner hidden" role="status"></div>
   <div id="market-banner" class="banner market-banner hidden" role="status"></div>
+
+  <dialog id="conn-dialog" class="conn-dialog">
+    <form method="dialog" class="conn-dialog-inner">
+      <header class="conn-dialog-head">
+        <h2>Data Connections</h2>
+        <button type="submit" class="btn" value="close" aria-label="Close">✕</button>
+      </header>
+      <div id="conn-dialog-body" class="conn-dialog-body muted">Loading…</div>
+      <footer class="conn-dialog-foot">
+        <button type="button" id="conn-open-debug" class="btn">Data debug</button>
+        <button type="submit" class="btn accent" value="ok">Done</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="debug-dialog" class="conn-dialog">
+    <form method="dialog" class="conn-dialog-inner">
+      <header class="conn-dialog-head">
+        <h2>Data Debug</h2>
+        <button type="submit" class="btn" value="close" aria-label="Close">✕</button>
+      </header>
+      <pre id="debug-dialog-body" class="debug-pre">—</pre>
+      <footer class="conn-dialog-foot">
+        <button type="submit" class="btn accent" value="ok">Close</button>
+      </footer>
+    </form>
+  </dialog>
 
   <div id="ticker" class="ticker" aria-label="Index ticker"></div>
 
@@ -436,15 +468,16 @@
     <!-- SETTINGS / DHAN -->
     <section class="view" data-view="settings">
       <h1 class="view-title">Dhan API</h1>
-      <p class="disclaimer-inline tiny">Enter Dhan Client ID, PIN, and TOTP secret so the Node server can pull live option chains. Secrets are never shown after save.</p>
+      <p class="disclaimer-inline tiny">Connect with Client ID + Access token. On a permanent host, prefer platform env secrets. Tokens are never shown after save, never put in the shareable URL, and never returned by GET APIs.</p>
       <div id="dhan-static-block" class="dhan-static-block hidden" role="status">
         <strong>Live Dhan input is off on this link</strong>
-        <p>GitHub Pages / Vercel are static demo only — they cannot safely store your PIN/TOTP or call Dhan from the phone browser.</p>
-        <p>To enter credentials: run <code>npm start</code> on a computer (or use a live tunnel URL to that server), then open that URL on your phone → More → Dhan API.</p>
+        <p>GitHub Pages / Vercel are static demo only — they cannot safely store secrets or call Dhan from the browser.</p>
+        <p>Use the permanent Node host URL (Render / Railway / VPS with <code>npm start</code>), then open More → Dhan API.</p>
       </div>
       <div id="dhan-status" class="dhan-status muted">Checking credentials…</div>
       <form id="dhan-form" class="dhan-form" autocomplete="off">
         <p class="tiny muted">Use <strong>Client ID + Access token</strong> (simplest), or Client ID + PIN + TOTP secret.</p>
+        <p id="dhan-connected-badge" class="dhan-connected-badge hidden" role="status">DHAN CONNECTED ✓</p>
         <label>
           <span>Client ID</span>
           <input id="dhan-client-id" name="clientId" type="text" inputmode="numeric" placeholder="Dhan client id" required>
@@ -751,6 +784,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1"></script>
   <script src="js/staticDemoApi.js"></script>
   <script src="js/markets.js"></script>
+  <script src="js/connections.js"></script>
   <script src="js/terminal.js"></script>
   <script src="app.js"></script>
 </body>

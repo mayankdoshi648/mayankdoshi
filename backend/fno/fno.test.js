@@ -182,7 +182,8 @@ describe('mock provider + service', () => {
       });
       const result = await service.testDhanCredentials();
       assert.equal(result.ok, true);
-      assert.match(result.tokenPreview, /^abcd/);
+      assert.equal(result.authMode, 'pin_totp');
+      assert.equal(result.tokenLength, 9);
     } finally {
       dhanAuth.fetchAccessToken = orig;
     }

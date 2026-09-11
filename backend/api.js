@@ -26,26 +26,59 @@ function createApiRouter({
   config,
   stockDashboard = null,
   tokenManager = null,
+  dataSources = null,
+  credentialSession = null,
 }) {
   const router = express.Router();
   let instrumentMapCache = null;
   let breadthProgress = null;
 
-  router.use('/fno', createFnoRouter({ config }));
+  router.use('/fno', createFnoRouter({ config, credentialSession, dataSources }));
 
   router.get('/status', (req, res) => {
     const auth = tokenManager?.getStatus?.() || null;
+    const hasDhan = Boolean(
+      (config?.clientId && config?.accessToken)
+      || (config?.clientId && config?.pin && config?.totpSecret)
+    );
+    const connections = dataSources?.snapshot?.({
+      marketOpen: isMarketOpenFn(),
+      hasDhan,
+      auth,
+    }) || null;
     res.json({
       marketOpen: isMarketOpenFn(),
       feedConnected: connectionStatus.isConnected(),
       lastError: connectionStatus.getLastError(),
       darvaxAutoTrade: config?.darvaxAutoTrade ?? false,
-      hasDhan: Boolean(
-        (config?.clientId && config?.accessToken)
-        || (config?.clientId && config?.pin && config?.totpSecret)
-      ),
+      hasDhan,
       auth,
       dashboardMode: stockDashboard?.isDemo?.() ? 'demo' : 'live',
+      connections,
+    });
+  });
+
+  router.get('/data-connections', (req, res) => {
+    const auth = tokenManager?.getStatus?.() || null;
+    const hasDhan = Boolean(
+      (config?.clientId && config?.accessToken)
+      || (config?.clientId && config?.pin && config?.totpSecret)
+    );
+    if (dataSources?.setWebsocket) {
+      dataSources.setWebsocket({
+        connected: connectionStatus.isConnected(),
+        error: connectionStatus.getLastError(),
+      });
+    }
+    res.json(dataSources?.snapshot?.({
+      marketOpen: isMarketOpenFn(),
+      hasDhan,
+      auth,
+    }) || {
+      overall: hasDhan ? 'DHAN CONNECTED' : 'DATA ERROR',
+      marketOpen: isMarketOpenFn(),
+      hasDhan,
+      sources: {},
     });
   });
 
