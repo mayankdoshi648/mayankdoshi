@@ -1639,7 +1639,8 @@
     }
 
     $('#playbook-bullish').innerHTML = bullish.map((r, i) => playbookCard(r, { mode: 'ready', rank: i + 1 })).join('') || '<p class="muted">No bullish setups in current board</p>';
-    $('#playbook-bearish').innerHTML = bearish.map((r, i) => playbookCard(r, { mode: 'ready', rank: i + 1 })).join('') || '<p class="muted">No bearish setups in current board</p>';
+    $('#playbook-bearish').innerHTML = bearish.map((r, i) => playbookCard(r, { mode: 'ready', rank: i + 1 })).join('')
+      || '<p class="muted">No non-AVOID bearish setups right now — see Avoid / Conflicted for downside risk names.</p>';
     $('#playbook-early').innerHTML = early.map((r, i) => playbookCard(r, { mode: 'early', rank: i + 1 })).join('') || '<p class="muted">No early setups</p>';
     $('#playbook-conflicted').innerHTML = conflicted.map((r, i) => playbookCard(r, { mode: 'conflict', rank: i + 1 })).join('') || '<p class="muted">No conflicted setups</p>';
     $('#playbook-avoid').innerHTML = avoid.map((r, i) => playbookCard(r, { mode: 'avoid', rank: i + 1 })).join('') || '<p class="muted">No avoid list items</p>';
