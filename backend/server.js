@@ -52,7 +52,7 @@ function todayTradeDate() {
 
 async function startIngestion() {
   if (!hasDhanCredentials(config) || config.forceDemo) {
-    console.log('Skipping live feed — demo mode or missing Dhan credentials.');
+    console.log('Skipping live equity feed — demo mode or missing Dhan credentials.');
     return;
   }
 
@@ -104,18 +104,19 @@ setInterval(() => {
 
 httpServer.listen(config.port, () => {
   const mode = demoMode ? 'DEMO' : 'LIVE';
-  console.log(`PowerBull Pro listening on http://localhost:${config.port} [${mode}]`);
-  if (demoMode) {
-    console.log('Dashboard running in demo mode. Add DHAN_* credentials to .env for live Dhan quotes.');
-    connectionStatus.setError(new Error('Demo mode — Dhan credentials not configured'));
-  } else if (isMarketOpen()) {
+  console.log(`F&O Intelligence Terminal listening on http://localhost:${config.port} [${mode}]`);
+  if (!config.hasDhan || demoMode) {
+    console.log('Dhan credentials not set (or DEMO_MODE) — F&O uses NSE public / labeled MOCK; Markets equity board uses demo quotes.');
+    console.log('Set DHAN_* for live option chain + equity feed, or enter them in More → Dhan API.');
+    return;
+  }
+  if (isMarketOpen()) {
     startIngestion().catch((err) => {
       connectionStatus.setError(err);
       console.error('Ingestion failed to start:', err);
     });
   } else {
-    console.log('Market closed — live feed will not start until 9:30 IST. Dashboard quotes still available via Dhan REST.');
-    // Warm auth + dashboard cache outside market hours
+    console.log('Market closed — equity ingestion waits for 9:30 IST. F&O APIs and Markets REST remain available.');
     tokenManager.getAccessToken().then(() => {
       stockDashboard.refresh('nifty50').catch((err) => console.warn('Dashboard warm failed:', err.message));
     }).catch((err) => {

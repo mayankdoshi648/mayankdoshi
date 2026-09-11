@@ -1,7 +1,12 @@
 // backend/config.js
 require('dotenv').config();
 
-function baseConfig() {
+function buildConfig({ requireDhan = true } = {}) {
+  const required = ['DHAN_CLIENT_ID', 'DHAN_PIN', 'DHAN_TOTP_SECRET'];
+  const missing = required.filter((key) => !process.env[key]);
+  if (requireDhan && missing.length > 0) {
+    throw new Error(`Missing required env vars: ${missing.join(', ')}. Copy .env.example to .env and fill it in.`);
+  }
   return {
     clientId: process.env.DHAN_CLIENT_ID || '',
     pin: process.env.DHAN_PIN || '',
@@ -20,25 +25,34 @@ function baseConfig() {
     telegramMinScore: Number(process.env.TELEGRAM_MIN_SCORE || 85),
     telegramBreakoutMinScore: Number(process.env.TELEGRAM_BREAKOUT_MIN_SCORE || 70),
     fundamentalsMaxFetch: Number(process.env.FUNDAMENTALS_MAX_FETCH || 30),
+    hasDhan: missing.length === 0,
   };
 }
 
-function hasDhanCredentials(cfg = baseConfig()) {
+function hasDhanCredentials(cfg = buildConfig({ requireDhan: false })) {
   return Boolean(cfg.clientId && cfg.pin && cfg.totpSecret);
 }
 
 function loadConfig() {
-  const cfg = baseConfig();
-  const required = ['DHAN_CLIENT_ID', 'DHAN_PIN', 'DHAN_TOTP_SECRET'];
-  const missing = required.filter((key) => !process.env[key]);
-  if (missing.length > 0) {
-    throw new Error(`Missing required env vars: ${missing.join(', ')}. Copy .env.example to .env and fill it in.`);
+  try {
+    return buildConfig({ requireDhan: true });
+  } catch {
+    return buildConfig({ requireDhan: false });
   }
-  return cfg;
 }
 
 function loadConfigOptional() {
-  return baseConfig();
+  return buildConfig({ requireDhan: false });
 }
 
-module.exports = { loadConfig, loadConfigOptional, hasDhanCredentials, baseConfig };
+function baseConfig() {
+  return buildConfig({ requireDhan: false });
+}
+
+module.exports = {
+  loadConfig,
+  loadConfigOptional,
+  buildConfig,
+  hasDhanCredentials,
+  baseConfig,
+};

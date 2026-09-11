@@ -1,110 +1,103 @@
-# PowerBull Pro + DarvaX Scanner
+# NSE F&O Intelligence Terminal (+ PowerBull / DarvaX)
 
-Intraday EMA/RSI dashboard (Dhan live feed) plus **DarvaX box scanner** for NSE + US markets: strength scoring, Obsidian export, Telegram alerts, Screener.in fundamentals, and optional Dhan order flow.
+Professional **mobile-first Indian NSE F&O market intelligence terminal**, built on the existing PowerBull Pro + DarvaX equity stack.
 
-## Laptop setup (start here)
+## Live demo (shareable · mobile)
 
-### 1. Prerequisites
+| Host | Link |
+|------|------|
+| **GitHub Pages** | **https://mayankdoshi648.github.io/mayankdoshi/** |
+| Vercel | https://mayankdoshi.vercel.app |
 
-- **Node.js 22.5+** (`node -v`)
-- Git
-- Dhan account (for NSE historical data, quotes, and orders)
-- Obsidian vault path (optional, for second-brain export)
-- Telegram bot (optional, for alerts)
+On static hosts the app runs in **labeled MOCK / static-demo mode** (full UI + Smart Money WHY panel). For live Dhan/NSE feeds, run the Node server locally (`npm start`), then open **More → Dhan API** and enter Client ID / PIN / TOTP (or set `DHAN_*` in `.env`).
 
-### 2. Clone and install
+> First-time GitHub Pages: after merge, open **Repo → Settings → Pages → Source = GitHub Actions**, then re-run the **Deploy GitHub Pages** workflow if needed.
+
+## What you get
+
+| Section | Purpose |
+|---------|---------|
+| Home | Regime + Smart Money + options + sectors + alerts |
+| F&O | Long/short buildup scanners |
+| Options | Chain, PCR, max pain, expected move |
+| Scan | Smart Money Proxy rankings |
+| Opp | Opportunity checklist / trade readiness |
+| Heatmap | Sector Smart Money → stock drill-down |
+| Dhan API | In-app Client ID / PIN / TOTP → live option chain (Node server only) |
+| WHY drawer | Explainable positioning checklist |
+| Equity / DarvaX | Preserved live EMA/RSI + DarvaX scanner |
+| Markets API | Equity board: sector filter, rankings, 52-week range (`/api/dashboard`) |
+
+## Architecture
+
+See [`docs/fno-architecture.md`](docs/fno-architecture.md).
+
+Layers: **Providers → Normalize → Calculations → Service/Engines → API → UI**.
+
+- **Dhan** (optional): option chain + equity live feed + Markets quotes/history
+- **NSE public**: indices / FII-DII cash when reachable
+- **Mock / static-demo** (explicitly labeled): shareable GitHub Pages & Vercel, or local `FNO_FORCE_MOCK=1`
+- **DEMO_MODE**: synthetic equity Markets quotes when Dhan creds are missing
+
+## Setup
 
 ```bash
 git clone https://github.com/mayankdoshi648/mayankdoshi.git
 cd mayankdoshi
+git checkout master
 npm install
-npm test
-```
-
-### 3. Configure environment
-
-```bash
 cp .env.example .env
+npm test
+FNO_FORCE_MOCK=1 npm start
 ```
 
-Edit `.env`:
+Open **http://localhost:3000**
+
+### Vercel note
+
+`vercel.json` deploys the **static `frontend/`** only (UI shell). The Express + SQLite + WebSocket backend is not serverless-compatible — run `npm start` (or your own Node host) for live API/feeds. Preview checks for linked Vercel projects should pass with this static config.
+
+### Environment
 
 | Variable | Purpose |
 |----------|---------|
-| `DHAN_CLIENT_ID`, `DHAN_PIN`, `DHAN_TOTP_SECRET` | Dhan login + NSE quotes / EOD history |
-| `DEMO_MODE` | Force synthetic Markets data (`true` / `false`) |
-| `OBSIDIAN_VAULT_PATH` | Full path to your Obsidian vault |
-| `OBSIDIAN_MIN_SCORE` | Min score for Obsidian notes (default 55) |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Alerts via @BotFather + @userinfobot |
-| `TELEGRAM_MIN_SCORE` | Alert threshold (default 85) |
-| `DARVAX_AUTO_TRADE` | Keep `false` until paper-trading validates picks |
+| `DHAN_CLIENT_ID`, `DHAN_PIN`, `DHAN_TOTP_SECRET` | Live Dhan option chain + equity feed + Markets quotes |
+| `DEMO_MODE=true` | Force synthetic Markets equity quotes |
+| `FNO_FORCE_MOCK=1` | Force labeled mock F&O data (UI/dev) |
+| `PORT` | Default 3000 |
+| DarvaX / Telegram / Obsidian | Same as before (optional) |
 
-Without Dhan credentials the app starts in **demo mode** so the Markets dashboard remains usable.
+**Server boots without Dhan** — terminal uses NSE public + labeled mock; Markets API falls back to demo quotes. Set `DHAN_*` in `.env` **or** enter them in **More → Dhan API** (optional write-back to `.env`).
 
-### 4. Run locally
+Never commit `.env`. PIN / TOTP are never returned by `GET /api/fno/credentials/dhan` (masked client id only).
 
-**Dashboard** (Markets tab at http://localhost:3000 — sector filters, rankings, 52-week range):
+## Key API routes
 
-```bash
-npm start
-```
+- `GET /api/fno/ticker` — NIFTY / BANKNIFTY / FINNIFTY / MIDCPNIFTY / INDIA VIX
+- `GET /api/fno/overview` — regime + options snapshot
+- `GET /api/fno/option-chain/:underlying?expiry=`
+- `GET /api/fno/scanner` · `/buildups` · `/smart-money` · `/sectors`
+- `GET /api/fno/fii-dii` · `/alerts` · `/watchlist`
+- `GET /api/fno/opportunity` · `/opportunity/:symbol` — trade-readiness checklist
+- `GET|PUT|DELETE /api/fno/credentials/dhan` · `POST …/test` — runtime Dhan API credentials
+- `GET /api/dashboard` · `/dashboard/sectors` · `/dashboard/rankings` — equity Markets board
+- `GET /api/auth/status` · `POST /api/auth/refresh` — Dhan token manager
+- Existing: `/api/signals`, `/api/darvax/*`, `/api/overview`, `/api/breadth`
 
-Deep-link: `http://localhost:3000/?tab=markets` (also `live`, `darvax`, `track`).
+## Calculations (unit-tested)
 
-**Markets API**
-
-- `GET /api/dashboard?universe=nifty50&sector=all&ranking=gainers`
-- `GET /api/dashboard/sectors`
-- `GET /api/dashboard/rankings`
-- `GET /api/auth/status` · `POST /api/auth/refresh`
-
-**One-off daily scan** (~20 min for full Nifty 500 + S&P 500):
-
-```bash
-npm run darvax:scan -- --export-obsidian --telegram
-```
-
-**Weekday cron** (7:00 AM IST, Mon–Fri):
-
-```bash
-npm run cron:install
-# logs: data/darvax-cron.log
-# remove: npm run cron:remove
-```
-
-### 5. Obsidian output
-
-When `OBSIDIAN_VAULT_PATH` is set, scans write:
-
-```
-03-Watchlists/
-  YYYY-MM-DD.md
-  YYYY-MM-DD-NSE.md
-  YYYY-MM-DD-US.md
-  stocks/
-    YYYY-MM-DD-NSE-SYMBOL.md
-```
-
-### 6. Useful commands
-
-```bash
-npm run universe:build    # Rebuild Nifty 500 / S&P 500 symbol lists
-npm run darvax:scan -- --market=NSE   # NSE only
-npm run darvax:scan -- --market=US    # US only
-```
-
-## Architecture (DarvaX)
-
-- `backend/darvaxEngine.js` — Box rules, Wyckoff, patterns, strength score, stops
-- `backend/darvaxScanner.js` — Universe scan, RS percentiles, fundamentals, Telegram
-- `backend/darvaxData.js` — NSE via Dhan historical, US via Yahoo
-- `backend/screenerFundamentals.js` — Screener.in scrape + score bonus
-- `backend/telegramAlerts.js` — High-score / SUPER_TREND / BREAKOUT alerts
-- `backend/obsidianExport.js` — Vault markdown export
-- `backend/dhanOrders.js` — Manual-approval Dhan limit orders
-- `frontend/` — Dashboard with DarvaX Scanner tab
+OI buildup classification, PCR, max pain, expected move  
+`spot × (IV/100) × √(DTE/365)`, market regime score, smart-money proxy, sector strength.
 
 ## Safety
 
-- Keep `DARVAX_AUTO_TRADE=false` initially; approve orders manually in the dashboard.
-- Telegram and Obsidian are optional; scanner works with Yahoo fallback if Dhan creds are missing (NSE quality is better with Dhan).
+- No naked BUY/SELL — interpretations always show evidence metrics
+- Smart Money is a **PROXY**, not institutional identification
+- Missing / unavailable fields stay `null` — never fabricated as live
+- Mock responses always set `meta.isMock: true` and UI banner
+
+## Legacy DarvaX
+
+DarvaX scan, Obsidian export, Telegram alerts, and manual-approval orders remain under **Equity / DarvaX** in the terminal.
+
+> **Note:** The standalone Markets UI shell from the equity-dashboard branch is not yet wired into this F&O terminal chrome. Backend Markets APIs above are available; UI integration into More / Legacy Desk is a follow-up.
