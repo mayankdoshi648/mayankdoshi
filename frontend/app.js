@@ -70,10 +70,17 @@ async function loadSignals(date) {
 
 async function loadStatus() {
   try {
-    const resp = await fetch('/api/status');
+    const resp = await fetch('/api/status', { credentials: 'include' });
     const status = await resp.json();
     const banner = document.getElementById('market-banner');
     if (!banner) return;
+    if (status.runtime === 'cloudflare') {
+      banner.textContent = status.hasDhan
+        ? 'Cloudflare live F&O — equity WebSocket is Node-only; use More → Dhan API session or Pages secrets.'
+        : 'Cloudflare host — connect Client ID + Access Token in More → Dhan API (encrypted cookie, not in the URL).';
+      banner.classList.remove('hidden');
+      return;
+    }
     if (!status.feedConnected) {
       if (status.hasDhan) {
         banner.textContent = status.lastError
@@ -82,7 +89,7 @@ async function loadStatus() {
       } else {
         banner.textContent = status.lastError
           ? `Dhan feed disconnected (${status.lastError}) — set credentials in More → Dhan API or .env, then restart if needed.`
-          : 'Dhan feed not connected — set Client ID / PIN / TOTP in More → Dhan API (or .env) for live data.';
+          : 'Dhan feed not connected — set Client ID / Access Token in More → Dhan API (or .env) for live data.';
       }
       banner.classList.remove('hidden');
     } else if (!status.marketOpen) {

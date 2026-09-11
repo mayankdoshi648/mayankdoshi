@@ -1,0 +1,15 @@
+# Cloudflare Pages — free permanent host for PowerBull Pro
+# Dashboard: connect this GitHub repo → Build command below → output frontend/
+#
+# Secrets (Pages → Settings → Environment variables):
+#   DHAN_CLIENT_ID       (Secret) optional host-wide shared account
+#   DHAN_ACCESS_TOKEN    (Secret) optional host-wide shared account
+#   SESSION_SECRET       (Secret) required for encrypting per-browser credential cookies
+#   ADMIN_SETUP_KEY      (Secret) optional — require X-Setup-Key to change credentials
+#   DEMO_MODE            (Plain)  default false
+#   FNO_FORCE_MOCK       (Plain)  leave unset for live
+
+name = "powerbull-pro"
+compatibility_date = "2024-11-12"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "frontend"

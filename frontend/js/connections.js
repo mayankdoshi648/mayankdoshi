@@ -59,7 +59,7 @@
 
   async function refreshConnections() {
     try {
-      const resp = await fetch('/api/data-connections');
+      const resp = await fetch('/api/data-connections', { credentials: 'include' });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const snapshot = await resp.json();
       paintPill(snapshot);
@@ -90,6 +90,7 @@
     try {
       await fetch('/api/fno/credentials/dhan', {
         method: 'PUT',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clientId,
@@ -114,9 +115,9 @@
     if (!dlg || !body) return;
     try {
       const [conn, status, dhan] = await Promise.all([
-        fetch('/api/data-connections').then((r) => r.json()),
-        fetch('/api/status').then((r) => r.json()),
-        fetch('/api/fno/credentials/dhan').then((r) => r.json()).catch(() => null),
+        fetch('/api/data-connections', { credentials: 'include' }).then((r) => r.json()),
+        fetch('/api/status', { credentials: 'include' }).then((r) => r.json()),
+        fetch('/api/fno/credentials/dhan', { credentials: 'include' }).then((r) => r.json()).catch(() => null),
       ]);
       body.textContent = JSON.stringify({
         connections: conn,
