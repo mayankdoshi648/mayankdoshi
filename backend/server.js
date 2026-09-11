@@ -16,10 +16,14 @@ const { createDhanFeed } = require('./dhanFeed');
 const { resolveNifty50InstrumentMap } = require('./instrumentMap');
 const { createTokenManager } = require('./dhanToken');
 const { createStockDashboard } = require('./stockDashboard');
+const { createDataSourceManager } = require('./dataSourceManager');
+const { createCredentialSession } = require('./credentialSession');
 
 const config = loadConfigOptional();
 const db = openDb();
 const connectionStatus = createConnectionStatus();
+const dataSources = createDataSourceManager();
+const credentialSession = createCredentialSession();
 const aggregator = new CandleAggregator();
 const tokenManager = createTokenManager({ config });
 const demoMode = config.forceDemo || !hasDhanCredentials(config);
@@ -30,7 +34,7 @@ const stockDashboard = createStockDashboard({
 });
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '256kb' }));
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 app.use('/api', createApiRouter({
   db,
@@ -40,6 +44,8 @@ app.use('/api', createApiRouter({
   config,
   stockDashboard,
   tokenManager,
+  dataSources,
+  credentialSession,
 }));
 
 const httpServer = http.createServer(app);
@@ -64,9 +70,18 @@ async function startIngestion() {
 
   const feed = createDhanFeed({ clientId: config.clientId, accessToken });
 
-  feed.on('connected', () => connectionStatus.setConnected(true));
-  feed.on('disconnected', () => connectionStatus.setConnected(false));
-  feed.on('error', (err) => connectionStatus.setError(err));
+  feed.on('connected', () => {
+    connectionStatus.setConnected(true);
+    dataSources.setWebsocket({ connected: true });
+  });
+  feed.on('disconnected', () => {
+    connectionStatus.setConnected(false);
+    dataSources.setWebsocket({ connected: false });
+  });
+  feed.on('error', (err) => {
+    connectionStatus.setError(err);
+    dataSources.setWebsocket({ connected: false, error: err?.message || String(err) });
+  });
 
   feed.on('tick', (tick) => {
     if (!isMarketOpen()) return;

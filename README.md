@@ -4,12 +4,27 @@ Professional **mobile-first Indian NSE F&O market intelligence terminal**, built
 
 ## Live demo (shareable · mobile)
 
-| Host | Link |
-|------|------|
-| **GitHub Pages** | **https://mayankdoshi648.github.io/mayankdoshi/** |
-| Vercel | https://mayankdoshi.vercel.app |
+| Host | Link | Mode |
+|------|------|------|
+| **GitHub Pages** | **https://mayankdoshi648.github.io/mayankdoshi/** | Labeled **MOCK** static UI |
+| Vercel | https://mayankdoshi.vercel.app | Labeled **MOCK** static UI |
+| **Permanent live** | Deploy `render.yaml` (Render Web Service) | **Live** Express + Dhan + NSE |
 
-On static hosts the app runs in **labeled MOCK / static-demo mode** (full UI + Smart Money WHY panel). For live Dhan/NSE feeds, run the Node server locally (`npm start`), then open **More → Dhan API** and enter Client ID / PIN / TOTP (or set `DHAN_*` in `.env`).
+Static hosts cannot store Dhan secrets or run WebSockets. For a **bookmarkable permanent HTTPS URL** that works on phone + laptop:
+
+1. Open [Render](https://render.com) → New → Blueprint → this repo (`render.yaml`)
+2. Set secrets: `DHAN_CLIENT_ID`, `DHAN_ACCESS_TOKEN` (or PIN + TOTP)
+3. Copy the `https://….onrender.com` URL — that is your permanent link
+
+Optional one-time bootstrap (token stripped from the address bar immediately):
+
+`https://YOUR-HOST/?client_id=XXXX&token=YYYY`
+
+Then the browser shows only `https://YOUR-HOST/`. Prefer platform env secrets for day-to-day use.
+
+In-app: **More → Dhan API** or the header **connection pill** → Data Connections.
+
+Data matrix: [`docs/data-sources.md`](docs/data-sources.md).
 
 > First-time GitHub Pages: after merge, open **Repo → Settings → Pages → Source = GitHub Actions**, then re-run the **Deploy GitHub Pages** workflow if needed.
 
@@ -30,14 +45,15 @@ On static hosts the app runs in **labeled MOCK / static-demo mode** (full UI + S
 
 ## Architecture
 
-See [`docs/fno-architecture.md`](docs/fno-architecture.md).
+See [`docs/fno-architecture.md`](docs/fno-architecture.md) and [`docs/data-sources.md`](docs/data-sources.md).
 
 Layers: **Providers → Normalize → Calculations → Service/Engines → API → UI**.
 
-- **Dhan** (optional): option chain + equity live feed + Markets quotes/history
-- **NSE public**: indices / FII-DII cash when reachable
-- **Mock / static-demo** (explicitly labeled): shareable GitHub Pages & Vercel, or local `FNO_FORCE_MOCK=1`
+- **Dhan** (primary live): futures quotes + option chain + equity feed/Markets
+- **NSE public** (secondary): indices / FII-DII cash
+- **Mock / static-demo** (explicitly labeled): GitHub Pages & Vercel, or `FNO_FORCE_MOCK=1`
 - **DEMO_MODE**: synthetic equity Markets quotes when Dhan creds are missing
+- **Connection pill** + `/api/data-connections`: Dhan / NSE / WebSocket health without exposing tokens
 
 ## Setup
 

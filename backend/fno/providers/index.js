@@ -14,6 +14,8 @@ const {
   loadFuturesSecurityMap,
   toQuoteRequests,
 } = require('../futuresSecurityMap');
+const { createOiCache } = require('../../oiCache');
+const { validateQuote } = require('../../priceValidation');
 
 /**
  * Hybrid: NSE for public indices / FII-DII, Dhan for option chain & futures.
@@ -27,6 +29,8 @@ class HybridProvider extends FoDataProvider {
    * @param {MockProvider} options.mock
    * @param {typeof loadFuturesSecurityMap} [options.loadFuturesMap]
    * @param {string[]} [options.defaultSymbols]
+   * @param {{ get: Function, setMany: Function }} [options.oiCache]
+   * @param {{ recordEnvelope?: Function }} [options.dataSources]
    */
   constructor({
     nse,
@@ -34,6 +38,8 @@ class HybridProvider extends FoDataProvider {
     mock,
     loadFuturesMap = loadFuturesSecurityMap,
     defaultSymbols = ALL_SECTOR_FO_SYMBOLS,
+    oiCache = createOiCache(),
+    dataSources = null,
   } = {}) {
     super();
     this.name = 'hybrid';
@@ -42,49 +48,59 @@ class HybridProvider extends FoDataProvider {
     this.mock = mock;
     this.loadFuturesMap = loadFuturesMap;
     this.defaultSymbols = defaultSymbols;
+    this.oiCache = oiCache;
+    this.dataSources = dataSources;
     /** @type {Map<string, number>} */
     this._prevOiBySymbol = new Map();
   }
 
+  _track(source, envelope) {
+    if (this.dataSources?.recordEnvelope) this.dataSources.recordEnvelope(source, envelope);
+    return envelope;
+  }
+
   async getIndexQuotes(symbols) {
     try {
-      return await this.nse.getIndexQuotes(symbols);
+      const env = await this.nse.getIndexQuotes(symbols);
+      return this._track('nse', env);
     } catch (err) {
       const fallback = await this.mock.getIndexQuotes(symbols);
-      return dataEnvelope(fallback.data, {
+      return this._track('nse', dataEnvelope(fallback.data, {
         ...fallback.meta,
         isMock: true,
         warning: `NSE indices failed; using mock (${err.message})`,
         error: err.message,
-      });
+      }));
     }
   }
 
   async getOptionExpiries(underlying) {
     try {
-      return await this.dhan.getOptionExpiries(underlying);
+      const env = await this.dhan.getOptionExpiries(underlying);
+      return this._track('dhan', env);
     } catch (err) {
       const fallback = await this.mock.getOptionExpiries(underlying);
-      return dataEnvelope(fallback.data, {
+      return this._track('dhan', dataEnvelope(fallback.data, {
         ...fallback.meta,
         isMock: true,
         warning: `Dhan expiries failed; using mock (${err.message})`,
         error: err.message,
-      });
+      }));
     }
   }
 
   async getOptionChain(underlying, expiry) {
     try {
-      return await this.dhan.getOptionChain(underlying, expiry);
+      const env = await this.dhan.getOptionChain(underlying, expiry);
+      return this._track('dhan', env);
     } catch (err) {
       const fallback = await this.mock.getOptionChain(underlying, expiry);
-      return dataEnvelope(fallback.data, {
+      return this._track('dhan', dataEnvelope(fallback.data, {
         ...fallback.meta,
         isMock: true,
         warning: `Dhan option chain failed; using mock (${err.message})`,
         error: err.message,
-      });
+      }));
     }
   }
 
@@ -97,29 +113,29 @@ class HybridProvider extends FoDataProvider {
       const resolved = await this._resolveFuturesRequests(symbols);
       if (!resolved.length) {
         const fallback = await this.mock.getFuturesQuotes(symbols);
-        return dataEnvelope(fallback.data, {
+        return this._track('dhan', dataEnvelope(fallback.data, {
           ...fallback.meta,
           isMock: true,
           warning: 'Dhan futures security-id map returned no contracts; using mock',
-        });
+        }));
       }
 
       const env = await this.dhan.getFuturesQuotes(resolved);
       const enriched = this._enrichFuturesRows(env.data || []);
-      return dataEnvelope(enriched, {
+      return this._track('dhan', dataEnvelope(enriched, {
         ...env.meta,
         source: env.meta?.source || 'dhan',
         isMock: false,
         mappedCount: resolved.length,
-      });
+      }));
     } catch (err) {
       const fallback = await this.mock.getFuturesQuotes(symbols);
-      return dataEnvelope(fallback.data, {
+      return this._track('dhan', dataEnvelope(fallback.data, {
         ...fallback.meta,
         isMock: true,
         warning: `Dhan futures failed; using mock (${err.message})`,
         error: err.message,
-      });
+      }));
     }
   }
 
@@ -141,7 +157,7 @@ class HybridProvider extends FoDataProvider {
   }
 
   _enrichFuturesRows(rows) {
-    return rows.map((q) => {
+    const enriched = rows.map((q) => {
       const symbol = String(q.symbol || '').toUpperCase();
       const priceChangePct = q.changePct ?? null;
 
@@ -149,10 +165,13 @@ class HybridProvider extends FoDataProvider {
       let oiChange = q.oiChange ?? null;
       if (q.oi != null && Number.isFinite(Number(q.oi))) {
         const oi = Number(q.oi);
-        const prevOi = this._prevOiBySymbol.get(symbol);
-        if (prevOi != null && prevOi > 0) {
+        const prevOi = this._prevOiBySymbol.get(symbol) ?? this.oiCache?.get?.(symbol);
+        if (prevOi != null && prevOi > 0 && prevOi !== oi) {
           oiChange = oi - prevOi;
           oiChangePct = Number((((oi - prevOi) / prevOi) * 100).toFixed(4));
+        } else if (prevOi != null && prevOi > 0 && prevOi === oi) {
+          oiChange = 0;
+          oiChangePct = 0;
         }
         this._prevOiBySymbol.set(symbol, oi);
       }
@@ -162,7 +181,7 @@ class HybridProvider extends FoDataProvider {
       let vwapRelation = null;
       if (ltp != null && vwap != null) vwapRelation = ltp >= vwap ? 'above' : 'below';
 
-      return {
+      const row = {
         ...q,
         symbol,
         oiChange,
@@ -177,7 +196,13 @@ class HybridProvider extends FoDataProvider {
         sector: SYMBOL_TO_SECTOR[symbol] || sectorForSymbol(symbol),
         label: 'LIVE',
       };
+      const check = validateQuote(row);
+      row.dataQuality = check.quality;
+      row.dataIssues = check.issues;
+      return row;
     });
+    this.oiCache?.setMany?.(enriched);
+    return enriched;
   }
 
   async getFoUniverse() {
@@ -185,7 +210,22 @@ class HybridProvider extends FoDataProvider {
   }
 
   async getFiiDii() {
-    return this.nse.getFiiDii();
+    try {
+      const env = await this.nse.getFiiDii();
+      return this._track('nse', env);
+    } catch (err) {
+      return this._track('nse', dataEnvelope({
+        cash: null,
+        futures: null,
+        available: false,
+        error: err.message,
+      }, {
+        source: 'nse',
+        isMock: false,
+        error: err.message,
+        warning: `NSE FII/DII unavailable (${err.message})`,
+      }));
+    }
   }
 
   async getSectorReturns() {
@@ -210,7 +250,15 @@ function hasDhanCreds(config = {}) {
  * @param {string} [options.clientId]
  * @returns {FoDataProvider}
  */
-function createProvider({ config = {}, preferMock = false, fetchImpl, accessToken, clientId } = {}) {
+function createProvider({
+  config = {},
+  preferMock = false,
+  fetchImpl,
+  accessToken,
+  clientId,
+  dataSources = null,
+  oiCache = null,
+} = {}) {
   const mock = new MockProvider();
   if (preferMock || process.env.FNO_FORCE_MOCK === '1') return mock;
 
@@ -232,7 +280,13 @@ function createProvider({ config = {}, preferMock = false, fetchImpl, accessToke
     fetchImpl,
   });
 
-  return new HybridProvider({ nse, dhan, mock });
+  return new HybridProvider({
+    nse,
+    dhan,
+    mock,
+    dataSources,
+    oiCache: oiCache || createOiCache(),
+  });
 }
 
 module.exports = {

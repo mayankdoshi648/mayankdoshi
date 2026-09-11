@@ -2,10 +2,21 @@
 
 const { getFnoService } = require('./service');
 
-function createFnoRouter({ config }) {
+function assertSetupAllowed(req) {
+  const expected = process.env.ADMIN_SETUP_KEY || process.env.DHAN_SETUP_KEY || '';
+  if (!expected) return; // open on private/local hosts
+  const got = req.get('x-setup-key') || req.body?.setupKey || '';
+  if (got !== expected) {
+    const err = new Error('Setup key required to change Dhan credentials on this host');
+    err.status = 403;
+    throw err;
+  }
+}
+
+function createFnoRouter({ config, credentialSession = null, dataSources = null }) {
   const express = require('express');
   const router = express.Router();
-  const service = getFnoService(config);
+  const service = getFnoService(config, { dataSources });
 
   const wrap = (fn) => async (req, res) => {
     try {
@@ -13,8 +24,8 @@ function createFnoRouter({ config }) {
       if (!res.headersSent) res.json(data);
     } catch (err) {
       const msg = err.message || 'Request failed';
-      const badRequest = /required|missing|invalid/i.test(msg);
-      res.status(badRequest ? 400 : 500).json({
+      const status = err.status || (/required|missing|invalid/i.test(msg) ? 400 : 500);
+      res.status(status).json({
         data: null,
         meta: {
           asOf: new Date().toISOString(),
@@ -68,17 +79,20 @@ function createFnoRouter({ config }) {
   router.get('/alerts/history', wrap(() => ({ alerts: service.getAlertHistory() })));
 
   router.get('/credentials/dhan', wrap(() => ({ data: service.getDhanStatus() })));
-  router.put('/credentials/dhan', express.json(), wrap((req) => {
+  router.put('/credentials/dhan', express.json(), wrap((req, res) => {
+    assertSetupAllowed(req);
     const body = req.body || {};
     const status = service.setDhanCredentials({
       clientId: body.clientId,
       pin: body.pin,
       totpSecret: body.totpSecret,
       accessToken: body.accessToken,
-      persistEnv: Boolean(body.persistEnv),
+      persistEnv: Boolean(body.persistEnv) && (
+        process.env.ALLOW_ENV_PERSIST === '1'
+        || (process.env.NODE_ENV !== 'production' && process.env.DISABLE_ENV_PERSIST !== '1')
+      ),
       clearForceMock: body.clearForceMock !== false,
     });
-    // Keep shared config object in sync for /api/status and other routers.
     if (config) {
       config.clientId = service.config.clientId;
       config.pin = service.config.pin;
@@ -86,9 +100,17 @@ function createFnoRouter({ config }) {
       config.accessToken = service.config.accessToken;
       config.hasDhan = true;
     }
+    if (credentialSession && body.accessToken && body.clientId) {
+      const id = credentialSession.create({
+        clientId: body.clientId,
+        accessToken: body.accessToken,
+      });
+      credentialSession.setCookieHeaders(res, id);
+    }
     return { data: status };
   }));
-  router.delete('/credentials/dhan', wrap(() => {
+  router.delete('/credentials/dhan', wrap((req, res) => {
+    assertSetupAllowed(req);
     const status = service.clearDhanCredentials();
     if (config) {
       config.clientId = '';
@@ -96,6 +118,11 @@ function createFnoRouter({ config }) {
       config.totpSecret = '';
       config.accessToken = '';
       config.hasDhan = false;
+    }
+    if (credentialSession) {
+      const sid = credentialSession.parseCookie(req.headers.cookie);
+      credentialSession.clear(sid);
+      credentialSession.setCookieHeaders(res, null, { clearCookie: true });
     }
     return { data: status };
   }));

@@ -19,9 +19,10 @@ const CACHE_TTL_MS = {
 };
 
 class FnoService {
-  constructor({ config = null, provider = null } = {}) {
+  constructor({ config = null, provider = null, dataSources = null } = {}) {
     this.config = config;
-    this.provider = provider || createProvider({ config });
+    this.dataSources = dataSources;
+    this.provider = provider || createProvider({ config, dataSources });
     this.cache = new Map();
     this.watchlist = new Set(['NIFTY', 'BANKNIFTY', 'HDFCBANK', 'RELIANCE', 'TCS']);
     this.alertRules = defaultAlertRules();
@@ -929,7 +930,7 @@ class FnoService {
     }
     if (clearForceMock) delete process.env.FNO_FORCE_MOCK;
 
-    this.provider = createProvider({ config: this.config, preferMock: false });
+    this.provider = createProvider({ config: this.config, preferMock: false, dataSources: this.dataSources });
     this.cache.clear();
 
     if (persistEnv) {
@@ -965,7 +966,7 @@ class FnoService {
     delete process.env.DHAN_TOTP_SECRET;
     delete process.env.DHAN_ACCESS_TOKEN;
     this._credentialSource = 'none';
-    this.provider = createProvider({ config: this.config || {}, preferMock: false });
+    this.provider = createProvider({ config: this.config || {}, preferMock: false, dataSources: this.dataSources });
     this.cache.clear();
     return this.getDhanStatus();
   }
@@ -990,7 +991,6 @@ class FnoService {
       return {
         ok: true,
         expiryTime: this.config?.accessTokenExpiry || null,
-        tokenPreview: `${String(cfg.accessToken).slice(0, 4)}…`,
         authMode: 'access_token',
         message: 'Static Dhan access token accepted (PIN/TOTP not required)',
       };
@@ -1003,9 +1003,10 @@ class FnoService {
     return {
       ok: true,
       expiryTime: expiryTime || null,
-      tokenPreview: accessToken ? `${String(accessToken).slice(0, 4)}…` : null,
       authMode: 'pin_totp',
       message: 'Dhan access token generated successfully',
+      // Do not return tokenPreview — avoids leaking token fragments to clients/logs.
+      tokenLength: accessToken ? String(accessToken).length : 0,
     };
   }
 }
@@ -1057,8 +1058,8 @@ function defaultAlertRules() {
 }
 
 let singleton = null;
-function getFnoService(config) {
-  if (!singleton) singleton = new FnoService({ config });
+function getFnoService(config, { dataSources = null } = {}) {
+  if (!singleton) singleton = new FnoService({ config, dataSources });
   return singleton;
 }
 

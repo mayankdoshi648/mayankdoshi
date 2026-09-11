@@ -3730,3 +3730,78 @@ html[data-theme="night"] .dense-table tbody tr:nth-child(even) td {
 .home-block.playbook-wait { border-top-color: var(--warn); }
 .home-block.playbook-conflict { border-top-color: var(--warn); }
 .home-block.playbook-avoid { border-top-color: var(--down); }
+
+/* —— Data connections pill / dialogs (additive) —— */
+.conn-pill {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text-dim);
+  border-radius: var(--radius-pill);
+  padding: 0.25rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 42vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.conn-pill.ok { color: var(--up); border-color: rgba(5, 150, 105, 0.35); background: var(--up-bg); }
+.conn-pill.warn { color: var(--warn); border-color: rgba(217, 119, 6, 0.35); background: var(--warn-bg); }
+.conn-pill.err { color: var(--down); border-color: rgba(220, 38, 38, 0.35); background: var(--down-bg); }
+.conn-dialog {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0;
+  max-width: min(520px, 94vw);
+  width: 100%;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+}
+.conn-dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
+.conn-dialog-inner { margin: 0; }
+.conn-dialog-head,
+.conn-dialog-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.conn-dialog-foot { border-bottom: 0; border-top: 1px solid var(--border); justify-content: flex-end; }
+.conn-dialog-head h2 { margin: 0; font-size: 1rem; }
+.conn-dialog-body { padding: 0.85rem 1rem 1rem; display: grid; gap: 0.55rem; }
+.conn-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.85rem;
+}
+.conn-row span { color: var(--muted); }
+.debug-pre {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  max-height: 55vh;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.dhan-connected-badge {
+  display: inline-block;
+  margin: 0.35rem 0 0.6rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radius-pill);
+  background: var(--up-bg);
+  color: var(--up);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+.err-text { color: var(--down); }
+@media (max-width: 720px) {
+  .conn-pill { max-width: 34vw; font-size: 0.65rem; padding: 0.2rem 0.5rem; }
+}
