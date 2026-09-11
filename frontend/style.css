@@ -3101,3 +3101,279 @@ html[data-theme="night"] .brand-mark {
 .st-caution { background: var(--warn-bg); }
 .st-fail { background: var(--down-bg); }
 .st-na { background: var(--panel-2); }
+
+/* =========================================================
+   POLISH PASS — desktop nav, sparklines, tables, drawers
+   ========================================================= */
+
+.desktop-nav {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .desktop-nav {
+    display: flex !important;
+    position: sticky;
+    top: var(--topbar-h);
+    z-index: 35;
+    gap: 0.25rem;
+    align-items: center;
+    padding: 0.4rem 1rem;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  html[data-theme="night"] .desktop-nav {
+    background: rgba(12, 17, 24, 0.92);
+  }
+
+  .desktop-nav[hidden] { display: none !important; }
+
+  .desktop-nav button {
+    flex: 0 0 auto;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font);
+    font-size: 0.78rem;
+    font-weight: 650;
+    padding: 0.4rem 0.75rem;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  .desktop-nav button:hover {
+    color: var(--text);
+    background: var(--panel-2);
+  }
+
+  .desktop-nav button.active {
+    color: var(--accent);
+    background: var(--accent-dim);
+    border-color: rgba(37, 99, 235, 0.2);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+  }
+
+  /* Keep primary bottom nav as compact top secondary on desktop,
+     but only the 5 primary items — extras live in desktop-nav */
+  .bottom-nav {
+    position: sticky !important;
+    top: calc(var(--topbar-h) + 42px) !important;
+    bottom: auto !important;
+    justify-content: flex-start !important;
+    min-height: 40px !important;
+    padding: 0.25rem 0.85rem !important;
+    box-shadow: none !important;
+    border-top: none !important;
+    border-bottom: 1px solid var(--border) !important;
+  }
+
+  body.has-desktop-nav .bottom-nav {
+    display: none !important; /* desktop uses desktop-nav only */
+  }
+
+  body.has-desktop-nav {
+    padding-bottom: 0 !important;
+  }
+
+  body.has-desktop-nav .main {
+    padding-top: 0.85rem !important;
+  }
+}
+
+.tick-mid {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.mini-spark {
+  flex: 0 0 auto;
+  opacity: 0.9;
+}
+.mini-spark polyline {
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mini-spark.up polyline { stroke: var(--up); }
+.mini-spark.down polyline { stroke: var(--down); }
+
+/* Compact banners */
+.banner {
+  padding: 0.35rem 0.85rem !important;
+  font-size: 0.72rem !important;
+}
+.mock-banner + .market-banner {
+  border-top: none !important;
+}
+
+/* Smart Money strip identity */
+#smart-market.strip-cards,
+.smart-market.strip-cards {
+  gap: 0.65rem !important;
+}
+.strip-card {
+  background: linear-gradient(160deg, rgba(124,58,237,0.08), var(--panel) 55%) !important;
+  border: 1px solid rgba(124,58,237,0.18) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow-sm);
+  padding: 0.75rem 0.85rem !important;
+}
+.strip-card .k {
+  color: var(--smart) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.06em;
+}
+.strip-card .v {
+  font-size: 1.2rem !important;
+  font-weight: 800 !important;
+  font-family: var(--mono) !important;
+}
+
+.smart-indices button,
+.home-ix {
+  border-left: 3px solid var(--smart) !important;
+  background: var(--panel) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* Options cyan panel */
+.view[data-view="chain"] .metrics-row .metric,
+.view[data-view="oi"] .metrics-row .metric,
+#overview-opt .metric {
+  background: linear-gradient(180deg, rgba(8,145,178,0.08), var(--panel-2)) !important;
+  border-color: rgba(8,145,178,0.18) !important;
+}
+.options-insight,
+.view[data-view="chain"] .interp {
+  background: var(--options-bg) !important;
+  border: 1px solid rgba(8,145,178,0.2) !important;
+  border-radius: var(--radius) !important;
+  padding: 0.75rem 0.85rem !important;
+}
+
+.chain-table .strike-col,
+.chain-table td.strike-col {
+  background: rgba(8,145,178,0.08) !important;
+  font-weight: 800 !important;
+}
+
+/* Tables */
+.dense-table tbody tr:nth-child(even) td {
+  background: rgba(241, 245, 249, 0.55);
+}
+html[data-theme="night"] .dense-table tbody tr:nth-child(even) td {
+  background: rgba(255,255,255,0.02);
+}
+.dense-table td strong {
+  letter-spacing: 0.02em;
+}
+.score-pill {
+  display: inline-flex;
+  min-width: 2.4rem;
+  justify-content: center;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-weight: 800;
+  font-size: 0.75rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+.score-pill.up { background: var(--up-bg); color: var(--up); border-color: rgba(5,150,105,.25); }
+.score-pill.down { background: var(--down-bg); color: var(--down); border-color: rgba(220,38,38,.25); }
+
+/* Opportunity drawer */
+.opp-detail.opp-drawer {
+  position: relative;
+  margin-top: 1rem;
+  border-left: 4px solid var(--accent) !important;
+  animation: drawer-in 0.22s ease;
+}
+@keyframes drawer-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (min-width: 900px) {
+  .opp-detail.opp-drawer {
+    position: sticky;
+    top: calc(var(--topbar-h) + 56px);
+    max-height: calc(100vh - var(--topbar-h) - 72px);
+    overflow: auto;
+    z-index: 5;
+  }
+}
+
+/* Buildup segment active colors */
+#buildup-seg button[data-signal="LONG_BUILDUP"].active {
+  background: var(--up-bg) !important;
+  border-color: rgba(5,150,105,.35) !important;
+  color: var(--up) !important;
+}
+#buildup-seg button[data-signal="SHORT_BUILDUP"].active {
+  background: var(--down-bg) !important;
+  border-color: rgba(220,38,38,.35) !important;
+  color: var(--down) !important;
+}
+#buildup-seg button[data-signal="SHORT_COVERING"].active {
+  background: var(--accent-dim) !important;
+  color: var(--accent) !important;
+}
+#buildup-seg button[data-signal="LONG_UNWINDING"].active {
+  background: var(--warn-bg) !important;
+  color: var(--warn) !important;
+}
+
+/* Heatmap rows */
+.hm-row {
+  border-radius: var(--radius-sm) !important;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Regime factors denser */
+.regime-factors .factor {
+  border-top: none !important;
+  margin: 0.25rem 0;
+}
+.regime-hero {
+  align-items: start !important;
+}
+@media (min-width: 900px) {
+  .regime-hero {
+    grid-template-columns: 180px 1fr !important;
+  }
+}
+
+/* Chart modal premium */
+.modal-content {
+  padding: 1rem 1.1rem 1.25rem !important;
+}
+#chart-canvas {
+  max-width: 100%;
+  background: linear-gradient(180deg, #f8fafc, #fff);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+/* Mobile: ensure only 5 bottom items, no overflow junk */
+@media (max-width: 899px) {
+  .desktop-nav { display: none !important; }
+  .bottom-nav button { min-width: 0; }
+}
+
+
+/* Banner compact stack */
+.banner.mock-banner,
+.banner.market-banner {
+  line-height: 1.35;
+}
+@media (min-width: 900px) {
+  .banner { font-size: 0.7rem !important; padding: 0.28rem 1rem !important; }
+}

@@ -27,6 +27,32 @@
     return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
   }
 
+  function prettyLabel(value) {
+    return String(value || '')
+      .replace(/_/g, ' ')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  function miniSpark(q) {
+    const high = Number(q.high);
+    const low = Number(q.low);
+    const ltp = Number(q.ltp);
+    const open = Number(q.open);
+    if (![high, low, ltp].every(Number.isFinite) || high <= low) return '';
+    const w = 54, h = 18, pad = 1;
+    const x = (i, n) => pad + (i / Math.max(1, n - 1)) * (w - pad * 2);
+    const y = (v) => {
+      const t = (v - low) / (high - low);
+      return h - pad - t * (h - pad * 2);
+    };
+    const pts = [open || low, (open + ltp) / 2 || ltp, ltp].map((v, i, arr) => `${x(i, arr.length).toFixed(1)},${y(v).toFixed(1)}`);
+    const dir = Number(q.changePct) >= 0 ? 'up' : 'down';
+    return `<svg class="mini-spark ${dir}" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true"><polyline fill="none" points="${pts.join(' ')}" /></svg>`;
+  }
+
   function clsDir(n) {
     if (n == null || Number.isNaN(Number(n))) return '';
     return Number(n) >= 0 ? 'up' : 'down';
@@ -91,6 +117,9 @@
       } else {
         b.classList.toggle('active', nav === name);
       }
+    });
+    $$('#desktop-nav [data-nav]').forEach((b) => {
+      b.classList.toggle('active', b.dataset.nav === name);
     });
     $('#more-sheet')?.classList.add('hidden');
     loadView(name);
@@ -167,7 +196,7 @@
       return `
       <div class="tick ${dir}" title="${escapeHtml(q.symbol)}">
         <div class="tick-top"><span class="sym">${escapeHtml(q.symbol)}</span><span class="tick-arrow ${dir}" aria-hidden="true">${arrow}</span></div>
-        <div class="ltp">${fmt(q.ltp, 2)}</div>
+        <div class="tick-mid"><div class="ltp">${fmt(q.ltp, 2)}</div>${miniSpark(q)}</div>
         <div class="chg ${dir}">${fmtPct(q.changePct)}</div>
         <div class="hi-lo">H ${fmt(q.high)} · L ${fmt(q.low)}${q.futuresPrice != null ? ` · F ${fmt(q.futuresPrice)}` : ''}</div>
       </div>`;
@@ -206,7 +235,11 @@
       const soft = /caution|mixed|neutral|elevated/i.test(String(f.evidence || ''));
       const st = ok ? (soft ? 'warn' : 'ok') : 'bad';
       const icon = st === 'ok' ? '🟢' : st === 'warn' ? '🟡' : '🔴';
-      return `<div class="factor check factor-${st}"><span class="factor-ico" aria-hidden="true">${icon}</span><span class="n">${escapeHtml(f.name)}</span><span class="e">${escapeHtml(f.evidence)}</span></div>`;
+      const evidence = String(f.evidence ?? '').replace(/(\d+\.\d{3,})/g, (m) => {
+        const n = Number(m);
+        return Number.isFinite(n) ? n.toFixed(2) : m;
+      });
+      return `<div class="factor check factor-${st}"><span class="factor-ico" aria-hidden="true">${icon}</span><span class="n">${escapeHtml(prettyLabel(f.name))}</span><span class="e">${escapeHtml(evidence)}</span></div>`;
     }).join('') || '<div class="muted">No factors available</div>';
 
     const snap = env.data?.optionSnapshot;
@@ -328,14 +361,14 @@
     const body = $('#intel-table tbody');
     body.innerHTML = (env.data || []).map((r) => `
       <tr data-why="${escapeHtml((r.why || []).join(' | '))}">
-        <td>${escapeHtml(r.symbol)}</td>
-        <td>${fmt(r.ltp)}</td>
+        <td><strong>${escapeHtml(r.symbol)}</strong></td>
+        <td class="mono">${fmt(r.ltp)}</td>
         <td class="${clsDir(r.priceChangePct)}">${fmtPct(r.priceChangePct)}</td>
         <td class="${clsDir(r.oiChangePct)}">${fmtPct(r.oiChangePct)}</td>
         <td>${fmt(r.relativeVolume)}</td>
         <td>${fmt(r.iv)}</td>
-        <td>${escapeHtml((r.buildup || '').replace(/_/g, ' '))}</td>
-        <td class="${clsDir(r.score)}">${r.score ?? '—'}</td>
+        <td><span class="setup-badge">${escapeHtml(prettyLabel(r.buildup || ''))}</span></td>
+        <td><span class="score-pill ${clsDir(r.score)}">${r.score ?? '—'}</span></td>
       </tr>
     `).join('');
     body.querySelectorAll('tr').forEach((tr) => {
@@ -385,6 +418,7 @@
     $('#chain-metrics').innerHTML = metricsHtml;
     $('#oi-metrics').innerHTML = metricsHtml;
     const ev = env.data?.interpretation?.evidence || [];
+    $('#chain-interp').classList.add('options-insight');
     $('#chain-interp').innerHTML = `<strong>${escapeHtml(env.data?.interpretation?.summary || '')}</strong><ul>${ev.map((e) => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`;
 
     const hiCall = env.data?.highlights?.highestCallOi?.strike;
@@ -481,10 +515,10 @@
     $('#smart-table tbody').innerHTML = (rows || []).map((r, i) => `
       <tr data-symbol="${escapeHtml(r.symbol)}" class="smart-row">
         <td>${i + 1}</td>
-        <td>${escapeHtml(r.symbol)}</td>
-        <td class="${clsDir(r.score)}">${r.score != null ? `${r.score >= 0 ? '+' : ''}${r.score}` : '—'}</td>
+        <td><strong>${escapeHtml(r.symbol)}</strong></td>
+        <td><span class="score-pill ${clsDir(r.score)}">${r.score != null ? `${r.score >= 0 ? '+' : ''}${r.score}` : '—'}</span></td>
         <td>${r.confidence != null ? `${r.confidence}%` : '—'}</td>
-        <td>${escapeHtml(r.setup || r.signal || '')}</td>
+        <td><span class="setup-badge">${escapeHtml(prettyLabel(r.setup || r.signal || ''))}</span></td>
         <td class="${clsDir(r.priceChangePct)}">${fmtPct(r.priceChangePct)}</td>
         <td class="${clsDir(r.oiChangePct)}">${fmtPct(r.oiChangePct)}</td>
         <td>${r.relativeVolume != null ? `${fmt(r.relativeVolume)}×` : '—'}</td>
@@ -1106,9 +1140,9 @@
         <td>${escapeHtml(r.vwapRelation || '—')}</td>
         <td>${escapeHtml(r.optionsAlignment || '—')}</td>
         <td>${r.momentum != null ? fmt(r.momentum, 1) : '—'}</td>
-        <td><strong>${r.opportunityScore}</strong></td>
-        <td>${escapeHtml(r.grade)}</td>
-        <td class="${readinessClass(r.readiness?.status)}">${readinessLabel(r.readiness)}</td>
+        <td><span class="score-pill">${r.opportunityScore}</span></td>
+        <td><span class="grade-badge ${gradeClass(r.grade)}">${escapeHtml(r.grade)}</span></td>
+        <td><span class="pill ${readinessClass(r.readiness?.status)}">${readinessLabel(r.readiness)}</span></td>
       </tr>
     `).join('') || '<tr><td colspan="15">No rows</td></tr>';
 
@@ -1177,6 +1211,7 @@
     }).join('');
 
     $('#opp-detail').classList.remove('hidden');
+    $('#opp-detail').classList.add('opp-drawer');
     $('#opp-detail').innerHTML = `
       <div class="opp-detail-head">
         <div>
@@ -1324,20 +1359,47 @@
     });
   }
 
-  // Desktop: expand bottom nav with more destinations
+  // Desktop: dedicated secondary nav (do not pollute mobile bottom nav)
   function expandDesktopNav() {
-    if (window.matchMedia('(min-width: 900px)').matches) {
-      const nav = $('.bottom-nav');
-      const extras = ['markets', 'chain', 'heatmap', 'oi', 'sectors', 'scanner', 'fii', 'alerts', 'watch', 'settings', 'opportunity', 'legacy'];
-      extras.forEach((id) => {
-        if (nav.querySelector(`[data-nav="${id}"]`)) return;
-        const b = document.createElement('button');
-        b.dataset.nav = id;
-        b.innerHTML = `<span>·</span>${id === 'markets' ? 'Markets' : id}`;
-        b.addEventListener('click', () => showView(id));
-        nav.appendChild(b);
+    const bar = $('#desktop-nav');
+    if (!bar) return;
+    const mq = window.matchMedia('(min-width: 900px)');
+    const items = [
+      ['overview', 'Home'],
+      ['opportunity', 'Opportunity'],
+      ['smart', 'Smart Money'],
+      ['intel', 'F&O'],
+      ['chain', 'Options'],
+      ['sectors', 'Sectors'],
+      ['scanner', 'Scanner'],
+      ['heatmap', 'Heatmap'],
+      ['watch', 'Watchlist'],
+      ['alerts', 'Alerts'],
+      ['markets', 'Markets'],
+      ['settings', 'Settings'],
+    ];
+    const render = () => {
+      const desktop = mq.matches;
+      bar.hidden = !desktop;
+      document.body.classList.toggle('has-desktop-nav', desktop);
+      if (!desktop) {
+        bar.innerHTML = '';
+        return;
+      }
+      if (bar.dataset.ready === '1') return;
+      bar.innerHTML = items.map(([id, label]) =>
+        `<button type="button" data-nav="${id}" class="${state.view === id ? 'active' : ''}">${label}</button>`
+      ).join('');
+      bar.querySelectorAll('[data-nav]').forEach((btn) => {
+        btn.addEventListener('click', () => showView(btn.dataset.nav));
       });
-    }
+      bar.dataset.ready = '1';
+    };
+    render();
+    mq.addEventListener?.('change', () => {
+      bar.dataset.ready = '0';
+      render();
+    });
   }
 
   async function boot() {
