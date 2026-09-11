@@ -168,4 +168,30 @@ describe('mock provider + service', () => {
       dhanAuth.fetchAccessToken = orig;
     }
   });
+
+  it('opportunity board returns ranked checklist rows', async () => {
+    const service = new FnoService({ provider: new MockProvider() });
+    const board = await service.getOpportunityBoard({ limit: 20 });
+    assert.ok(Array.isArray(board.data.rows));
+    assert.ok(board.data.rows.length >= 10);
+    const row = board.data.rows[0];
+    assert.ok(row.opportunityScore != null);
+    assert.ok(row.confidence != null);
+    assert.ok(row.grade);
+    assert.ok(row.readiness?.status);
+    assert.ok(board.data.rankings?.topBullish);
+    assert.match(board.data.disclaimer, /NOT a guarantee/i);
+  });
+
+  it('opportunity detail includes wait-for and unavailable fields', async () => {
+    const service = new FnoService({ provider: new MockProvider() });
+    const board = await service.getOpportunityBoard({ limit: 5 });
+    const symbol = board.data.rows[0].symbol;
+    const detail = await service.getOpportunityDetail(symbol);
+    assert.equal(detail.data.symbol, symbol);
+    assert.ok(Array.isArray(detail.data.checks));
+    assert.ok(detail.data.checks.some((c) => c.status === 'UNAVAILABLE'));
+    assert.ok(detail.data.waitFor);
+    assert.ok(detail.data.why);
+  });
 });

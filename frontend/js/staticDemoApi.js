@@ -82,6 +82,124 @@
     return 'VERY STRONG SHORT';
   }
 
+  function demoOpportunityDetail(row) {
+    const sm = row.smartMoney || makeSmart(row);
+    const score = Math.max(0, Math.min(100, Math.round(55 + Math.abs(sm.score) * 0.35 + (row.relativeVolume || 1) * 4)));
+    const confidence = Math.max(40, Math.min(95, sm.confidence - 5));
+    const grade = score >= 85 && confidence >= 80 ? 'A+' : score >= 75 ? 'A' : score >= 65 ? 'B' : score >= 50 ? 'WATCH' : 'AVOID';
+    const direction = sm.score >= 20 ? 'BULLISH' : sm.score <= -20 ? 'BEARISH' : 'NEUTRAL';
+    const readiness = score >= 80 && confidence >= 75
+      ? { status: 'READY', label: 'READY', stage: 'READY' }
+      : score >= 60
+        ? { status: 'WAIT', label: 'WAIT FOR CONFIRMATION', stage: 'CONFIRMING' }
+        : { status: 'NOT_READY', label: 'NOT READY', stage: 'AVOID' };
+    const mk = (id, category, label, status, value, note) => ({ id, category, label, status, value, note: note || '' });
+    const categories = {
+      MARKET: [mk('m1', 'MARKET', 'Overall Market Regime', 'CAUTION', 'DEMO', 'Static demo regime')],
+      SECTOR: [mk('s1', 'SECTOR', 'Sector trend', 'PASS', row.sector, '')],
+      PRICE: [mk('p1', 'PRICE', 'Current trend', row.priceChangePct > 0 ? 'PASS' : 'CAUTION', `${row.priceChangePct}%`)],
+      OI: [mk('o1', 'OI', 'Price + OI relationship', 'PASS', row.buildup, '')],
+      VOLUME: [mk('v1', 'VOLUME', 'Relative Volume', row.relativeVolume >= 1.5 ? 'PASS' : 'CAUTION', `${row.relativeVolume}x`)],
+      VWAP: [mk('w1', 'VWAP', 'Price vs VWAP', row.vwapRelation === 'above' ? 'PASS' : 'CAUTION', row.vwapRelation)],
+      OPTIONS: [mk('op1', 'OPTIONS', 'PCR', 'CAUTION', row.pcr, 'Not standalone')],
+      SMART_MONEY: [mk('sm1', 'SMART_MONEY', 'Smart Money Score', 'PASS', sm.score, 'PROXY')],
+      MTF: [mk('mt1', 'MTF', '15M trend', 'UNAVAILABLE', null, 'Demo limited')],
+      RISK: [mk('r1', 'RISK', 'Recent price extension', Math.abs(row.priceChangePct) > 3 ? 'CAUTION' : 'PASS', `${row.priceChangePct}%`)],
+      FII: [mk('f1', 'FII', 'FII Net Position', 'UNAVAILABLE', null, 'Index context only')],
+    };
+    const triggers = [];
+    if ((row.relativeVolume || 0) < 1.5) {
+      triggers.push({ id: 'rvol', label: 'Relative volume expansion', current: `${row.relativeVolume}x`, required: '> 1.50x', status: 'WAIT', priority: 10, why: 'Volume confirmation' });
+    }
+    if (row.vwapRelation === 'below' && direction === 'BULLISH') {
+      triggers.push({ id: 'vwap', label: 'Reclaim VWAP', current: 'below', required: 'Sustain above VWAP', status: 'WAIT', priority: 20, why: 'Acceptance above VWAP' });
+    }
+    return {
+      symbol: row.symbol,
+      sector: row.sector,
+      ltp: row.ltp,
+      priceChangePct: row.priceChangePct,
+      smartMoneyScore: sm.score,
+      smartMoneyConfidence: sm.confidence,
+      oiSignal: row.buildup,
+      sectorStrength: 60,
+      relativeVolume: row.relativeVolume,
+      vwapRelation: row.vwapRelation,
+      optionsAlignment: 'SUPPORTIVE',
+      momentum: sm.components?.momentum?.score ?? null,
+      opportunityScore: score,
+      confidence,
+      grade,
+      setup: sm.setup,
+      direction,
+      primarySetup: sm.setup,
+      readiness,
+      bucket: readiness.status === 'READY' ? 'READY_NOW' : readiness.status === 'WAIT' ? 'EARLY' : 'AVOID',
+      extension: Math.abs(row.priceChangePct) > 3.5 ? 'MODERATE_EXTENSION' : 'LOW_RISK',
+      components: {
+        market: { score: 6, max: 10, available: true },
+        sector: { score: 7, max: 10, available: true },
+        price: { score: 7, max: 10, available: true },
+        oi: { score: 12, max: 15, available: true },
+        volume: { score: row.relativeVolume >= 1.5 ? 8 : 4, max: 10, available: true },
+        vwap: { score: 7, max: 10, available: true },
+        options: { score: 8, max: 15, available: true },
+        smartMoney: { score: 8, max: 10, available: true },
+        mtf: { score: 0, max: 5, available: false },
+        risk: { score: 4, max: 5, available: true },
+      },
+      categories,
+      checks: Object.values(categories).flat(),
+      conflict: { level: 'LOW', bullish: ['OI', 'VWAP'], bearish: [], neutral: ['MTF'] },
+      waitFor: {
+        triggers,
+        topTrigger: triggers[0] || null,
+        scenario: { note: 'Demo scenario only', currentScore: score, potentialScore: Math.min(100, score + 8), currentConfidence: confidence, potentialConfidence: Math.min(100, confidence + 8) },
+      },
+      invalidation: { summary: 'Demo invalidation if VWAP/buildup reverse', items: [{ text: 'Price loses VWAP', level: null }, { text: 'Buildup reverses', level: null }] },
+      strongestFactors: [{ text: sm.setup }, { text: `RVOL ${row.relativeVolume}x` }],
+      weakestFactors: triggers.length ? [{ text: triggers[0].label }] : [{ text: 'Demo limitations' }],
+      expectedMove: null,
+      levels: { support: [], resistance: [] },
+      why: `${direction} ${sm.setup} demo opportunity. Score ${score} with confidence ${confidence}%. Static demo — not live.`,
+      summary: {},
+      disclaimer: 'Opportunity Checklist — structured confirmation. READY is NOT a guarantee. Static demo data.',
+      unavailableFields: ['Multi-timeframe', 'ATR', 'EMA'],
+      mtf: { text: 'MTF unavailable in static demo detail path', aligned: 0, total: 5 },
+    };
+  }
+
+  function demoOpportunityBoard(qs = {}) {
+    const details = ROWS.map((r) => demoOpportunityDetail(r));
+    details.sort((a, b) => b.opportunityScore - a.opportunityScore);
+    details.forEach((r, i) => { r.rank = i + 1; });
+    let rows = details;
+    const f = String(qs.filter || '').toUpperCase();
+    if (f === 'BULLISH') rows = rows.filter((r) => r.direction === 'BULLISH');
+    if (f === 'BEARISH') rows = rows.filter((r) => r.direction === 'BEARISH');
+    if (f === 'A+') rows = rows.filter((r) => r.grade === 'A+');
+    if (f === 'READY') rows = rows.filter((r) => r.readiness.status === 'READY');
+    if (f === 'HIGH_VOLUME') rows = rows.filter((r) => (r.relativeVolume || 0) >= 1.5);
+    return {
+      disclaimer: 'Opportunity Checklist — static demo',
+      rows,
+      rankings: {
+        topBullish: details.filter((r) => r.direction === 'BULLISH').slice(0, 10),
+        topBearish: details.filter((r) => r.direction === 'BEARISH').slice(0, 10),
+        topShortCovering: details.filter((r) => r.oiSignal === 'SHORT_COVERING').slice(0, 10),
+        topLongUnwinding: details.filter((r) => r.oiSignal === 'LONG_UNWINDING').slice(0, 10),
+        readyNow: details.filter((r) => r.bucket === 'READY_NOW').slice(0, 10),
+        early: details.filter((r) => r.bucket === 'EARLY').slice(0, 10),
+        conflicted: details.filter((r) => r.bucket === 'CONFLICTED').slice(0, 10),
+        avoid: details.filter((r) => r.grade === 'AVOID').slice(0, 10),
+        watchlist: details.filter((r) => r.readiness.status === 'WAIT').slice(0, 10),
+      },
+      heatmap: details.slice(0, 40).map((r) => ({
+        symbol: r.symbol, opportunityScore: r.opportunityScore, confidence: r.confidence, grade: r.grade, direction: r.direction,
+      })),
+    };
+  }
+
   function makeSmart(row) {
     const buildup = classify(row.priceChangePct, row.oiChangePct);
     const setup = setupLabel(buildup);
@@ -411,6 +529,15 @@
     }
     if (parts[0] === 'smart-money' && parts[1]) return smartDetail(parts[1]);
     if (parts[0] === 'smart-money') return smartMoney();
+    if (parts[0] === 'opportunity' && parts[1]) {
+      const sym = String(parts[1]).toUpperCase();
+      const row = ROWS.find((r) => r.symbol === sym);
+      if (!row) return env(null, { error: `Symbol not found: ${sym}` });
+      return env(demoOpportunityDetail(row));
+    }
+    if (parts[0] === 'opportunity') {
+      return env(demoOpportunityBoard(qs));
+    }
     if (parts[0] === 'sectors' && parts[1]) return env(ROWS.filter((r) => r.sector === decodeURIComponent(parts[1])));
     if (parts[0] === 'sectors') return sectors();
     if (parts[0] === 'expiries') return env(['2026-09-17', '2026-09-24', '2026-10-01']);

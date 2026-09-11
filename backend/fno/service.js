@@ -5,6 +5,7 @@ const { analyzeOptionChain } = require('./calculations/optionChainMetrics');
 const { computeMarketRegime } = require('./calculations/marketRegime');
 const { explainBuildup, classifyBuildup } = require('./calculations/oiBuildup');
 const { computeSmartMoneyProxy, buildRankings, summarizeMarketBias, evaluateSmartMoneyAlert, DISCLAIMER } = require('./calculations/smartMoney');
+const { evaluateOpportunity, buildOpportunityUniverse, filterOpportunityRows, DISCLAIMER: OPP_DISCLAIMER } = require('./calculations/opportunityChecklist');
 const { computeSectorStrength, rankSectors } = require('./calculations/sectorStrength');
 const { SECTOR_MAP, sectorForSymbol } = require('./universe/sectors');
 const { TICKER_ORDER } = require('./universe/underlyings');
@@ -740,6 +741,25 @@ class FnoService {
         });
       }
 
+      // Opportunity thresholds — reuse same scanner row; evaluate lightly without full board rebuild cost per alert pass
+      try {
+        const opp = evaluateOpportunity(row, {});
+        if (rules.opportunityScoreAbove != null && opp.opportunityScore >= rules.opportunityScoreAbove) {
+          reasons.push(`Opportunity score ${opp.opportunityScore} ≥ ${rules.opportunityScoreAbove}`);
+        }
+        if (rules.opportunityConfidenceAbove != null && opp.confidence >= rules.opportunityConfidenceAbove) {
+          reasons.push(`Opportunity confidence ${opp.confidence}% ≥ ${rules.opportunityConfidenceAbove}%`);
+        }
+        if (rules.opportunityGradeAPlus && opp.grade === 'A+') {
+          reasons.push('Opportunity grade A+');
+        }
+        if (rules.opportunityReady && opp.readiness?.status === 'READY') {
+          reasons.push('Opportunity READY');
+        }
+      } catch {
+        /* ignore opportunity eval errors in alert loop */
+      }
+
       if (reasons.length) {
         fired.push({
           symbol: row.symbol,
@@ -760,6 +780,79 @@ class FnoService {
 
   getAlertHistory() {
     return this.alertHistory;
+  }
+
+  async _opportunityContext() {
+    const overview = await this.getMarketOverviewIntelligence();
+    const sectorsEnv = await this.getSectorAnalysis();
+    let fii = null;
+    try {
+      fii = await this.getFiiDii();
+    } catch {
+      fii = null;
+    }
+    const indices = {};
+    for (const q of overview.data?.ticker || []) {
+      indices[String(q.symbol).toUpperCase()] = q;
+    }
+    const sectorsByName = new Map((sectorsEnv.data || []).map((s) => [s.sector, s]));
+    return {
+      regime: overview.data?.regime || null,
+      indices,
+      fii: fii?.data || null,
+      sectorsByName,
+      optionSnapshot: overview.data?.optionSnapshot || null,
+    };
+  }
+
+  async getOpportunityBoard({ filter = null, sort = 'opportunityScore', dir = 'desc', limit = 80 } = {}) {
+    const scan = await this.getFoScanner();
+    const ctx = await this._opportunityContext();
+    const universe = buildOpportunityUniverse(scan.data || [], ctx);
+    const filtered = filterOpportunityRows(universe.rows, { filter, sort, dir });
+    const rows = filtered.slice(0, Math.max(1, Number(limit) || 80));
+    return dataEnvelope({
+      disclaimer: OPP_DISCLAIMER,
+      rows,
+      rankings: universe.rankings,
+      heatmap: universe.heatmap,
+      metaExtras: {
+        filter: filter || null,
+        sort,
+        dir,
+        total: universe.rows.length,
+        shown: rows.length,
+      },
+    }, scan.meta);
+  }
+
+  async getOpportunityDetail(symbol) {
+    const sym = String(symbol || '').toUpperCase();
+    const scan = await this.getFoScanner();
+    const row = (scan.data || []).find((r) => String(r.symbol).toUpperCase() === sym);
+    if (!row) {
+      return dataEnvelope(null, {
+        asOf: new Date().toISOString(),
+        source: 'error',
+        isMock: false,
+        error: `Symbol not found: ${sym}`,
+      });
+    }
+    const ctx = await this._opportunityContext();
+    const sectorStats = ctx.sectorsByName.get(row.sector) || null;
+    let chainMetrics = null;
+    // Only attach index option snapshot as soft market options context — never invent stock chain.
+    if (['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY'].includes(sym) && ctx.optionSnapshot) {
+      chainMetrics = {
+        pcr: ctx.optionSnapshot.pcr,
+        atmIv: ctx.optionSnapshot.atm?.iv ?? null,
+        expectedMove: ctx.optionSnapshot.expectedMove || null,
+        callResistance: null,
+        putSupport: null,
+      };
+    }
+    const detail = evaluateOpportunity(row, { ...ctx, sectorStats, chainMetrics });
+    return dataEnvelope(detail, scan.meta);
   }
 
   getDhanStatus() {
@@ -903,6 +996,10 @@ function defaultAlertRules() {
     smartMoneyCrossAbove: 60,
     smartMoneyCrossBelow: -60,
     smartMoneyConfidenceAbove: 80,
+    opportunityScoreAbove: 85,
+    opportunityConfidenceAbove: 80,
+    opportunityGradeAPlus: true,
+    opportunityReady: true,
   };
 }
 

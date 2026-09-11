@@ -101,6 +101,7 @@
       if (name === 'alerts') await renderAlerts();
       if (name === 'watch') await renderWatch();
       if (name === 'settings') await renderSettings();
+      if (name === 'opportunity') await renderOpportunity();
       if (name === 'legacy') await renderFuturesTable();
     } catch (err) {
       console.error(err);
@@ -930,6 +931,206 @@
     }
   }
 
+  function statusIcon(st) {
+    if (st === 'PASS') return '<span class="st-pass">✅ PASS</span>';
+    if (st === 'CAUTION') return '<span class="st-caution">⚠️ CAUTION</span>';
+    if (st === 'FAIL') return '<span class="st-fail">❌ FAIL</span>';
+    return '<span class="st-na">— UNAVAILABLE</span>';
+  }
+
+  function readinessClass(status) {
+    if (status === 'READY') return 'opp-ready';
+    if (status === 'WAIT') return 'opp-wait';
+    return 'opp-not';
+  }
+
+  function readinessLabel(r) {
+    if (!r) return '—';
+    if (r.status === 'READY') return '🟢 READY';
+    if (r.status === 'WAIT') return '🟡 WAIT';
+    return '🔴 NOT READY';
+  }
+
+  async function renderOpportunity() {
+    const filter = $('#opp-filter')?.value || '';
+    const sort = $('#opp-sort')?.value || 'opportunityScore';
+    const qs = new URLSearchParams({ limit: '80', sort, dir: 'desc' });
+    if (filter) qs.set('filter', filter);
+    const env = await api(`/api/fno/opportunity?${qs}`);
+    state.opportunity = env.data || {};
+    const rows = state.opportunity.rows || [];
+    const rankings = state.opportunity.rankings || {};
+
+    const bucket = state.oppBucket || 'all';
+    $$('#opp-buckets .opp-bucket').forEach((b) => b.classList.toggle('active', b.dataset.bucket === bucket));
+    const shown = bucket === 'all' ? rows : rows.filter((r) => r.bucket === bucket || (bucket === 'AVOID' && r.grade === 'AVOID'));
+
+    const card = (r) => `
+      <button type="button" class="opp-card" data-opp-sym="${escapeHtml(r.symbol)}">
+        <div class="sym">${escapeHtml(r.symbol)} · <span class="${clsDir(r.opportunityScore)}">${escapeHtml(r.grade)}</span></div>
+        <div class="meta">
+          <span>${r.opportunityScore}/100</span>
+          <span>${r.confidence}%</span>
+          <span class="${readinessClass(r.readiness?.status)}">${readinessLabel(r.readiness)}</span>
+          <span>${escapeHtml((r.setup || '').replace(/_/g, ' '))}</span>
+        </div>
+      </button>`;
+
+    $('#opp-top').innerHTML = `
+      <div><h3 class="section-label">Bullish</h3>${(rankings.topBullish || []).slice(0, 5).map(card).join('') || '<p class="muted">None</p>'}</div>
+      <div><h3 class="section-label">Bearish</h3>${(rankings.topBearish || []).slice(0, 5).map(card).join('') || '<p class="muted">None</p>'}</div>
+      <div><h3 class="section-label">Ready now</h3>${(rankings.readyNow || []).slice(0, 5).map(card).join('') || '<p class="muted">None</p>'}</div>
+      <div><h3 class="section-label">Short covering</h3>${(rankings.topShortCovering || []).slice(0, 5).map(card).join('') || '<p class="muted">None</p>'}</div>
+    `;
+
+    $('#opp-watch').innerHTML = (rankings.watchlist || []).slice(0, 8).map((r) => {
+      const wait = (r.waitFor?.triggers || []).slice(0, 2).map((t) => t.label).join(' · ') || 'confirmation';
+      return `<button type="button" class="opp-card" data-opp-sym="${escapeHtml(r.symbol)}">
+        <div class="sym">${escapeHtml(r.symbol)} · ${r.opportunityScore} · ${r.confidence}%</div>
+        <div class="meta">Waiting: ${escapeHtml(wait)}</div>
+      </button>`;
+    }).join('') || '<p class="muted">No early watch items</p>';
+
+    $('#opp-table tbody').innerHTML = shown.map((r) => `
+      <tr class="smart-row" data-opp-sym="${escapeHtml(r.symbol)}">
+        <td>${r.rank ?? '—'}</td>
+        <td>${escapeHtml(r.symbol)}</td>
+        <td>${fmt(r.ltp)}</td>
+        <td class="${clsDir(r.priceChangePct)}">${fmtPct(r.priceChangePct)}</td>
+        <td class="${clsDir(r.smartMoneyScore)}">${r.smartMoneyScore != null ? `${r.smartMoneyScore >= 0 ? '+' : ''}${r.smartMoneyScore}` : '—'}</td>
+        <td>${r.smartMoneyConfidence != null ? `${r.smartMoneyConfidence}%` : '—'}</td>
+        <td>${escapeHtml((r.oiSignal || '').replace(/_/g, ' '))}</td>
+        <td>${r.sectorStrength != null ? fmt(r.sectorStrength, 0) : '—'}</td>
+        <td>${r.relativeVolume != null ? `${fmt(r.relativeVolume)}x` : '—'}</td>
+        <td>${escapeHtml(r.vwapRelation || '—')}</td>
+        <td>${escapeHtml(r.optionsAlignment || '—')}</td>
+        <td>${r.momentum != null ? fmt(r.momentum, 1) : '—'}</td>
+        <td><strong>${r.opportunityScore}</strong></td>
+        <td>${escapeHtml(r.grade)}</td>
+        <td class="${readinessClass(r.readiness?.status)}">${readinessLabel(r.readiness)}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="15">No rows</td></tr>';
+
+    $('#opp-heatmap').innerHTML = (state.opportunity.heatmap || []).map((h) => {
+      const cls = h.opportunityScore >= 75 && h.confidence >= 70 ? 'hi' : h.opportunityScore >= 55 ? 'mid' : 'lo';
+      return `<button type="button" class="opp-dot ${cls}" data-opp-sym="${escapeHtml(h.symbol)}" title="${escapeHtml(h.symbol)} ${h.opportunityScore}/${h.confidence}">${escapeHtml(h.symbol)}<br>${h.opportunityScore}·${h.confidence}</button>`;
+    }).join('');
+
+    $$('[data-opp-sym]').forEach((el) => {
+      el.addEventListener('click', () => openOpportunityDetail(el.dataset.oppSym));
+    });
+  }
+
+  async function openOpportunityDetail(symbol) {
+    const env = await api(`/api/fno/opportunity/${encodeURIComponent(symbol)}`);
+    const d = env.data;
+    if (!d) {
+      $('#opp-detail').classList.remove('hidden');
+      $('#opp-detail').innerHTML = `<p class="muted">No detail for ${escapeHtml(symbol)}</p>`;
+      return;
+    }
+    const cats = d.categories || {};
+    const catHtml = Object.keys(cats).map((cat) => `
+      <div class="opp-check-cat">
+        <h3>${escapeHtml(cat)}</h3>
+        ${(cats[cat] || []).map((c) => `
+          <div class="opp-check-row">
+            <div>${statusIcon(c.status)}</div>
+            <div>
+              <strong>${escapeHtml(c.label)}</strong>
+              ${c.note ? `<div class="muted tiny">${escapeHtml(c.note)}</div>` : ''}
+            </div>
+            <div class="mono">${c.value == null ? '—' : escapeHtml(String(c.value))}</div>
+          </div>
+        `).join('')}
+      </div>
+    `).join('');
+
+    const trig = (d.waitFor?.triggers || []).map((t) => `
+      <div class="opp-trig">
+        <div>${escapeHtml(t.label)}</div>
+        <div>Now: ${escapeHtml(String(t.current))}</div>
+        <div>Need: ${escapeHtml(String(t.required))}</div>
+        <div class="opp-wait">WAIT</div>
+      </div>
+    `).join('') || '<p class="muted">No outstanding measurable triggers</p>';
+
+    const inv = (d.invalidation?.items || []).map((i) => `<li>${escapeHtml(i.text)}</li>`).join('');
+    const strong = (d.strongestFactors || []).map((s) => `<li>${escapeHtml(s.text)}</li>`).join('') || '<li class="muted">—</li>';
+    const weak = (d.weakestFactors || []).map((s) => `<li>${escapeHtml(s.text)}</li>`).join('') || '<li class="muted">—</li>';
+    const comps = d.components || {};
+    const compHtml = Object.entries(comps).map(([k, v]) => `
+      <div class="metric"><div class="k">${escapeHtml(k)}</div><div class="v">${v.available ? `${v.score}/${v.max}` : 'n/a'}</div></div>
+    `).join('');
+
+    const mobileStrip = ['MARKET', 'SECTOR', 'PRICE', 'OI', 'VOLUME', 'VWAP', 'OPTIONS', 'MTF', 'RISK'].map((cat) => {
+      const list = cats[cat] || [];
+      const fail = list.some((c) => c.status === 'FAIL');
+      const pass = list.filter((c) => c.status === 'PASS').length;
+      const icon = fail ? '❌' : pass > 0 ? '✅' : '⚠️';
+      return `<div>${escapeHtml(cat)} ${icon}</div>`;
+    }).join('');
+
+    $('#opp-detail').classList.remove('hidden');
+    $('#opp-detail').innerHTML = `
+      <div class="opp-detail-head">
+        <div>
+          <h2 class="view-title" style="margin:0">${escapeHtml(d.symbol)}</h2>
+          <p class="muted">${fmt(d.ltp)} · <span class="${clsDir(d.priceChangePct)}">${fmtPct(d.priceChangePct)}</span> · ${escapeHtml(d.sector || '')}</p>
+        </div>
+        <button type="button" id="opp-detail-close" class="ghost-btn" aria-label="Close">×</button>
+      </div>
+      <div class="opp-kpis">
+        <div class="metric"><div class="k">Opportunity</div><div class="v">${d.opportunityScore}/100</div></div>
+        <div class="metric"><div class="k">Confidence</div><div class="v">${d.confidence}%</div></div>
+        <div class="metric"><div class="k">Grade</div><div class="v">${escapeHtml(d.grade)}</div></div>
+        <div class="metric"><div class="k">Setup</div><div class="v">${escapeHtml(d.setup || '')}</div></div>
+        <div class="metric"><div class="k">Readiness</div><div class="v ${readinessClass(d.readiness?.status)}">${readinessLabel(d.readiness)}</div></div>
+        <div class="metric"><div class="k">Conflict</div><div class="v">${escapeHtml(d.conflict?.level || '—')}</div></div>
+      </div>
+      <div class="opp-mobile-strip">${mobileStrip}</div>
+      <h3 class="section-label">Why this opportunity?</h3>
+      <p>${escapeHtml(d.why || '')}</p>
+      <h3 class="section-label">Score components</h3>
+      <div class="opp-kpis">${compHtml}</div>
+      <h3 class="section-label">What to wait for</h3>
+      ${d.readiness?.status === 'READY'
+        ? '<p class="opp-ready">Major confirmation conditions satisfied. READY is checklist confirmation only — not a trade guarantee.</p>'
+        : trig}
+      ${d.waitFor?.topTrigger ? `<p class="muted tiny">Top trigger: ${escapeHtml(d.waitFor.topTrigger.label)} — ${escapeHtml(d.waitFor.topTrigger.why || '')}</p>` : ''}
+      ${d.waitFor?.scenario ? `<p class="muted tiny">If conditions improve (scenario estimate): score ~${d.waitFor.scenario.potentialScore}, confidence ~${d.waitFor.scenario.potentialConfidence}%. Not a prediction.</p>` : ''}
+      <h3 class="section-label">Setup invalidation</h3>
+      <p class="muted">${escapeHtml(d.invalidation?.summary || '')}</p>
+      <ul>${inv}</ul>
+      <h3 class="section-label">Conflict check</h3>
+      <p>Level: <strong>${escapeHtml(d.conflict?.level || '—')}</strong></p>
+      <div class="home-two-col">
+        <div><h4 class="section-label">Strongest</h4><ul>${strong}</ul></div>
+        <div><h4 class="section-label">Weakest</h4><ul>${weak}</ul></div>
+      </div>
+      <h3 class="section-label">Full checklist</h3>
+      ${catHtml}
+      <h3 class="section-label">Opportunity summary</h3>
+      <p>Direction <strong>${escapeHtml(d.direction)}</strong> · Setup <strong>${escapeHtml(d.setup)}</strong> · ${d.opportunityScore}/100 · ${d.confidence}% · ${escapeHtml(d.grade)} · ${readinessLabel(d.readiness)}</p>
+      ${d.expectedMove ? `<p class="muted">Expected move context: ${fmt(d.expectedMove.lower)} – ${fmt(d.expectedMove.upper)} (spot ${fmt(d.expectedMove.spot)})</p>` : '<p class="muted">Expected move: DATA UNAVAILABLE at stock level unless index chain attached</p>'}
+      <p class="disclaimer-inline tiny">${escapeHtml(d.disclaimer || '')}</p>
+    `;
+    $('#opp-detail-close')?.addEventListener('click', () => $('#opp-detail')?.classList.add('hidden'));
+    $('#opp-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function initTheme() {
+    const saved = localStorage.getItem('fno-theme') || 'auto';
+    document.documentElement.dataset.theme = saved;
+    const sel = $('#theme-select');
+    if (sel) sel.value = saved;
+    sel?.addEventListener('change', () => {
+      const v = sel.value || 'auto';
+      document.documentElement.dataset.theme = v;
+      localStorage.setItem('fno-theme', v);
+    });
+  }
+
   async function renderFuturesTable() {
     const env = await api('/api/fno/scanner');
     $('#futures-table tbody').innerHTML = (env.data || []).slice(0, 50).map((r) => `
@@ -1000,6 +1201,14 @@
     $('#dhan-form')?.addEventListener('submit', saveDhanCredentials);
     $('#dhan-test')?.addEventListener('click', testDhanCredentials);
     $('#dhan-clear')?.addEventListener('click', clearDhanCredentials);
+    $('#opp-filter')?.addEventListener('change', () => renderOpportunity());
+    $('#opp-sort')?.addEventListener('change', () => renderOpportunity());
+    $$('#opp-buckets .opp-bucket').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.oppBucket = btn.dataset.bucket || 'all';
+        renderOpportunity();
+      });
+    });
     $('#btn-refresh')?.addEventListener('click', async () => {
       await renderTicker();
       await loadView(state.view);
@@ -1010,7 +1219,7 @@
   function expandDesktopNav() {
     if (window.matchMedia('(min-width: 900px)').matches) {
       const nav = $('.bottom-nav');
-      const extras = ['heatmap', 'oi', 'sectors', 'scanner', 'fii', 'alerts', 'watch', 'settings', 'legacy'];
+      const extras = ['chain', 'heatmap', 'oi', 'sectors', 'scanner', 'fii', 'alerts', 'watch', 'settings', 'opportunity', 'legacy'];
       extras.forEach((id) => {
         if (nav.querySelector(`[data-nav="${id}"]`)) return;
         const b = document.createElement('button');
@@ -1023,6 +1232,7 @@
   }
 
   async function boot() {
+    initTheme();
     updateMarketSession();
     setInterval(updateMarketSession, 30_000);
     wireNav();
