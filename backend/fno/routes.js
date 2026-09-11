@@ -74,6 +74,7 @@ function createFnoRouter({ config }) {
       clientId: body.clientId,
       pin: body.pin,
       totpSecret: body.totpSecret,
+      accessToken: body.accessToken,
       persistEnv: Boolean(body.persistEnv),
       clearForceMock: body.clearForceMock !== false,
     });
@@ -82,6 +83,7 @@ function createFnoRouter({ config }) {
       config.clientId = service.config.clientId;
       config.pin = service.config.pin;
       config.totpSecret = service.config.totpSecret;
+      config.accessToken = service.config.accessToken;
       config.hasDhan = true;
     }
     return { data: status };
@@ -92,13 +94,14 @@ function createFnoRouter({ config }) {
       config.clientId = '';
       config.pin = '';
       config.totpSecret = '';
+      config.accessToken = '';
       config.hasDhan = false;
     }
     return { data: status };
   }));
   router.post('/credentials/dhan/test', express.json(), wrap(async (req) => {
     const body = req.body || {};
-    const hasOverride = body.clientId || body.pin || body.totpSecret;
+    const hasOverride = body.clientId || body.pin || body.totpSecret || body.accessToken;
     const result = await service.testDhanCredentials(hasOverride ? body : null);
     return { data: result };
   }));

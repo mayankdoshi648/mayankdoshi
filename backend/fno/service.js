@@ -30,7 +30,10 @@ class FnoService {
     this._smartMoneyPrev = new Map();
     /** @type {Map<string, Array<{at:string,score:number,confidence:number,priceChangePct:number|null,oiChangePct:number|null,relativeVolume:number|null,ltp:number|null}>>} */
     this._smartMoneyHistory = new Map();
-    this._credentialSource = (config?.clientId && config?.pin && config?.totpSecret) ? 'env' : 'none';
+    this._credentialSource = (
+      (config?.clientId && config?.accessToken)
+      || (config?.clientId && config?.pin && config?.totpSecret)
+    ) ? 'env' : 'none';
   }
 
   _getCache(key) {
@@ -856,12 +859,16 @@ class FnoService {
   }
 
   getDhanStatus() {
-    const has = Boolean(this.config?.clientId && this.config?.pin && this.config?.totpSecret);
+    const hasStatic = Boolean(this.config?.clientId && this.config?.accessToken);
+    const hasLogin = Boolean(this.config?.clientId && this.config?.pin && this.config?.totpSecret);
+    const has = hasStatic || hasLogin;
     const id = this.config?.clientId || '';
     const forceMock = process.env.FNO_FORCE_MOCK === '1';
     let note = 'No Dhan credentials — using NSE public / labeled mock';
     if (has && forceMock) {
       note = 'Dhan credentials present but FNO_FORCE_MOCK=1 — labeled mock only. Save again or unset force mock for live pull.';
+    } else if (hasStatic) {
+      note = 'Dhan client id + access token configured — hybrid provider can pull live option chain / quotes';
     } else if (has) {
       note = 'Dhan credentials configured — hybrid provider can pull live option chain / quotes';
     }
@@ -869,6 +876,7 @@ class FnoService {
       hasDhan: has,
       liveCapable: has && !forceMock,
       source: this._credentialSource || (has ? 'env' : 'none'),
+      authMode: hasStatic ? 'access_token' : (hasLogin ? 'pin_totp' : null),
       clientIdMasked: id.length > 4 ? `${id.slice(0, 2)}••••${id.slice(-2)}` : (id ? '••••' : null),
       forceMock,
       provider: this.provider?.name || null,
@@ -879,24 +887,46 @@ class FnoService {
   /**
    * Apply Dhan credentials at runtime and rebuild the market-data provider.
    * Secrets are kept in-memory (and optionally written to process.env); never returned by GET.
+   * Accepts either accessToken+clientId OR clientId+pin+totpSecret.
    */
-  setDhanCredentials({ clientId, pin, totpSecret, persistEnv = false, clearForceMock = true } = {}) {
+  setDhanCredentials({
+    clientId,
+    pin,
+    totpSecret,
+    accessToken,
+    persistEnv = false,
+    clearForceMock = true,
+  } = {}) {
     const cid = String(clientId || '').trim();
     const p = String(pin || '').trim();
     const secret = String(totpSecret || '').trim().replace(/\s+/g, '');
-    if (!cid || !p || !secret) {
-      throw new Error('clientId, pin, and totpSecret are required');
+    const token = String(accessToken || '').trim();
+    const useStatic = Boolean(cid && token);
+    const useLogin = Boolean(cid && p && secret);
+    if (!useStatic && !useLogin) {
+      throw new Error('Provide clientId + accessToken, or clientId + pin + totpSecret');
     }
     this.config = this.config || {};
     this.config.clientId = cid;
-    this.config.pin = p;
-    this.config.totpSecret = secret;
+    if (useStatic) {
+      this.config.accessToken = token;
+      // Keep optional login secrets if already present; not required for live.
+      if (p) this.config.pin = p;
+      if (secret) this.config.totpSecret = secret;
+    } else {
+      this.config.pin = p;
+      this.config.totpSecret = secret;
+    }
     this.config.hasDhan = true;
     this._credentialSource = 'runtime';
 
     process.env.DHAN_CLIENT_ID = cid;
-    process.env.DHAN_PIN = p;
-    process.env.DHAN_TOTP_SECRET = secret;
+    if (useStatic) {
+      process.env.DHAN_ACCESS_TOKEN = token;
+    } else {
+      process.env.DHAN_PIN = p;
+      process.env.DHAN_TOTP_SECRET = secret;
+    }
     if (clearForceMock) delete process.env.FNO_FORCE_MOCK;
 
     this.provider = createProvider({ config: this.config, preferMock: false });
@@ -904,7 +934,12 @@ class FnoService {
 
     if (persistEnv) {
       try {
-        persistDhanEnv({ clientId: cid, pin: p, totpSecret: secret });
+        persistDhanEnv({
+          clientId: cid,
+          pin: useLogin ? p : undefined,
+          totpSecret: useLogin ? secret : undefined,
+          accessToken: useStatic ? token : undefined,
+        });
       } catch (err) {
         return {
           ...this.getDhanStatus(),
@@ -922,11 +957,13 @@ class FnoService {
       this.config.clientId = '';
       this.config.pin = '';
       this.config.totpSecret = '';
+      this.config.accessToken = '';
       this.config.hasDhan = false;
     }
     delete process.env.DHAN_CLIENT_ID;
     delete process.env.DHAN_PIN;
     delete process.env.DHAN_TOTP_SECRET;
+    delete process.env.DHAN_ACCESS_TOKEN;
     this._credentialSource = 'none';
     this.provider = createProvider({ config: this.config || {}, preferMock: false });
     this.cache.clear();
@@ -940,26 +977,40 @@ class FnoService {
         clientId: String(override.clientId || '').trim(),
         pin: String(override.pin || '').trim(),
         totpSecret: String(override.totpSecret || '').trim().replace(/\s+/g, ''),
+        accessToken: String(override.accessToken || '').trim(),
       }
       : {
         clientId: this.config?.clientId,
         pin: this.config?.pin,
         totpSecret: this.config?.totpSecret,
+        accessToken: this.config?.accessToken,
       };
+
+    if (cfg.clientId && cfg.accessToken) {
+      return {
+        ok: true,
+        expiryTime: this.config?.accessTokenExpiry || null,
+        tokenPreview: `${String(cfg.accessToken).slice(0, 4)}…`,
+        authMode: 'access_token',
+        message: 'Static Dhan access token accepted (PIN/TOTP not required)',
+      };
+    }
+
     if (!cfg.clientId || !cfg.pin || !cfg.totpSecret) {
-      throw new Error('Dhan credentials missing');
+      throw new Error('Dhan credentials missing — need clientId + accessToken, or pin + totpSecret');
     }
     const { accessToken, expiryTime } = await fetchAccessToken(cfg);
     return {
       ok: true,
       expiryTime: expiryTime || null,
       tokenPreview: accessToken ? `${String(accessToken).slice(0, 4)}…` : null,
+      authMode: 'pin_totp',
       message: 'Dhan access token generated successfully',
     };
   }
 }
 
-function persistDhanEnv({ clientId, pin, totpSecret }) {
+function persistDhanEnv({ clientId, pin, totpSecret, accessToken }) {
   const fs = require('fs');
   const path = require('path');
   const envPath = path.join(process.cwd(), '.env');
@@ -970,14 +1021,16 @@ function persistDhanEnv({ clientId, pin, totpSecret }) {
     text = '';
   }
   const upsert = (key, value) => {
+    if (value === undefined || value === null) return;
     const line = `${key}=${value}`;
     const re = new RegExp(`^${key}=.*$`, 'm');
     if (re.test(text)) text = text.replace(re, line);
     else text = `${text.trimEnd()}\n${line}\n`;
   };
   upsert('DHAN_CLIENT_ID', clientId);
-  upsert('DHAN_PIN', pin);
-  upsert('DHAN_TOTP_SECRET', totpSecret);
+  if (accessToken) upsert('DHAN_ACCESS_TOKEN', accessToken);
+  if (pin) upsert('DHAN_PIN', pin);
+  if (totpSecret) upsert('DHAN_TOTP_SECRET', totpSecret);
   fs.writeFileSync(envPath, text.endsWith('\n') ? text : `${text}\n`, 'utf8');
 }
 

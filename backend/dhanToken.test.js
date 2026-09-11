@@ -29,6 +29,23 @@ test('token manager caches access token', async () => {
   assert.equal(tm.getStatus().mode, 'live');
 });
 
+test('token manager uses static access token without login fetch', async () => {
+  let calls = 0;
+  const tm = createTokenManager({
+    config: { clientId: 'c', accessToken: 'static-tok' },
+    fetchTokenFn: async () => {
+      calls += 1;
+      return { accessToken: 'should-not-run' };
+    },
+  });
+  const a = await tm.getAccessToken();
+  assert.equal(a.accessToken, 'static-tok');
+  assert.equal(a.source, 'static');
+  assert.equal(calls, 0);
+  assert.equal(tm.getStatus().authMode, 'access_token');
+  assert.equal(tm.getStatus().authenticated, true);
+});
+
 test('token manager force refresh', async () => {
   let calls = 0;
   const tm = createTokenManager({

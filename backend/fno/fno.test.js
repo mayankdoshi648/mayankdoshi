@@ -148,8 +148,27 @@ describe('mock provider + service', () => {
     const service = new FnoService({ provider: new MockProvider() });
     assert.throws(
       () => service.setDhanCredentials({ clientId: '1', pin: '', totpSecret: '' }),
-      /required/i,
+      /accessToken|pin|totp/i,
     );
+  });
+
+  it('accepts clientId + accessToken without PIN/TOTP', () => {
+    const prevForce = process.env.FNO_FORCE_MOCK;
+    delete process.env.FNO_FORCE_MOCK;
+    const service = new FnoService({
+      config: { clientId: '', pin: '', totpSecret: '', accessToken: '', hasDhan: false },
+      provider: new MockProvider(),
+    });
+    const status = service.setDhanCredentials({
+      clientId: '1100110011',
+      accessToken: 'eyJhbGciOi.static.token',
+      persistEnv: false,
+    });
+    assert.equal(status.hasDhan, true);
+    assert.equal(status.authMode, 'access_token');
+    assert.equal(status.liveCapable, true);
+    if (prevForce != null) process.env.FNO_FORCE_MOCK = prevForce;
+    else delete process.env.FNO_FORCE_MOCK;
   });
 
   it('testDhanCredentials uses auth helper', async () => {
@@ -167,6 +186,16 @@ describe('mock provider + service', () => {
     } finally {
       dhanAuth.fetchAccessToken = orig;
     }
+  });
+
+  it('testDhanCredentials accepts static access token', async () => {
+    const service = new FnoService({
+      config: { clientId: '1100110011', accessToken: 'statictoken123' },
+      provider: new MockProvider(),
+    });
+    const result = await service.testDhanCredentials();
+    assert.equal(result.ok, true);
+    assert.equal(result.authMode, 'access_token');
   });
 
   it('opportunity board returns ranked checklist rows', async () => {

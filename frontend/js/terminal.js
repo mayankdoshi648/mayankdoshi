@@ -938,6 +938,7 @@
   function readDhanForm() {
     return {
       clientId: $('#dhan-client-id')?.value.trim() || '',
+      accessToken: ($('#dhan-access-token')?.value || '').trim(),
       pin: $('#dhan-pin')?.value.trim() || '',
       totpSecret: ($('#dhan-totp')?.value || '').trim().replace(/\s+/g, ''),
       persistEnv: Boolean($('#dhan-persist')?.checked),
@@ -984,8 +985,10 @@
   async function saveDhanCredentials(ev) {
     ev?.preventDefault?.();
     const body = readDhanForm();
-    if (!body.clientId || !body.pin || !body.totpSecret) {
-      setDhanMsg('Client ID, PIN, and TOTP secret are required', false);
+    const hasToken = Boolean(body.clientId && body.accessToken);
+    const hasLogin = Boolean(body.clientId && body.pin && body.totpSecret);
+    if (!hasToken && !hasLogin) {
+      setDhanMsg('Need Client ID + Access token, or Client ID + PIN + TOTP secret', false);
       return;
     }
     setDhanMsg('Saving…');
@@ -999,6 +1002,7 @@
       const persistNote = env.data?.persisted
         ? 'Saved to memory + .env'
         : (env.data?.persistError ? `Saved in memory; .env write failed: ${env.data.persistError}` : 'Saved in memory for this process');
+      if ($('#dhan-access-token')) $('#dhan-access-token').value = '';
       $('#dhan-pin').value = '';
       $('#dhan-totp').value = '';
       await renderTicker();
@@ -1014,6 +1018,7 @@
       const env = await api('/api/fno/credentials/dhan', { method: 'DELETE' });
       paintDhanStatus(env.data);
       $('#dhan-client-id').value = '';
+      if ($('#dhan-access-token')) $('#dhan-access-token').value = '';
       $('#dhan-pin').value = '';
       $('#dhan-totp').value = '';
       setDhanMsg('Credentials cleared — using NSE public / mock', true);

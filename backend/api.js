@@ -40,7 +40,10 @@ function createApiRouter({
       feedConnected: connectionStatus.isConnected(),
       lastError: connectionStatus.getLastError(),
       darvaxAutoTrade: config?.darvaxAutoTrade ?? false,
-      hasDhan: Boolean(config?.clientId && config?.pin && config?.totpSecret),
+      hasDhan: Boolean(
+        (config?.clientId && config?.accessToken)
+        || (config?.clientId && config?.pin && config?.totpSecret)
+      ),
       auth,
       dashboardMode: stockDashboard?.isDemo?.() ? 'demo' : 'live',
     });
@@ -334,7 +337,8 @@ function createApiRouter({
       const securityId = instrumentMapCache.get(order.symbol);
       if (!securityId) throw new Error(`No Dhan securityId for ${order.symbol}`);
 
-      const { accessToken } = await fetchAccessToken(cfg);
+      const accessToken = cfg.accessToken
+        || (await fetchAccessToken(cfg)).accessToken;
       const dhanResp = await placeDhanOrder({
         accessToken,
         clientId: cfg.clientId,

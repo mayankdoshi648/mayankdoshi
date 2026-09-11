@@ -1,16 +1,25 @@
 // backend/config.js
 require('dotenv').config();
 
+function hasLoginCredentials(cfg) {
+  return Boolean(cfg?.clientId && cfg?.pin && cfg?.totpSecret);
+}
+
+function hasStaticAccessToken(cfg) {
+  return Boolean(cfg?.clientId && cfg?.accessToken);
+}
+
+function hasDhanCredentials(cfg) {
+  return hasStaticAccessToken(cfg) || hasLoginCredentials(cfg);
+}
+
 function buildConfig({ requireDhan = true } = {}) {
-  const required = ['DHAN_CLIENT_ID', 'DHAN_PIN', 'DHAN_TOTP_SECRET'];
-  const missing = required.filter((key) => !process.env[key]);
-  if (requireDhan && missing.length > 0) {
-    throw new Error(`Missing required env vars: ${missing.join(', ')}. Copy .env.example to .env and fill it in.`);
-  }
-  return {
+  const cfg = {
     clientId: process.env.DHAN_CLIENT_ID || '',
     pin: process.env.DHAN_PIN || '',
     totpSecret: process.env.DHAN_TOTP_SECRET || '',
+    accessToken: process.env.DHAN_ACCESS_TOKEN || '',
+    accessTokenExpiry: process.env.DHAN_ACCESS_TOKEN_EXPIRY || '',
     port: Number(process.env.PORT || 3000),
     forceDemo: process.env.DEMO_MODE === 'true',
     darvaxAutoTrade: process.env.DARVAX_AUTO_TRADE === 'true',
@@ -25,12 +34,15 @@ function buildConfig({ requireDhan = true } = {}) {
     telegramMinScore: Number(process.env.TELEGRAM_MIN_SCORE || 85),
     telegramBreakoutMinScore: Number(process.env.TELEGRAM_BREAKOUT_MIN_SCORE || 70),
     fundamentalsMaxFetch: Number(process.env.FUNDAMENTALS_MAX_FETCH || 30),
-    hasDhan: missing.length === 0,
   };
-}
+  cfg.hasDhan = hasDhanCredentials(cfg);
 
-function hasDhanCredentials(cfg = buildConfig({ requireDhan: false })) {
-  return Boolean(cfg.clientId && cfg.pin && cfg.totpSecret);
+  if (requireDhan && !cfg.hasDhan) {
+    throw new Error(
+      'Missing Dhan credentials. Set DHAN_CLIENT_ID + DHAN_ACCESS_TOKEN, or DHAN_CLIENT_ID + DHAN_PIN + DHAN_TOTP_SECRET.'
+    );
+  }
+  return cfg;
 }
 
 function loadConfig() {
@@ -54,5 +66,7 @@ module.exports = {
   loadConfigOptional,
   buildConfig,
   hasDhanCredentials,
+  hasLoginCredentials,
+  hasStaticAccessToken,
   baseConfig,
 };
