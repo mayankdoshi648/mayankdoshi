@@ -46,6 +46,13 @@ function createFnoRouter({ config }) {
     return { data: history, meta: { asOf: new Date().toISOString() } };
   }));
   router.get('/smart-money/:symbol', wrap((req) => service.getSmartMoneyDetail(req.params.symbol)));
+  router.get('/opportunity', wrap((req) => service.getOpportunityBoard({
+    filter: req.query.filter || null,
+    sort: req.query.sort || 'opportunityScore',
+    dir: req.query.dir || 'desc',
+    limit: Number(req.query.limit || 80),
+  })));
+  router.get('/opportunity/:symbol', wrap((req) => service.getOpportunityDetail(req.params.symbol)));
   router.get('/sectors', wrap(() => service.getSectorAnalysis()));
   router.get('/sectors/:sector', wrap((req) => service.getSectorStocks(req.params.sector)));
   router.get('/fii-dii', wrap(() => service.getFiiDii()));

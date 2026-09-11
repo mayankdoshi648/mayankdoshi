@@ -21,6 +21,7 @@ On static hosts the app runs in **labeled MOCK / static-demo mode** (full UI + S
 | F&O | Long/short buildup scanners |
 | Options | Chain, PCR, max pain, expected move |
 | Scan | Smart Money Proxy rankings |
+| Opp | Opportunity checklist / trade readiness |
 | Heatmap | Sector Smart Money → stock drill-down |
 | Dhan API | In-app Client ID / PIN / TOTP → live option chain (Node server only) |
 | WHY drawer | Explainable positioning checklist |
@@ -76,6 +77,7 @@ Never commit `.env`. PIN / TOTP are never returned by `GET /api/fno/credentials/
 - `GET /api/fno/option-chain/:underlying?expiry=`
 - `GET /api/fno/scanner` · `/buildups` · `/smart-money` · `/sectors`
 - `GET /api/fno/fii-dii` · `/alerts` · `/watchlist`
+- `GET /api/fno/opportunity` · `/opportunity/:symbol` — trade-readiness checklist
 - `GET|PUT|DELETE /api/fno/credentials/dhan` · `POST …/test` — runtime Dhan API credentials
 - Existing: `/api/signals`, `/api/darvax/*`, `/api/overview`, `/api/breadth`
 

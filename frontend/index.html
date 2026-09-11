@@ -14,6 +14,14 @@
     <div class="brand" aria-label="Brand">F&amp;O TERMINAL</div>
     <div id="market-session" class="market-session">SESSION · —</div>
     <div id="data-meta" class="data-meta">—</div>
+    <label class="theme-toggle" title="Theme">
+      <span class="sr-only">Theme</span>
+      <select id="theme-select" aria-label="Color theme">
+        <option value="auto">Auto</option>
+        <option value="night">Night</option>
+        <option value="light">Light</option>
+      </select>
+    </label>
     <button type="button" id="btn-refresh" class="btn btn-refresh" title="Refresh">↻</button>
   </header>
 
@@ -56,6 +64,7 @@
             </div>
           </div>
           <button type="button" class="btn accent block-cta" data-jump="heatmap">Smart Money Heatmap →</button>
+          <button type="button" class="btn block-cta" data-jump="opportunity">Opportunity Checklist →</button>
         </article>
 
         <article class="home-block">
@@ -221,6 +230,80 @@
         <div id="smart-detail-body"></div>
       </div>
       </div>
+    </section>
+
+    <!-- OPPORTUNITY / TRADE READINESS -->
+    <section class="view" data-view="opportunity">
+      <h1 class="view-title">Opportunity</h1>
+      <p class="disclaimer-inline tiny">Decision-support checklist — not buy/sell advice. READY means confirmations passed, not guaranteed profit.</p>
+
+      <div class="opp-buckets" id="opp-buckets">
+        <button type="button" class="opp-bucket active" data-bucket="all">All</button>
+        <button type="button" class="opp-bucket" data-bucket="READY_NOW">Ready now</button>
+        <button type="button" class="opp-bucket" data-bucket="EARLY">Early</button>
+        <button type="button" class="opp-bucket" data-bucket="CONFLICTED">Conflicted</button>
+        <button type="button" class="opp-bucket" data-bucket="AVOID">Avoid</button>
+      </div>
+
+      <div class="home-block">
+        <h2 class="section-label">Top opportunities</h2>
+        <div id="opp-top" class="opp-top-grid"></div>
+      </div>
+
+      <div class="home-block">
+        <h2 class="section-label">Opportunities to watch</h2>
+        <div id="opp-watch" class="signal-list"></div>
+      </div>
+
+      <div class="filters opp-filters">
+        <select id="opp-filter" aria-label="Filter">
+          <option value="">All filters</option>
+          <option value="A+">A+ only</option>
+          <option value="A">A and A+</option>
+          <option value="BULLISH">Bullish</option>
+          <option value="BEARISH">Bearish</option>
+          <option value="LONG_BUILDUP">Long Buildup</option>
+          <option value="SHORT_COVERING">Short Covering</option>
+          <option value="SHORT_BUILDUP">Short Buildup</option>
+          <option value="LONG_UNWINDING">Long Unwinding</option>
+          <option value="HIGH_CONFIDENCE">High Confidence</option>
+          <option value="HIGH_VOLUME">High Volume</option>
+          <option value="ABOVE_VWAP">Above VWAP</option>
+          <option value="STRONG_SECTOR">Strong Sector</option>
+          <option value="READY">Ready</option>
+          <option value="EARLY">Early / Watch</option>
+        </select>
+        <select id="opp-sort" aria-label="Sort">
+          <option value="opportunityScore">Opportunity Score</option>
+          <option value="smartMoneyScore">Smart Money</option>
+          <option value="confidence">Confidence</option>
+          <option value="volume">Volume / RVOL</option>
+          <option value="sectorStrength">Sector Strength</option>
+          <option value="momentum">Momentum</option>
+          <option value="dayPct">Day %</option>
+          <option value="oiSignal">OI Signal</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table id="opp-table" class="dense-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Stock</th><th>CMP</th><th>Day%</th><th>SM</th><th>Conf</th>
+              <th>OI</th><th>Sector</th><th>RVol</th><th>VWAP</th><th>Opt</th><th>Mom</th>
+              <th>Opp</th><th>Grade</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="home-block">
+        <h2 class="section-label">Score × Confidence map</h2>
+        <div id="opp-heatmap" class="opp-heatmap" aria-label="Opportunity heatmap"></div>
+      </div>
+
+      <div id="opp-detail" class="opp-detail hidden" aria-live="polite"></div>
     </section>
 
     <!-- HEATMAP -->
@@ -479,7 +562,7 @@
   <nav class="bottom-nav" aria-label="Primary">
     <button type="button" data-nav="overview" class="active"><span>⌂</span>Home</button>
     <button type="button" data-nav="intel"><span>▣</span>F&amp;O</button>
-    <button type="button" data-nav="chain"><span>☰</span>Options</button>
+    <button type="button" data-nav="opportunity"><span>◎</span>Opp</button>
     <button type="button" data-nav="smart"><span>◆</span>Scan</button>
     <button type="button" data-nav="more"><span>⋯</span>More</button>
   </nav>
@@ -490,6 +573,8 @@
         <span>More</span>
         <button type="button" id="sheet-close" class="btn">Close</button>
       </div>
+      <button type="button" data-nav="chain">Options Chain</button>
+      <button type="button" data-nav="opportunity">Opportunity Checklist</button>
       <button type="button" data-nav="settings">Dhan API (live data)</button>
       <button type="button" data-nav="heatmap">Smart Money Heatmap</button>
       <button type="button" data-nav="sectors">Sectors</button>
