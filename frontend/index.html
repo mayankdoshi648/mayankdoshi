@@ -243,6 +243,37 @@
       </div>
     </section>
 
+    <!-- SETTINGS / DHAN -->
+    <section class="view" data-view="settings">
+      <h1 class="view-title">Dhan API</h1>
+      <p class="disclaimer-inline tiny">Enter Dhan Client ID, PIN, and TOTP secret so the Node server can pull live option chains. Secrets are never shown after save. Static hosts (GitHub Pages / Vercel) stay mock-only — run <code>npm start</code> locally for live data.</p>
+      <div id="dhan-status" class="dhan-status muted">Checking credentials…</div>
+      <form id="dhan-form" class="dhan-form" autocomplete="off">
+        <label>
+          <span>Client ID</span>
+          <input id="dhan-client-id" name="clientId" type="text" inputmode="numeric" placeholder="Dhan client id" required>
+        </label>
+        <label>
+          <span>PIN</span>
+          <input id="dhan-pin" name="pin" type="password" placeholder="App PIN" required>
+        </label>
+        <label>
+          <span>TOTP secret</span>
+          <input id="dhan-totp" name="totpSecret" type="password" placeholder="Base32 TOTP secret" required>
+        </label>
+        <label class="dhan-check">
+          <input id="dhan-persist" type="checkbox" checked>
+          <span>Also write to server <code>.env</code> (survives restart)</span>
+        </label>
+        <div class="row-actions dhan-actions">
+          <button type="button" id="dhan-test" class="btn">Test</button>
+          <button type="submit" id="dhan-save" class="btn accent">Save &amp; use live</button>
+          <button type="button" id="dhan-clear" class="btn">Clear</button>
+        </div>
+      </form>
+      <p id="dhan-msg" class="dhan-msg muted" role="status"></p>
+    </section>
+
     <!-- SECTORS -->
     <section class="view" data-view="sectors">
       <h1 class="view-title">Sector Positioning</h1>
@@ -454,6 +485,7 @@
         <span>More</span>
         <button type="button" id="sheet-close" class="btn">Close</button>
       </div>
+      <button type="button" data-nav="settings">Dhan API (live data)</button>
       <button type="button" data-nav="heatmap">Smart Money Heatmap</button>
       <button type="button" data-nav="sectors">Sectors</button>
       <button type="button" data-nav="fii">FII / DII</button>

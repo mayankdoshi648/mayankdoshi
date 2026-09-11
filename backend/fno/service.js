@@ -29,6 +29,7 @@ class FnoService {
     this._smartMoneyPrev = new Map();
     /** @type {Map<string, Array<{at:string,score:number,confidence:number,priceChangePct:number|null,oiChangePct:number|null,relativeVolume:number|null,ltp:number|null}>>} */
     this._smartMoneyHistory = new Map();
+    this._credentialSource = (config?.clientId && config?.pin && config?.totpSecret) ? 'env' : 'none';
   }
 
   _getCache(key) {
@@ -760,6 +761,131 @@ class FnoService {
   getAlertHistory() {
     return this.alertHistory;
   }
+
+  getDhanStatus() {
+    const has = Boolean(this.config?.clientId && this.config?.pin && this.config?.totpSecret);
+    const id = this.config?.clientId || '';
+    const forceMock = process.env.FNO_FORCE_MOCK === '1';
+    let note = 'No Dhan credentials — using NSE public / labeled mock';
+    if (has && forceMock) {
+      note = 'Dhan credentials present but FNO_FORCE_MOCK=1 — labeled mock only. Save again or unset force mock for live pull.';
+    } else if (has) {
+      note = 'Dhan credentials configured — hybrid provider can pull live option chain / quotes';
+    }
+    return {
+      hasDhan: has,
+      liveCapable: has && !forceMock,
+      source: this._credentialSource || (has ? 'env' : 'none'),
+      clientIdMasked: id.length > 4 ? `${id.slice(0, 2)}••••${id.slice(-2)}` : (id ? '••••' : null),
+      forceMock,
+      provider: this.provider?.name || null,
+      note,
+    };
+  }
+
+  /**
+   * Apply Dhan credentials at runtime and rebuild the market-data provider.
+   * Secrets are kept in-memory (and optionally written to process.env); never returned by GET.
+   */
+  setDhanCredentials({ clientId, pin, totpSecret, persistEnv = false, clearForceMock = true } = {}) {
+    const cid = String(clientId || '').trim();
+    const p = String(pin || '').trim();
+    const secret = String(totpSecret || '').trim().replace(/\s+/g, '');
+    if (!cid || !p || !secret) {
+      throw new Error('clientId, pin, and totpSecret are required');
+    }
+    this.config = this.config || {};
+    this.config.clientId = cid;
+    this.config.pin = p;
+    this.config.totpSecret = secret;
+    this.config.hasDhan = true;
+    this._credentialSource = 'runtime';
+
+    process.env.DHAN_CLIENT_ID = cid;
+    process.env.DHAN_PIN = p;
+    process.env.DHAN_TOTP_SECRET = secret;
+    if (clearForceMock) delete process.env.FNO_FORCE_MOCK;
+
+    this.provider = createProvider({ config: this.config, preferMock: false });
+    this.cache.clear();
+
+    if (persistEnv) {
+      try {
+        persistDhanEnv({ clientId: cid, pin: p, totpSecret: secret });
+      } catch (err) {
+        return {
+          ...this.getDhanStatus(),
+          persisted: false,
+          persistError: err.message,
+        };
+      }
+    }
+
+    return { ...this.getDhanStatus(), persisted: Boolean(persistEnv) };
+  }
+
+  clearDhanCredentials() {
+    if (this.config) {
+      this.config.clientId = '';
+      this.config.pin = '';
+      this.config.totpSecret = '';
+      this.config.hasDhan = false;
+    }
+    delete process.env.DHAN_CLIENT_ID;
+    delete process.env.DHAN_PIN;
+    delete process.env.DHAN_TOTP_SECRET;
+    this._credentialSource = 'none';
+    this.provider = createProvider({ config: this.config || {}, preferMock: false });
+    this.cache.clear();
+    return this.getDhanStatus();
+  }
+
+  async testDhanCredentials(override = null) {
+    const { fetchAccessToken } = require('../dhanAuth');
+    const cfg = override
+      ? {
+        clientId: String(override.clientId || '').trim(),
+        pin: String(override.pin || '').trim(),
+        totpSecret: String(override.totpSecret || '').trim().replace(/\s+/g, ''),
+      }
+      : {
+        clientId: this.config?.clientId,
+        pin: this.config?.pin,
+        totpSecret: this.config?.totpSecret,
+      };
+    if (!cfg.clientId || !cfg.pin || !cfg.totpSecret) {
+      throw new Error('Dhan credentials missing');
+    }
+    const { accessToken, expiryTime } = await fetchAccessToken(cfg);
+    return {
+      ok: true,
+      expiryTime: expiryTime || null,
+      tokenPreview: accessToken ? `${String(accessToken).slice(0, 4)}…` : null,
+      message: 'Dhan access token generated successfully',
+    };
+  }
+}
+
+function persistDhanEnv({ clientId, pin, totpSecret }) {
+  const fs = require('fs');
+  const path = require('path');
+  const envPath = path.join(process.cwd(), '.env');
+  let text = '';
+  try {
+    text = fs.readFileSync(envPath, 'utf8');
+  } catch {
+    text = '';
+  }
+  const upsert = (key, value) => {
+    const line = `${key}=${value}`;
+    const re = new RegExp(`^${key}=.*$`, 'm');
+    if (re.test(text)) text = text.replace(re, line);
+    else text = `${text.trimEnd()}\n${line}\n`;
+  };
+  upsert('DHAN_CLIENT_ID', clientId);
+  upsert('DHAN_PIN', pin);
+  upsert('DHAN_TOTP_SECRET', totpSecret);
+  fs.writeFileSync(envPath, text.endsWith('\n') ? text : `${text}\n`, 'utf8');
 }
 
 function defaultAlertRules() {

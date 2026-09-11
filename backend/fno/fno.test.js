@@ -111,4 +111,61 @@ describe('mock provider + service', () => {
     const alerts = await service.evaluateAlerts();
     assert.ok(Array.isArray(alerts.data.alerts));
   });
+
+  it('dhan credentials status / set / clear (no secrets in status)', () => {
+    const prevForce = process.env.FNO_FORCE_MOCK;
+    delete process.env.FNO_FORCE_MOCK;
+    const service = new FnoService({
+      config: { clientId: '', pin: '', totpSecret: '', hasDhan: false },
+      provider: new MockProvider(),
+    });
+    assert.equal(service.getDhanStatus().hasDhan, false);
+    assert.equal(service.getDhanStatus().liveCapable, false);
+
+    const status = service.setDhanCredentials({
+      clientId: '1100110011',
+      pin: '1234',
+      totpSecret: 'JBSWY3DPEHPK3PXP',
+      persistEnv: false,
+    });
+    assert.equal(status.hasDhan, true);
+    assert.equal(status.liveCapable, true);
+    assert.equal(status.source, 'runtime');
+    assert.equal(status.clientIdMasked, '11••••11');
+    assert.equal(status.pin, undefined);
+    assert.equal(status.totpSecret, undefined);
+    assert.ok(service.provider?.name === 'hybrid' || service.provider?.name === 'dhan' || service.provider?.name);
+
+    service.clearDhanCredentials();
+    assert.equal(service.getDhanStatus().hasDhan, false);
+    assert.equal(service.getDhanStatus().source, 'none');
+
+    if (prevForce != null) process.env.FNO_FORCE_MOCK = prevForce;
+    else delete process.env.FNO_FORCE_MOCK;
+  });
+
+  it('rejects incomplete dhan credentials', () => {
+    const service = new FnoService({ provider: new MockProvider() });
+    assert.throws(
+      () => service.setDhanCredentials({ clientId: '1', pin: '', totpSecret: '' }),
+      /required/i,
+    );
+  });
+
+  it('testDhanCredentials uses auth helper', async () => {
+    const dhanAuth = require('../dhanAuth');
+    const orig = dhanAuth.fetchAccessToken;
+    dhanAuth.fetchAccessToken = async () => ({ accessToken: 'abcdTOKEN', expiryTime: '2099-01-01T00:00:00Z' });
+    try {
+      const service = new FnoService({
+        config: { clientId: '1100110011', pin: '1234', totpSecret: 'JBSWY3DPEHPK3PXP' },
+        provider: new MockProvider(),
+      });
+      const result = await service.testDhanCredentials();
+      assert.equal(result.ok, true);
+      assert.match(result.tokenPreview, /^abcd/);
+    } finally {
+      dhanAuth.fetchAccessToken = orig;
+    }
+  });
 });
