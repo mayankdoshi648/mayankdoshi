@@ -12,6 +12,7 @@ function buildConfig({ requireDhan = true } = {}) {
     pin: process.env.DHAN_PIN || '',
     totpSecret: process.env.DHAN_TOTP_SECRET || '',
     port: Number(process.env.PORT || 3000),
+    forceDemo: process.env.DEMO_MODE === 'true',
     darvaxAutoTrade: process.env.DARVAX_AUTO_TRADE === 'true',
     darvaxRiskPct: Number(process.env.DARVAX_RISK_PCT || 1),
     darvaxCapital: Number(process.env.DARVAX_CAPITAL || 1000000),
@@ -28,6 +29,10 @@ function buildConfig({ requireDhan = true } = {}) {
   };
 }
 
+function hasDhanCredentials(cfg = buildConfig({ requireDhan: false })) {
+  return Boolean(cfg.clientId && cfg.pin && cfg.totpSecret);
+}
+
 function loadConfig() {
   try {
     return buildConfig({ requireDhan: true });
@@ -40,4 +45,14 @@ function loadConfigOptional() {
   return buildConfig({ requireDhan: false });
 }
 
-module.exports = { loadConfig, loadConfigOptional, buildConfig };
+function baseConfig() {
+  return buildConfig({ requireDhan: false });
+}
+
+module.exports = {
+  loadConfig,
+  loadConfigOptional,
+  buildConfig,
+  hasDhanCredentials,
+  baseConfig,
+};

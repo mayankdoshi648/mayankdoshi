@@ -3,7 +3,7 @@ const path = require('node:path');
 const express = require('express');
 const http = require('node:http');
 
-const { loadConfig } = require('./config');
+const { loadConfigOptional, hasDhanCredentials } = require('./config');
 const { isMarketOpen } = require('./marketWindow');
 const { openDb, insertSignal } = require('./db');
 const { evaluateSignal, MIN_CANDLES } = require('./signalEngine');
@@ -14,12 +14,20 @@ const { createApiRouter } = require('./api');
 const { createLiveSocketServer } = require('./liveSocket');
 const { createDhanFeed } = require('./dhanFeed');
 const { resolveNifty50InstrumentMap } = require('./instrumentMap');
-const { fetchAccessToken } = require('./dhanAuth');
+const { createTokenManager } = require('./dhanToken');
+const { createStockDashboard } = require('./stockDashboard');
 
-const config = loadConfig();
+const config = loadConfigOptional();
 const db = openDb();
 const connectionStatus = createConnectionStatus();
 const aggregator = new CandleAggregator();
+const tokenManager = createTokenManager({ config });
+const demoMode = config.forceDemo || !hasDhanCredentials(config);
+const stockDashboard = createStockDashboard({
+  tokenManager,
+  config,
+  demoMode,
+});
 
 const app = express();
 app.use(express.json());
@@ -30,6 +38,8 @@ app.use('/api', createApiRouter({
   isMarketOpenFn: isMarketOpen,
   getCandles: (symbol) => aggregator.getCandles(symbol),
   config,
+  stockDashboard,
+  tokenManager,
 }));
 
 const httpServer = http.createServer(app);
@@ -41,7 +51,12 @@ function todayTradeDate() {
 }
 
 async function startIngestion() {
-  const { accessToken } = await fetchAccessToken(config);
+  if (!hasDhanCredentials(config) || config.forceDemo) {
+    console.log('Skipping live equity feed — demo mode or missing Dhan credentials.');
+    return;
+  }
+
+  const { accessToken } = await tokenManager.getAccessToken();
 
   const instrumentMap = await resolveNifty50InstrumentMap();
   const securityIdToSymbol = new Map();
@@ -88,9 +103,11 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 httpServer.listen(config.port, () => {
-  console.log(`F&O Intelligence Terminal listening on http://localhost:${config.port}`);
-  if (!config.hasDhan) {
-    console.log('Dhan credentials not set — F&O uses NSE public / labeled MOCK. Set DHAN_* for live option chain + equity feed.');
+  const mode = demoMode ? 'DEMO' : 'LIVE';
+  console.log(`F&O Intelligence Terminal listening on http://localhost:${config.port} [${mode}]`);
+  if (!config.hasDhan || demoMode) {
+    console.log('Dhan credentials not set (or DEMO_MODE) — F&O uses NSE public / labeled MOCK; Markets equity board uses demo quotes.');
+    console.log('Set DHAN_* for live option chain + equity feed, or enter them in More → Dhan API.');
     return;
   }
   if (isMarketOpen()) {
@@ -99,6 +116,12 @@ httpServer.listen(config.port, () => {
       console.error('Ingestion failed to start:', err);
     });
   } else {
-    console.log('Market closed — equity ingestion waits for 9:30 IST. F&O APIs remain available.');
+    console.log('Market closed — equity ingestion waits for 9:30 IST. F&O APIs and Markets REST remain available.');
+    tokenManager.getAccessToken().then(() => {
+      stockDashboard.refresh('nifty50').catch((err) => console.warn('Dashboard warm failed:', err.message));
+    }).catch((err) => {
+      connectionStatus.setError(err);
+      console.error('Dhan auth failed:', err.message);
+    });
   }
 });

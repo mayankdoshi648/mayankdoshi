@@ -26,6 +26,7 @@ On static hosts the app runs in **labeled MOCK / static-demo mode** (full UI + S
 | Dhan API | In-app Client ID / PIN / TOTP → live option chain (Node server only) |
 | WHY drawer | Explainable positioning checklist |
 | Equity / DarvaX | Preserved live EMA/RSI + DarvaX scanner |
+| Markets API | Equity board: sector filter, rankings, 52-week range (`/api/dashboard`) |
 
 ## Architecture
 
@@ -33,9 +34,10 @@ See [`docs/fno-architecture.md`](docs/fno-architecture.md).
 
 Layers: **Providers → Normalize → Calculations → Service/Engines → API → UI**.
 
-- **Dhan** (optional): option chain + equity live feed
+- **Dhan** (optional): option chain + equity live feed + Markets quotes/history
 - **NSE public**: indices / FII-DII cash when reachable
 - **Mock / static-demo** (explicitly labeled): shareable GitHub Pages & Vercel, or local `FNO_FORCE_MOCK=1`
+- **DEMO_MODE**: synthetic equity Markets quotes when Dhan creds are missing
 
 ## Setup
 
@@ -51,8 +53,6 @@ FNO_FORCE_MOCK=1 npm start
 
 Open **http://localhost:3000**
 
-Open http://localhost:3000
-
 ### Vercel note
 
 `vercel.json` deploys the **static `frontend/`** only (UI shell). The Express + SQLite + WebSocket backend is not serverless-compatible — run `npm start` (or your own Node host) for live API/feeds. Preview checks for linked Vercel projects should pass with this static config.
@@ -61,12 +61,13 @@ Open http://localhost:3000
 
 | Variable | Purpose |
 |----------|---------|
-| `DHAN_CLIENT_ID`, `DHAN_PIN`, `DHAN_TOTP_SECRET` | Live Dhan option chain + equity feed |
+| `DHAN_CLIENT_ID`, `DHAN_PIN`, `DHAN_TOTP_SECRET` | Live Dhan option chain + equity feed + Markets quotes |
+| `DEMO_MODE=true` | Force synthetic Markets equity quotes |
 | `FNO_FORCE_MOCK=1` | Force labeled mock F&O data (UI/dev) |
 | `PORT` | Default 3000 |
 | DarvaX / Telegram / Obsidian | Same as before (optional) |
 
-**Server boots without Dhan** — terminal uses NSE public + labeled mock. Set `DHAN_*` in `.env` **or** enter them in **More → Dhan API** (optional write-back to `.env`).
+**Server boots without Dhan** — terminal uses NSE public + labeled mock; Markets API falls back to demo quotes. Set `DHAN_*` in `.env` **or** enter them in **More → Dhan API** (optional write-back to `.env`).
 
 Never commit `.env`. PIN / TOTP are never returned by `GET /api/fno/credentials/dhan` (masked client id only).
 
@@ -79,6 +80,8 @@ Never commit `.env`. PIN / TOTP are never returned by `GET /api/fno/credentials/
 - `GET /api/fno/fii-dii` · `/alerts` · `/watchlist`
 - `GET /api/fno/opportunity` · `/opportunity/:symbol` — trade-readiness checklist
 - `GET|PUT|DELETE /api/fno/credentials/dhan` · `POST …/test` — runtime Dhan API credentials
+- `GET /api/dashboard` · `/dashboard/sectors` · `/dashboard/rankings` — equity Markets board
+- `GET /api/auth/status` · `POST /api/auth/refresh` — Dhan token manager
 - Existing: `/api/signals`, `/api/darvax/*`, `/api/overview`, `/api/breadth`
 
 ## Calculations (unit-tested)
@@ -96,3 +99,5 @@ OI buildup classification, PCR, max pain, expected move
 ## Legacy DarvaX
 
 DarvaX scan, Obsidian export, Telegram alerts, and manual-approval orders remain under **Equity / DarvaX** in the terminal.
+
+> **Note:** The standalone Markets UI shell from the equity-dashboard branch is not yet wired into this F&O terminal chrome. Backend Markets APIs above are available; UI integration into More / Legacy Desk is a follow-up.

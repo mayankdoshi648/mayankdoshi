@@ -1,6 +1,5 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 const { shouldAlert, formatAlertMessage } = require('./telegramAlerts');
 const { parseScreenerHtml, applyFundamentalBonus } = require('./screenerFundamentals');
 
@@ -29,10 +28,26 @@ test('formatAlertMessage includes symbol and score', () => {
 });
 
 test('parseScreenerHtml extracts ROCE and growth from sample HTML', () => {
-  const sample = fs.readFileSync('/tmp/screener.html', 'utf8');
+  const sample = `
+    <ul id="top-ratios">
+      <li><span class="name">ROCE</span><span class="number">18.5</span></li>
+      <li><span class="name">ROE</span><span class="number">22.1</span></li>
+      <li><span class="name">Stock P/E</span><span class="number">25.4</span></li>
+    </ul>
+    <table>
+      <th colspan="2">Compounded Sales Growth</th>
+      <tr><td>TTM:</td><td>12.5%</td></tr>
+      <tr><td>3 Years:</td><td>10%</td></tr>
+    </table>
+    <table>
+      <th colspan="2">Compounded Profit Growth</th>
+      <tr><td>TTM:</td><td>15%</td></tr>
+    </table>
+  `;
   const data = parseScreenerHtml(sample, 'RELIANCE');
   assert.ok(data.roce > 0);
   assert.ok(data.roe > 0);
+  assert.equal(data.salesGrowthTtm, 12.5);
 });
 
 test('applyFundamentalBonus increases score for strong fundamentals', () => {

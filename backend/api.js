@@ -24,6 +24,8 @@ function createApiRouter({
   isMarketOpenFn,
   getCandles,
   config,
+  stockDashboard = null,
+  tokenManager = null,
 }) {
   const router = express.Router();
   let instrumentMapCache = null;
@@ -32,13 +34,84 @@ function createApiRouter({
   router.use('/fno', createFnoRouter({ config }));
 
   router.get('/status', (req, res) => {
+    const auth = tokenManager?.getStatus?.() || null;
     res.json({
       marketOpen: isMarketOpenFn(),
       feedConnected: connectionStatus.isConnected(),
       lastError: connectionStatus.getLastError(),
       darvaxAutoTrade: config?.darvaxAutoTrade ?? false,
       hasDhan: Boolean(config?.clientId && config?.pin && config?.totpSecret),
+      auth,
+      dashboardMode: stockDashboard?.isDemo?.() ? 'demo' : 'live',
     });
+  });
+
+  router.get('/auth/status', (req, res) => {
+    res.json(tokenManager?.getStatus?.() || {
+      hasCredentials: false,
+      authenticated: false,
+      mode: 'demo',
+      lastError: null,
+    });
+  });
+
+  router.post('/auth/refresh', async (req, res) => {
+    if (!tokenManager) {
+      return res.status(503).json({ error: 'Auth manager unavailable' });
+    }
+    try {
+      const token = await tokenManager.getAccessToken({ force: true });
+      res.json({
+        ok: true,
+        expiryTime: token.expiryTime || null,
+        ...tokenManager.getStatus(),
+      });
+    } catch (err) {
+      res.status(401).json({ error: err.message, ...tokenManager.getStatus() });
+    }
+  });
+
+  router.get('/dashboard', async (req, res) => {
+    if (!stockDashboard) {
+      return res.status(503).json({ error: 'Stock dashboard not initialized' });
+    }
+    try {
+      const report = await stockDashboard.getDashboard({
+        universe: req.query.universe || 'nifty50',
+        sector: req.query.sector || 'all',
+        ranking: req.query.ranking || 'all',
+        limit: Number(req.query.limit || 100),
+        force: req.query.refresh === '1' || req.query.refresh === 'true',
+      });
+      res.json(report);
+    } catch (err) {
+      res.status(err.status || 500).json({ error: err.message });
+    }
+  });
+
+  router.get('/dashboard/sectors', async (req, res) => {
+    if (!stockDashboard) {
+      return res.status(503).json({ error: 'Stock dashboard not initialized' });
+    }
+    try {
+      res.json(await stockDashboard.getSectors(req.query.universe || 'nifty50'));
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/dashboard/rankings', async (req, res) => {
+    if (!stockDashboard) {
+      return res.status(503).json({ error: 'Stock dashboard not initialized' });
+    }
+    try {
+      res.json(await stockDashboard.getRankings(
+        req.query.universe || 'nifty50',
+        req.query.sector || 'all'
+      ));
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   router.get('/overview', async (req, res) => {
