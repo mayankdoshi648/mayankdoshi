@@ -154,18 +154,43 @@ function buildMockOptionChain(underlying = 'NIFTY', expiry = null) {
   };
 }
 
-const SAMPLE_FUTURES = [
-  { symbol: 'RELIANCE', ltp: 2985.4, changePct: 1.2, oiChangePct: 3.4, buildup: 'LONG_BUILDUP' },
-  { symbol: 'HDFCBANK', ltp: 1682.1, changePct: -0.8, oiChangePct: 2.1, buildup: 'SHORT_BUILDUP' },
-  { symbol: 'TCS', ltp: 4125.0, changePct: 0.6, oiChangePct: -1.8, buildup: 'SHORT_COVERING' },
-  { symbol: 'INFY', ltp: 1888.5, changePct: -1.1, oiChangePct: -2.4, buildup: 'LONG_UNWINDING' },
-  { symbol: 'ICICIBANK', ltp: 1245.2, changePct: 0.9, oiChangePct: 4.2, buildup: 'LONG_BUILDUP' },
-  { symbol: 'SBIN', ltp: 812.3, changePct: -0.4, oiChangePct: 1.5, buildup: 'SHORT_BUILDUP' },
-  { symbol: 'TATAMOTORS', ltp: 975.6, changePct: 2.3, oiChangePct: 5.1, buildup: 'LONG_BUILDUP' },
-  { symbol: 'BAJFINANCE', ltp: 7120.0, changePct: -1.6, oiChangePct: 2.8, buildup: 'SHORT_BUILDUP' },
-  { symbol: 'MARUTI', ltp: 12450, changePct: 0.4, oiChangePct: -0.9, buildup: 'SHORT_COVERING' },
-  { symbol: 'ITC', ltp: 465.2, changePct: -0.3, oiChangePct: 1.1, buildup: 'SHORT_BUILDUP' },
-];
+const SAMPLE_FUTURES = (() => {
+  const seeds = [
+    { symbol: 'RELIANCE', ltp: 2985.4, changePct: 1.2, oiChangePct: 3.4, buildup: 'LONG_BUILDUP' },
+    { symbol: 'HDFCBANK', ltp: 1682.1, changePct: -0.8, oiChangePct: 2.1, buildup: 'SHORT_BUILDUP' },
+    { symbol: 'TCS', ltp: 4125.0, changePct: 0.6, oiChangePct: -1.8, buildup: 'SHORT_COVERING' },
+    { symbol: 'INFY', ltp: 1888.5, changePct: -1.1, oiChangePct: -2.4, buildup: 'LONG_UNWINDING' },
+    { symbol: 'ICICIBANK', ltp: 1245.2, changePct: 0.9, oiChangePct: 4.2, buildup: 'LONG_BUILDUP' },
+    { symbol: 'SBIN', ltp: 812.3, changePct: -0.4, oiChangePct: 1.5, buildup: 'SHORT_BUILDUP' },
+    { symbol: 'TATAMOTORS', ltp: 975.6, changePct: 2.3, oiChangePct: 5.1, buildup: 'LONG_BUILDUP' },
+    { symbol: 'BAJFINANCE', ltp: 7120.0, changePct: -1.6, oiChangePct: 2.8, buildup: 'SHORT_BUILDUP' },
+    { symbol: 'MARUTI', ltp: 12450, changePct: 0.4, oiChangePct: -0.9, buildup: 'SHORT_COVERING' },
+    { symbol: 'ITC', ltp: 465.2, changePct: -0.3, oiChangePct: 1.1, buildup: 'SHORT_BUILDUP' },
+  ];
+  const bySym = new Map(seeds.map((s) => [s.symbol, s]));
+  const patterns = ['LONG_BUILDUP', 'SHORT_BUILDUP', 'SHORT_COVERING', 'LONG_UNWINDING'];
+  for (const symbol of ALL_SECTOR_FO_SYMBOLS) {
+    if (bySym.has(symbol)) continue;
+    const h = hash01(symbol);
+    const changePct = Number(((h - 0.5) * 4).toFixed(2));
+    const oiChangePct = Number(((hash01(`${symbol}:oi`) - 0.45) * 8).toFixed(2));
+    let buildup = 'MIXED';
+    if (Math.abs(changePct) >= 0.05 && Math.abs(oiChangePct) >= 0.05) {
+      if (changePct > 0 && oiChangePct > 0) buildup = 'LONG_BUILDUP';
+      else if (changePct < 0 && oiChangePct > 0) buildup = 'SHORT_BUILDUP';
+      else if (changePct > 0 && oiChangePct < 0) buildup = 'SHORT_COVERING';
+      else buildup = 'LONG_UNWINDING';
+    }
+    bySym.set(symbol, {
+      symbol,
+      ltp: Number((200 + h * 4000).toFixed(2)),
+      changePct,
+      oiChangePct,
+      buildup: buildup === 'MIXED' ? patterns[Math.floor(h * 4) % 4] : buildup,
+    });
+  }
+  return [...bySym.values()];
+})();
 
 class MockProvider extends FoDataProvider {
   constructor(options = {}) {
