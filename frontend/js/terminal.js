@@ -51,27 +51,31 @@
 
   async function api(path, options) {
     // Prefer live Express API; fall back to labeled static demo for GitHub Pages / Vercel.
-    try {
-      if (!state.forceStaticDemo) {
+    if (!state.forceStaticDemo) {
+      try {
         const resp = await fetch(path, options);
         const ct = resp.headers.get('content-type') || '';
-        if (resp.ok && ct.includes('application/json')) {
+        if (ct.includes('application/json')) {
           const json = await resp.json();
+          if (!resp.ok) {
+            throw new Error(json?.error || json?.meta?.error || `HTTP ${resp.status}`);
+          }
           if (json && (json.data !== undefined || json.meta || json.rules || json.symbols || json.alerts)) {
             if (json.meta) setMeta(json.meta);
-            if (!resp.ok && json.error) throw new Error(json.error);
             return json;
           }
         }
-        // HTML / 404 from static host → enable demo mode
+        state.forceStaticDemo = true;
+      } catch (err) {
+        // Express JSON errors (credentials, validation) must surface — not fall into mock.
+        if (err && !(err instanceof TypeError)) throw err;
         state.forceStaticDemo = true;
       }
-    } catch {
-      state.forceStaticDemo = true;
     }
     if (!window.FnoStaticDemoApi) throw new Error('Static demo API unavailable');
     const json = await window.FnoStaticDemoApi.handle(path, options);
     if (json.meta) setMeta(json.meta);
+    if (json.error && json.data == null) throw new Error(json.error);
     if (json.meta?.error && json.data == null) throw new Error(json.meta.error);
     return json;
   }
@@ -96,6 +100,7 @@
       if (name === 'fii') await renderFii();
       if (name === 'alerts') await renderAlerts();
       if (name === 'watch') await renderWatch();
+      if (name === 'settings') await renderSettings();
       if (name === 'legacy') await renderFuturesTable();
     } catch (err) {
       console.error(err);
@@ -815,6 +820,114 @@
     });
   }
 
+  function paintDhanStatus(status) {
+    const el = $('#dhan-status');
+    if (!el || !status) return;
+    const live = status.liveCapable ? 'LIVE CAPABLE' : (status.hasDhan ? 'CONFIGURED (mock forced)' : 'NOT SET');
+    const bits = [
+      `<strong>${escapeHtml(live)}</strong>`,
+      status.clientIdMasked ? `Client ${escapeHtml(status.clientIdMasked)}` : null,
+      status.source ? `source ${escapeHtml(status.source)}` : null,
+      status.provider ? `provider ${escapeHtml(status.provider)}` : null,
+      status.forceMock ? 'FNO_FORCE_MOCK=1' : null,
+    ].filter(Boolean);
+    el.innerHTML = `${bits.join(' · ')}<br><span class="tiny">${escapeHtml(status.note || '')}</span>`;
+  }
+
+  function setDhanMsg(text, ok = null) {
+    const el = $('#dhan-msg');
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.toggle('ok', ok === true);
+    el.classList.toggle('err', ok === false);
+  }
+
+  function readDhanForm() {
+    return {
+      clientId: $('#dhan-client-id')?.value.trim() || '',
+      pin: $('#dhan-pin')?.value.trim() || '',
+      totpSecret: ($('#dhan-totp')?.value || '').trim().replace(/\s+/g, ''),
+      persistEnv: Boolean($('#dhan-persist')?.checked),
+    };
+  }
+
+  async function renderSettings() {
+    setDhanMsg('');
+    try {
+      const env = await api('/api/fno/credentials/dhan');
+      paintDhanStatus(env.data || env);
+      if (state.forceStaticDemo || env.data?.staticOnly) {
+        $('#dhan-form')?.classList.add('disabled');
+        $$('#dhan-form input, #dhan-form button').forEach((n) => { n.disabled = true; });
+        setDhanMsg(env.data?.note || 'Live Dhan needs the Node server (npm start). Static hosts cannot store secrets safely.', false);
+      } else {
+        $('#dhan-form')?.classList.remove('disabled');
+        $$('#dhan-form input, #dhan-form button').forEach((n) => { n.disabled = false; });
+      }
+    } catch (err) {
+      paintDhanStatus({ hasDhan: false, liveCapable: false, note: err.message, source: 'error' });
+      setDhanMsg(err.message, false);
+    }
+  }
+
+  async function testDhanCredentials() {
+    const body = readDhanForm();
+    setDhanMsg('Testing Dhan token…');
+    try {
+      const env = await api('/api/fno/credentials/dhan/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const d = env.data || {};
+      setDhanMsg(d.message || 'Token OK', true);
+    } catch (err) {
+      setDhanMsg(err.message || 'Test failed', false);
+    }
+  }
+
+  async function saveDhanCredentials(ev) {
+    ev?.preventDefault?.();
+    const body = readDhanForm();
+    if (!body.clientId || !body.pin || !body.totpSecret) {
+      setDhanMsg('Client ID, PIN, and TOTP secret are required', false);
+      return;
+    }
+    setDhanMsg('Saving…');
+    try {
+      const env = await api('/api/fno/credentials/dhan', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      paintDhanStatus(env.data);
+      const persistNote = env.data?.persisted
+        ? 'Saved to memory + .env'
+        : (env.data?.persistError ? `Saved in memory; .env write failed: ${env.data.persistError}` : 'Saved in memory for this process');
+      $('#dhan-pin').value = '';
+      $('#dhan-totp').value = '';
+      await renderTicker();
+      setDhanMsg(`${persistNote}. Live provider reloaded.`, true);
+    } catch (err) {
+      setDhanMsg(err.message || 'Save failed', false);
+    }
+  }
+
+  async function clearDhanCredentials() {
+    setDhanMsg('Clearing…');
+    try {
+      const env = await api('/api/fno/credentials/dhan', { method: 'DELETE' });
+      paintDhanStatus(env.data);
+      $('#dhan-client-id').value = '';
+      $('#dhan-pin').value = '';
+      $('#dhan-totp').value = '';
+      setDhanMsg('Credentials cleared — using NSE public / mock', true);
+      await renderTicker();
+    } catch (err) {
+      setDhanMsg(err.message || 'Clear failed', false);
+    }
+  }
+
   async function renderFuturesTable() {
     const env = await api('/api/fno/scanner');
     $('#futures-table tbody').innerHTML = (env.data || []).slice(0, 50).map((r) => `
@@ -882,6 +995,9 @@
       $('#watch-input').value = '';
       renderWatch();
     });
+    $('#dhan-form')?.addEventListener('submit', saveDhanCredentials);
+    $('#dhan-test')?.addEventListener('click', testDhanCredentials);
+    $('#dhan-clear')?.addEventListener('click', clearDhanCredentials);
     $('#btn-refresh')?.addEventListener('click', async () => {
       await renderTicker();
       await loadView(state.view);
@@ -892,7 +1008,7 @@
   function expandDesktopNav() {
     if (window.matchMedia('(min-width: 900px)').matches) {
       const nav = $('.bottom-nav');
-      const extras = ['heatmap', 'oi', 'sectors', 'scanner', 'fii', 'alerts', 'watch', 'legacy'];
+      const extras = ['heatmap', 'oi', 'sectors', 'scanner', 'fii', 'alerts', 'watch', 'settings', 'legacy'];
       extras.forEach((id) => {
         if (nav.querySelector(`[data-nav="${id}"]`)) return;
         const b = document.createElement('button');

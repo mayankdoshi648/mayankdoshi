@@ -402,6 +402,70 @@ body {
   font-family: var(--mono);
 }
 
+/* —— Dhan settings —— */
+.dhan-status {
+  margin: 0.5rem 0 0.85rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.dhan-form {
+  display: grid;
+  gap: 0.65rem;
+  max-width: 420px;
+}
+
+.dhan-form label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dhan-form label.dhan-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.dhan-form input[type="text"],
+.dhan-form input[type="password"] {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.65rem;
+  text-transform: none;
+}
+
+.dhan-form.disabled {
+  opacity: 0.55;
+}
+
+.dhan-actions {
+  margin-top: 0.25rem;
+}
+
+.dhan-msg {
+  margin-top: 0.75rem;
+  font-size: 12px;
+  min-height: 1.2em;
+}
+
+.dhan-msg.ok { color: var(--up, #3d9a6a); }
+.dhan-msg.err { color: var(--down, #c45c5c); }
+
 /* —— Tables —— */
 .table-wrap {
   overflow-x: auto;

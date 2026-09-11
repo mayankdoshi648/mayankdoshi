@@ -9,7 +9,7 @@ Professional **mobile-first Indian NSE F&O market intelligence terminal**, built
 | **GitHub Pages** | **https://mayankdoshi648.github.io/mayankdoshi/** |
 | Vercel | https://mayankdoshi.vercel.app |
 
-On static hosts the app runs in **labeled MOCK / static-demo mode** (full UI + Smart Money WHY panel). For live Dhan/NSE feeds, run the Node server locally.
+On static hosts the app runs in **labeled MOCK / static-demo mode** (full UI + Smart Money WHY panel). For live Dhan/NSE feeds, run the Node server locally (`npm start`), then open **More → Dhan API** and enter Client ID / PIN / TOTP (or set `DHAN_*` in `.env`).
 
 > First-time GitHub Pages: after merge, open **Repo → Settings → Pages → Source = GitHub Actions**, then re-run the **Deploy GitHub Pages** workflow if needed.
 
@@ -22,6 +22,7 @@ On static hosts the app runs in **labeled MOCK / static-demo mode** (full UI + S
 | Options | Chain, PCR, max pain, expected move |
 | Scan | Smart Money Proxy rankings |
 | Heatmap | Sector Smart Money → stock drill-down |
+| Dhan API | In-app Client ID / PIN / TOTP → live option chain (Node server only) |
 | WHY drawer | Explainable positioning checklist |
 | Equity / DarvaX | Preserved live EMA/RSI + DarvaX scanner |
 
@@ -64,9 +65,9 @@ Open http://localhost:3000
 | `PORT` | Default 3000 |
 | DarvaX / Telegram / Obsidian | Same as before (optional) |
 
-**Server boots without Dhan** — terminal uses NSE public + labeled mock. Set `DHAN_*` for live option chains.
+**Server boots without Dhan** — terminal uses NSE public + labeled mock. Set `DHAN_*` in `.env` **or** enter them in **More → Dhan API** (optional write-back to `.env`).
 
-Never commit `.env`. Credentials stay server-side only.
+Never commit `.env`. PIN / TOTP are never returned by `GET /api/fno/credentials/dhan` (masked client id only).
 
 ## Key API routes
 
@@ -75,6 +76,7 @@ Never commit `.env`. Credentials stay server-side only.
 - `GET /api/fno/option-chain/:underlying?expiry=`
 - `GET /api/fno/scanner` · `/buildups` · `/smart-money` · `/sectors`
 - `GET /api/fno/fii-dii` · `/alerts` · `/watchlist`
+- `GET|PUT|DELETE /api/fno/credentials/dhan` · `POST …/test` — runtime Dhan API credentials
 - Existing: `/api/signals`, `/api/darvax/*`, `/api/overview`, `/api/breadth`
 
 ## Calculations (unit-tested)

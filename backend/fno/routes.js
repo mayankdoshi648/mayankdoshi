@@ -12,16 +12,18 @@ function createFnoRouter({ config }) {
       const data = await fn(req, res);
       if (!res.headersSent) res.json(data);
     } catch (err) {
-      res.status(500).json({
+      const msg = err.message || 'Request failed';
+      const badRequest = /required|missing|invalid/i.test(msg);
+      res.status(badRequest ? 400 : 500).json({
         data: null,
         meta: {
           asOf: new Date().toISOString(),
           source: 'error',
           isMock: false,
           stale: false,
-          error: err.message,
+          error: msg,
         },
-        error: err.message,
+        error: msg,
       });
     }
   };
@@ -57,6 +59,42 @@ function createFnoRouter({ config }) {
   router.put('/alerts/rules', express.json(), wrap((req) => ({ rules: service.updateAlertRules(req.body || {}) })));
   router.get('/alerts', wrap(() => service.evaluateAlerts()));
   router.get('/alerts/history', wrap(() => ({ alerts: service.getAlertHistory() })));
+
+  router.get('/credentials/dhan', wrap(() => ({ data: service.getDhanStatus() })));
+  router.put('/credentials/dhan', express.json(), wrap((req) => {
+    const body = req.body || {};
+    const status = service.setDhanCredentials({
+      clientId: body.clientId,
+      pin: body.pin,
+      totpSecret: body.totpSecret,
+      persistEnv: Boolean(body.persistEnv),
+      clearForceMock: body.clearForceMock !== false,
+    });
+    // Keep shared config object in sync for /api/status and other routers.
+    if (config) {
+      config.clientId = service.config.clientId;
+      config.pin = service.config.pin;
+      config.totpSecret = service.config.totpSecret;
+      config.hasDhan = true;
+    }
+    return { data: status };
+  }));
+  router.delete('/credentials/dhan', wrap(() => {
+    const status = service.clearDhanCredentials();
+    if (config) {
+      config.clientId = '';
+      config.pin = '';
+      config.totpSecret = '';
+      config.hasDhan = false;
+    }
+    return { data: status };
+  }));
+  router.post('/credentials/dhan/test', express.json(), wrap(async (req) => {
+    const body = req.body || {};
+    const hasOverride = body.clientId || body.pin || body.totpSecret;
+    const result = await service.testDhanCredentials(hasOverride ? body : null);
+    return { data: result };
+  }));
 
   return router;
 }

@@ -460,6 +460,28 @@
       }));
       return env({ rules: {}, alerts });
     }
+    if (parts[0] === 'credentials' && parts[1] === 'dhan') {
+      const note = 'STATIC DEMO — enter Dhan credentials on a Node server (npm start). GitHub Pages / Vercel cannot hold secrets or call Dhan from the browser.';
+      if (method === 'GET') {
+        return {
+          data: {
+            hasDhan: false,
+            liveCapable: false,
+            staticOnly: true,
+            source: 'static-demo',
+            clientIdMasked: null,
+            forceMock: true,
+            provider: 'static-demo',
+            note,
+          },
+        };
+      }
+      return {
+        data: null,
+        error: note,
+        meta: { ...META, error: note },
+      };
+    }
     return env(null, { error: `Static demo: unhandled ${path}` });
   }
 
