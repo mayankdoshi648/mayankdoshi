@@ -40,6 +40,10 @@ npm start
 
 Open http://localhost:3000
 
+### Vercel note
+
+`vercel.json` deploys the **static `frontend/`** only (UI shell). The Express + SQLite + WebSocket backend is not serverless-compatible — run `npm start` (or your own Node host) for live API/feeds. Preview checks for linked Vercel projects should pass with this static config.
+
 ### Environment
 
 | Variable | Purpose |
