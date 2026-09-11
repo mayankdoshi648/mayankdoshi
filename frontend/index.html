@@ -467,6 +467,42 @@
       </div>
     </section>
 
+    <!-- MARKETS (equity board) -->
+    <section class="view" data-view="markets">
+      <div class="markets-hero">
+        <div>
+          <p class="markets-kicker">NSE · Equity</p>
+          <h1 class="view-title markets-title">Indian Market Pulse</h1>
+          <p class="markets-sub">Sector filter, rankings, and 52-week context — Dhan quotes when credentials are set.</p>
+        </div>
+        <div class="markets-actions">
+          <select id="markets-universe" aria-label="Universe">
+            <option value="nifty50">Nifty 50</option>
+            <option value="nifty500">Nifty 500</option>
+          </select>
+          <button type="button" id="markets-refresh" class="btn accent">Refresh</button>
+        </div>
+      </div>
+
+      <div class="ranking-scroll" role="tablist" aria-label="Rankings">
+        <button type="button" class="rank-chip active" data-ranking="all">All</button>
+        <button type="button" class="rank-chip" data-ranking="gainers">Gainers</button>
+        <button type="button" class="rank-chip" data-ranking="losers">Losers</button>
+        <button type="button" class="rank-chip" data-ranking="near52wHigh">Near 52W High</button>
+        <button type="button" class="rank-chip" data-ranking="near52wLow">Near 52W Low</button>
+        <button type="button" class="rank-chip" data-ranking="volume">Volume</button>
+      </div>
+
+      <div id="sector-chips" class="sector-scroll" aria-label="Sectors"></div>
+
+      <div class="markets-meta">
+        <span id="markets-status">Open Markets to load…</span>
+        <span id="markets-count"></span>
+      </div>
+      <div id="markets-error" class="markets-error hidden" role="alert"></div>
+      <div id="markets-list" class="markets-list" aria-live="polite"></div>
+    </section>
+
     <!-- LEGACY -->
     <section class="view" data-view="legacy">
       <h1 class="view-title">Legacy Desk</h1>
@@ -573,6 +609,7 @@
         <span>More</span>
         <button type="button" id="sheet-close" class="btn">Close</button>
       </div>
+      <button type="button" data-nav="markets">Equity Markets</button>
       <button type="button" data-nav="chain">Options Chain</button>
       <button type="button" data-nav="opportunity">Opportunity Checklist</button>
       <button type="button" data-nav="settings">Dhan API (live data)</button>
@@ -600,6 +637,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1"></script>
   <script src="js/staticDemoApi.js"></script>
+  <script src="js/markets.js"></script>
   <script src="js/terminal.js"></script>
   <script src="app.js"></script>
 </body>

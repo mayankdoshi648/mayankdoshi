@@ -102,6 +102,7 @@
       if (name === 'watch') await renderWatch();
       if (name === 'settings') await renderSettings();
       if (name === 'opportunity') await renderOpportunity();
+      if (name === 'markets') await window.MarketsBoard?.render?.();
       if (name === 'legacy') await renderFuturesTable();
     } catch (err) {
       console.error(err);
@@ -1219,12 +1220,12 @@
   function expandDesktopNav() {
     if (window.matchMedia('(min-width: 900px)').matches) {
       const nav = $('.bottom-nav');
-      const extras = ['chain', 'heatmap', 'oi', 'sectors', 'scanner', 'fii', 'alerts', 'watch', 'settings', 'opportunity', 'legacy'];
+      const extras = ['markets', 'chain', 'heatmap', 'oi', 'sectors', 'scanner', 'fii', 'alerts', 'watch', 'settings', 'opportunity', 'legacy'];
       extras.forEach((id) => {
         if (nav.querySelector(`[data-nav="${id}"]`)) return;
         const b = document.createElement('button');
         b.dataset.nav = id;
-        b.innerHTML = `<span>·</span>${id}`;
+        b.innerHTML = `<span>·</span>${id === 'markets' ? 'Markets' : id}`;
         b.addEventListener('click', () => showView(id));
         nav.appendChild(b);
       });
@@ -1238,7 +1239,10 @@
     wireNav();
     expandDesktopNav();
     await renderTicker();
-    await showView('overview');
+    const tab = new URLSearchParams(location.search).get('tab')
+      || new URLSearchParams(location.search).get('view');
+    const initial = tab === 'markets' ? 'markets' : 'overview';
+    await showView(initial);
     setInterval(renderTicker, 60_000);
   }
 
