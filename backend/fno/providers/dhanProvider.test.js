@@ -161,4 +161,54 @@ describe('DhanProvider', () => {
     });
     assert.ok(p instanceof MockProvider);
   });
+
+  it('Hybrid getFuturesQuotes resolves security ids and returns live (non-mock) rows', async () => {
+    const fetchImpl = async (url, opts = {}) => {
+      if (String(url).includes('marketfeed/quote')) {
+        const body = JSON.parse(opts.body || '{}');
+        assert.ok(body.NSE_FNO.includes(222));
+        return jsonResponse({
+          data: {
+            NSE_FNO: {
+              222: {
+                last_price: 1266.1,
+                net_change: -6.4,
+                average_price: 1262.3,
+                volume: 10122500,
+                oi: 131565500,
+                ohlc: { open: 1270.1, high: 1270.9, low: 1255.7, close: 1272.5 },
+              },
+            },
+          },
+        });
+      }
+      return jsonResponse({ data: [] });
+    };
+    const dhan = new DhanProvider({
+      accessToken: 't',
+      clientId: 'c',
+      fetchImpl,
+    });
+    const hybrid = new HybridProvider({
+      nse: new MockProvider(),
+      dhan,
+      mock: new MockProvider(),
+      loadFuturesMap: async () => new Map([
+        ['RELIANCE', { securityId: 222, segment: 'NSE_FNO' }],
+      ]),
+      defaultSymbols: ['RELIANCE'],
+    });
+
+    const first = await hybrid.getFuturesQuotes();
+    assert.equal(first.meta.isMock, false);
+    assert.equal(first.meta.source, 'dhan');
+    assert.equal(first.data.length, 1);
+    assert.equal(first.data[0].symbol, 'RELIANCE');
+    assert.equal(first.data[0].ltp, 1266.1);
+    assert.equal(first.data[0].priceChangePct != null, true);
+    assert.equal(first.data[0].oiChangePct, null); // no prior snapshot yet
+
+    const second = await hybrid.getFuturesQuotes();
+    assert.equal(second.data[0].oiChangePct, 0); // same OI as previous poll
+  });
 });
