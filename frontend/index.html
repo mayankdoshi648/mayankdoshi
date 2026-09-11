@@ -2,212 +2,361 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>PowerBull Pro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>NSE F&O Intelligence Terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="header">
-    <div class="brand">⚡ <span>PowerBull Pro</span></div>
-    <nav class="nav">
-      <button id="tab-live" class="tab active">Live Signals</button>
-      <button id="tab-breadth" class="tab">Market Breadth</button>
-      <button id="tab-darvax" class="tab">DarvaX Scanner</button>
-      <button id="tab-track" class="tab">Track Record</button>
-    </nav>
-    <input type="date" id="date-picker" />
+  <header class="topbar">
+    <div class="brand" aria-label="Brand">FOTERMINAL</div>
+    <div id="data-meta" class="data-meta">—</div>
+    <button type="button" id="btn-refresh" class="btn btn-refresh" title="Refresh">↻</button>
   </header>
 
-  <div id="market-banner" class="banner hidden"></div>
+  <div id="mock-banner" class="banner mock-banner hidden" role="status"></div>
+  <div id="market-banner" class="banner market-banner hidden" role="status"></div>
 
-  <section id="counters" class="counters">
-    <div class="counter"><span id="count-total">0</span><label>Total</label></div>
-    <div class="counter buy"><span id="count-buy">0</span><label>Buy</label></div>
-    <div class="counter sell"><span id="count-sell">0</span><label>Sell</label></div>
-  </section>
+  <div id="ticker" class="ticker" aria-label="Index ticker"></div>
 
-  <section id="view-live">
-    <table class="signal-table">
-      <thead><tr><th>Symbol</th><th>Side</th><th>Price</th><th>Time</th></tr></thead>
-      <tbody id="signal-rows"></tbody>
-    </table>
-  </section>
-
-  <section id="view-breadth" class="hidden">
-    <div class="breadth-toolbar">
-      <select id="breadth-universe">
-        <option value="nifty50">Nifty 50</option>
-        <option value="nifty500">Nifty 500</option>
-      </select>
-      <button id="breadth-refresh" class="btn accent">Refresh Breadth</button>
-      <span id="breadth-status" class="darvax-status"></span>
-    </div>
-
-    <div id="overview-headline" class="quote-strip quote-strip-headline" aria-label="Nifty Bank Nifty VIX"></div>
-    <div id="overview-size" class="quote-strip quote-strip-size" aria-label="Large Mid Small Cap"></div>
-
-    <div class="breadth-section-head">
-      <h3>Sector Indices — EMA 20 / 50 / 200</h3>
-      <p>Green chip = index close above that EMA · Red = below</p>
-    </div>
-    <div id="overview-sectors" class="sector-grid" aria-label="Sector EMA dashboard"></div>
-
-    <div class="breadth-hero">
-      <div class="breadth-def">
-        <h2>Market Breadth Decoded</h2>
-        <p>
-          <strong>Breadth</strong> = % of stocks trading above the
-          <em>20 / 50 / 200-day</em> simple moving averages (DMA).
-          Index price is the surface — breadth is the internal health.
-        </p>
+  <main class="main">
+    <!-- OVERVIEW -->
+    <section class="view active" data-view="overview">
+      <h1 class="view-title">Market Regime</h1>
+      <div class="regime-panel">
+        <div class="regime-head">
+          <div id="regime-label" class="regime-label">—</div>
+          <div class="regime-stats">
+            <div class="metric"><div class="k">Score</div><div class="v" id="regime-score">—</div></div>
+            <div class="metric"><div class="k">Confidence</div><div class="v" id="regime-conf">—</div></div>
+          </div>
+        </div>
+        <div id="regime-factors" class="regime-factors"></div>
       </div>
-      <div id="breadth-posture" class="breadth-posture tone-neutral">
-        <div class="posture-label">Posture</div>
-        <div id="breadth-posture-value" class="posture-value">—</div>
-        <div id="breadth-diagnosis" class="posture-diagnosis">Load or refresh to diagnose market health.</div>
-      </div>
-    </div>
+      <h2 class="section-label">Option Snapshot · NIFTY</h2>
+      <div id="overview-opt" class="metrics-row"></div>
+      <div id="overview-interp" class="interp"></div>
+      <h2 class="section-label">Sector Heat</h2>
+      <div id="overview-sectors" class="sector-chips"></div>
+    </section>
 
-    <div class="breadth-gauges" id="breadth-gauges">
-      <div class="gauge-card" data-key="dma20">
-        <canvas class="gauge-canvas" width="160" height="160"></canvas>
-        <div class="gauge-meta">
-          <div class="gauge-title">20 DMA — LEADERS</div>
-          <div class="gauge-sub">Short-term health</div>
-          <div class="gauge-readout"><span class="gauge-pct">—</span> <span class="gauge-arrow"></span></div>
+    <!-- INTEL -->
+    <section class="view" data-view="intel">
+      <h1 class="view-title">Buildup Intelligence</h1>
+      <div id="buildup-seg" class="seg" role="tablist">
+        <button type="button" class="active" data-signal="LONG_BUILDUP">Long Buildup</button>
+        <button type="button" data-signal="SHORT_BUILDUP">Short Buildup</button>
+        <button type="button" data-signal="SHORT_COVERING">Short Covering</button>
+        <button type="button" data-signal="LONG_UNWINDING">Long Unwinding</button>
+      </div>
+      <div class="table-wrap">
+        <table id="intel-table" class="dense-table">
+          <thead>
+            <tr>
+              <th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI%</th><th>RVol</th><th>IV</th><th>Buildup</th><th>Score</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="intel-why" class="intel-why hidden"></div>
+    </section>
+
+    <!-- CHAIN -->
+    <section class="view" data-view="chain">
+      <h1 class="view-title">Option Chain</h1>
+      <div class="chain-controls">
+        <label>
+          <span class="sr-only">Underlying</span>
+          <select id="chain-underlying">
+            <option value="NIFTY">NIFTY</option>
+            <option value="BANKNIFTY">BANKNIFTY</option>
+            <option value="FINNIFTY">FINNIFTY</option>
+            <option value="MIDCPNIFTY">MIDCPNIFTY</option>
+            <option value="SENSEX">SENSEX</option>
+          </select>
+        </label>
+        <label>
+          <span class="sr-only">Expiry</span>
+          <select id="chain-expiry"></select>
+        </label>
+      </div>
+      <div id="chain-metrics" class="metrics-row"></div>
+      <div id="chain-interp" class="interp"></div>
+      <div class="table-wrap chain-wrap">
+        <table id="chain-table" class="dense-table chain-table">
+          <thead>
+            <tr>
+              <th>C OI</th><th>ΔOI</th><th>Vol</th><th>IV</th><th>LTP</th><th>Chg</th>
+              <th class="strike-col">Strike</th>
+              <th>Chg</th><th>LTP</th><th>IV</th><th>Vol</th><th>ΔOI</th><th>P OI</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- OI -->
+    <section class="view" data-view="oi">
+      <h1 class="view-title">Open Interest Profile</h1>
+      <p class="muted tiny">Uses same underlying / expiry as Option Chain.</p>
+      <div id="oi-metrics" class="metrics-row"></div>
+      <div id="oi-bars" class="oi-bars"></div>
+    </section>
+
+    <!-- SMART -->
+    <section class="view" data-view="smart">
+      <h1 class="view-title">Smart Money Proxy</h1>
+      <p class="disclaimer-inline">Heuristic proxy from price · OI · volume · IV — not institutional order flow. Not advice.</p>
+      <div class="table-wrap">
+        <table id="smart-table" class="dense-table">
+          <thead>
+            <tr>
+              <th>Symbol</th><th>Score</th><th>Signals</th><th>Chg%</th><th>OI%</th><th>RVol</th><th>Why</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SECTORS -->
+    <section class="view" data-view="sectors">
+      <h1 class="view-title">Sector Positioning</h1>
+      <div class="table-wrap">
+        <table id="sector-table" class="dense-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Sector</th><th>Ret%</th><th>OI%</th><th>A/D</th><th>Long</th><th>Short</th><th>Score</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="sector-stocks" class="sector-stocks hidden">
+        <h2 id="sector-stocks-title" class="section-label">—</h2>
+        <div class="table-wrap">
+          <table id="sector-stocks-table" class="dense-table">
+            <thead>
+              <tr>
+                <th>Symbol</th><th>Chg%</th><th>OI%</th><th>Buildup</th><th>Score</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
       </div>
-      <div class="gauge-card" data-key="dma50">
-        <canvas class="gauge-canvas" width="160" height="160"></canvas>
-        <div class="gauge-meta">
-          <div class="gauge-title">50 DMA — CORE</div>
-          <div class="gauge-sub">Medium-term health</div>
-          <div class="gauge-readout"><span class="gauge-pct">—</span> <span class="gauge-arrow"></span></div>
+    </section>
+
+    <!-- SCANNER -->
+    <section class="view" data-view="scanner">
+      <h1 class="view-title">F&O Scanner</h1>
+      <div class="filters">
+        <select id="scan-sector">
+          <option value="">All sectors</option>
+        </select>
+        <select id="scan-signal">
+          <option value="">All signals</option>
+          <option value="LONG_BUILDUP">Long Buildup</option>
+          <option value="SHORT_BUILDUP">Short Buildup</option>
+          <option value="SHORT_COVERING">Short Covering</option>
+          <option value="LONG_UNWINDING">Long Unwinding</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table id="scan-table" class="dense-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Symbol</th><th>Sector</th><th>LTP</th><th>Chg%</th><th>OI%</th><th>RVol</th><th>IV</th><th>Buildup</th><th>Score</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- FII -->
+    <section class="view" data-view="fii">
+      <h1 class="view-title">FII / DII Flow</h1>
+      <div id="fii-regime"></div>
+      <h2 class="section-label">Cash Market</h2>
+      <div id="fii-cash" class="metrics-row"></div>
+      <h2 class="section-label">Index Futures</h2>
+      <div id="fii-futures" class="interp"></div>
+      <h2 class="section-label">History</h2>
+      <div id="fii-history"></div>
+    </section>
+
+    <!-- ALERTS -->
+    <section class="view" data-view="alerts">
+      <h1 class="view-title">Alert Engine</h1>
+      <div class="row-actions">
+        <button type="button" id="alerts-run" class="btn accent">Run Alerts</button>
+      </div>
+      <div id="alerts-rules" class="metrics-row"></div>
+      <div class="table-wrap">
+        <table id="alerts-table" class="dense-table">
+          <thead>
+            <tr>
+              <th>Symbol</th><th>Reasons</th><th>Buildup</th><th>Score</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- WATCH -->
+    <section class="view" data-view="watch">
+      <h1 class="view-title">Watchlist</h1>
+      <div class="watch-form">
+        <input type="text" id="watch-input" placeholder="Symbol e.g. RELIANCE" autocomplete="off" spellcheck="false" />
+        <button type="button" id="watch-add" class="btn accent">Add</button>
+      </div>
+      <div class="table-wrap">
+        <table id="watch-table" class="dense-table">
+          <thead>
+            <tr>
+              <th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI%</th><th>Vol</th><th>Buildup</th><th>Score</th><th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- LEGACY -->
+    <section class="view" data-view="legacy">
+      <h1 class="view-title">Legacy Desk</h1>
+      <div id="legacy-seg" class="seg" role="tablist">
+        <button type="button" class="active" data-legacy="live">Live</button>
+        <button type="button" data-legacy="darvax">DarvaX</button>
+        <button type="button" data-legacy="track">Track</button>
+        <button type="button" data-legacy="futures">Futures</button>
+      </div>
+
+      <div id="legacy-live">
+        <div class="legacy-toolbar">
+          <input type="date" id="date-picker" />
+        </div>
+        <section id="counters" class="counters">
+          <div class="counter"><span id="count-total">0</span><label>Total</label></div>
+          <div class="counter buy"><span id="count-buy">0</span><label>Buy</label></div>
+          <div class="counter sell"><span id="count-sell">0</span><label>Sell</label></div>
+        </section>
+        <div class="table-wrap">
+          <table class="dense-table signal-table">
+            <thead><tr><th>Symbol</th><th>Side</th><th>Price</th><th>Time</th></tr></thead>
+            <tbody id="signal-rows"></tbody>
+          </table>
         </div>
       </div>
-      <div class="gauge-card" data-key="dma200">
-        <canvas class="gauge-canvas" width="160" height="160"></canvas>
-        <div class="gauge-meta">
-          <div class="gauge-title">200 DMA — FOUNDATION</div>
-          <div class="gauge-sub">Long-term health</div>
-          <div class="gauge-readout"><span class="gauge-pct">—</span> <span class="gauge-arrow"></span></div>
+
+      <div id="legacy-darvax" class="hidden">
+        <div class="darvax-toolbar">
+          <select id="darvax-market">
+            <option value="">All Markets</option>
+            <option value="NSE">NSE</option>
+            <option value="US">US</option>
+          </select>
+          <input type="number" id="darvax-min-score" value="55" min="0" max="100" title="Min score" />
+          <button type="button" id="darvax-refresh" class="btn">Refresh</button>
+          <button type="button" id="darvax-run-scan" class="btn accent">Run Scan</button>
+          <button type="button" id="darvax-export-obsidian" class="btn">Export Obsidian</button>
+          <span id="darvax-status" class="darvax-status"></span>
+        </div>
+        <div class="table-wrap">
+          <table class="dense-table signal-table darvax-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Symbol</th>
+                <th>Mkt</th>
+                <th>Score</th>
+                <th>Stage</th>
+                <th>Box Top</th>
+                <th>Box Bottom</th>
+                <th>RS%</th>
+                <th>RVOL</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="darvax-rows"></tbody>
+          </table>
+        </div>
+        <h3 class="darvax-subhead">Pending Orders</h3>
+        <div class="table-wrap">
+          <table class="dense-table signal-table">
+            <thead><tr><th>ID</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th>Status</th><th></th></tr></thead>
+            <tbody id="darvax-order-rows"></tbody>
+          </table>
         </div>
       </div>
-    </div>
-    <p class="breadth-note">Above 50% = majority participating · 50% line marked on each gauge</p>
 
-    <div class="breadth-charts">
-      <div class="chart-panel">
-        <h3>Index (Surface) — Nifty 50</h3>
-        <canvas id="breadth-index-chart" height="120"></canvas>
+      <div id="legacy-track" class="hidden">
+        <div class="table-wrap">
+          <table class="dense-table signal-table">
+            <thead><tr><th>Symbol</th><th>Side</th><th>Entry</th><th>Time</th><th>Outcome</th></tr></thead>
+            <tbody id="track-rows"></tbody>
+          </table>
+        </div>
       </div>
-      <div class="chart-panel">
-        <h3>Breadth (Internal) — % Above DMA</h3>
-        <canvas id="breadth-pct-chart" height="160"></canvas>
+
+      <div id="legacy-futures" class="hidden">
+        <div class="table-wrap">
+          <table id="futures-table" class="dense-table">
+            <thead>
+              <tr>
+                <th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI%</th><th>Vol</th><th>IV</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
-    </div>
+    </section>
+  </main>
 
-    <div class="breadth-rules">
-      <h3>Market Posture Logic</h3>
-      <table class="signal-table breadth-rules-table">
-        <thead>
-          <tr>
-            <th>Reading</th>
-            <th>What changed</th>
-            <th>Diagnosis</th>
-            <th>Posture</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr class="tone-warn">
-            <td>20 ↓, 50 →, 200 →</td>
-            <td>Only 20-day breadth drops</td>
-            <td>Leaders are cracking. First warning.</td>
-            <td><strong>STOP PRESSING</strong></td>
-          </tr>
-          <tr class="tone-danger">
-            <td>20 →, 50 ↓, 200 ↓</td>
-            <td>50- and 200-day breadth drop</td>
-            <td>Weaker stocks rolling over. Junk rally ending.</td>
-            <td><strong>REDUCE RISK</strong></td>
-          </tr>
-          <tr class="tone-danger">
-            <td>20 ↓, 50 ↓, 200 ↓</td>
-            <td>All three fall together</td>
-            <td>The rally lacks broad support.</td>
-            <td><strong>SIT OUT</strong></td>
-          </tr>
-          <tr class="tone-good">
-            <td>20, 50, 200 &gt; 50%</td>
-            <td>All three above 50%</td>
-            <td>Participation broad enough for a sustainable move.</td>
-            <td><strong>GREEN LIGHT — PRESS</strong></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
+  <nav class="bottom-nav" aria-label="Primary">
+    <button type="button" data-nav="overview" class="active"><span>◉</span>Overview</button>
+    <button type="button" data-nav="intel"><span>▣</span>Intel</button>
+    <button type="button" data-nav="chain"><span>☰</span>Chain</button>
+    <button type="button" data-nav="smart"><span>◆</span>Smart</button>
+    <button type="button" data-nav="more"><span>⋯</span>More</button>
+  </nav>
 
-  <section id="view-darvax" class="hidden">
-    <div class="darvax-toolbar">
-      <select id="darvax-market">
-        <option value="">All Markets</option>
-        <option value="NSE">NSE</option>
-        <option value="US">US</option>
-      </select>
-      <input type="number" id="darvax-min-score" value="55" min="0" max="100" title="Min score" />
-      <button id="darvax-refresh" class="btn">Refresh</button>
-      <button id="darvax-run-scan" class="btn accent">Run Scan</button>
-      <button id="darvax-export-obsidian" class="btn">Export Obsidian</button>
-      <span id="darvax-status" class="darvax-status"></span>
+  <div id="more-sheet" class="more-sheet hidden" role="dialog" aria-label="More views">
+    <div class="more-sheet-inner">
+      <div class="more-sheet-head">
+        <span>More</span>
+        <button type="button" id="sheet-close" class="btn">Close</button>
+      </div>
+      <button type="button" data-nav="oi">OI Profile</button>
+      <button type="button" data-nav="sectors">Sectors</button>
+      <button type="button" data-nav="scanner">Scanner</button>
+      <button type="button" data-nav="fii">FII / DII</button>
+      <button type="button" data-nav="alerts">Alerts</button>
+      <button type="button" data-nav="watch">Watchlist</button>
+      <button type="button" data-nav="legacy">Legacy Desk</button>
     </div>
-    <table class="signal-table darvax-table">
-      <thead>
-        <tr>
-          <th></th>
-          <th>Symbol</th>
-          <th>Mkt</th>
-          <th>Score</th>
-          <th>Stage</th>
-          <th>Box Top</th>
-          <th>Box Bottom</th>
-          <th>RS%</th>
-          <th>RVOL</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody id="darvax-rows"></tbody>
-    </table>
-    <h3 class="darvax-subhead">Pending Orders</h3>
-    <table class="signal-table">
-      <thead><tr><th>ID</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th>Status</th><th></th></tr></thead>
-      <tbody id="darvax-order-rows"></tbody>
-    </table>
-  </section>
-
-  <section id="view-track" class="hidden">
-    <table class="signal-table">
-      <thead><tr><th>Symbol</th><th>Side</th><th>Entry</th><th>Time</th><th>Outcome</th></tr></thead>
-      <tbody id="track-rows"></tbody>
-    </table>
-  </section>
+  </div>
 
   <div id="chart-modal" class="modal hidden">
     <div class="modal-content">
-      <button id="chart-close">&times;</button>
+      <button type="button" id="chart-close">&times;</button>
       <h3 id="chart-title"></h3>
       <canvas id="chart-canvas"></canvas>
     </div>
   </div>
 
-  <p class="disclaimer">
-    Personal experiment, not investment advice. DarvaX orders require manual approval unless DARVAX_AUTO_TRADE=true.
-    Not affiliated with any SEBI-registered research analyst.
-  </p>
-
   <audio id="alert-sound" src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=" preload="auto"></audio>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1"></script>
+  <script src="js/terminal.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

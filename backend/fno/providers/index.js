@@ -122,7 +122,7 @@ function hasDhanCreds(config = {}) {
  */
 function createProvider({ config = {}, preferMock = false, fetchImpl, accessToken, clientId } = {}) {
   const mock = new MockProvider();
-  if (preferMock) return mock;
+  if (preferMock || process.env.FNO_FORCE_MOCK === '1') return mock;
 
   const cfg = {
     ...config,

@@ -3,7 +3,7 @@ const path = require('node:path');
 const express = require('express');
 const http = require('node:http');
 
-const { loadConfigOptional } = require('./config');
+const { loadConfig } = require('./config');
 const { isMarketOpen } = require('./marketWindow');
 const { openDb, insertSignal } = require('./db');
 const { evaluateSignal, MIN_CANDLES } = require('./signalEngine');
@@ -16,8 +16,7 @@ const { createDhanFeed } = require('./dhanFeed');
 const { resolveNifty50InstrumentMap } = require('./instrumentMap');
 const { fetchAccessToken } = require('./dhanAuth');
 
-const config = loadConfigOptional();
-const hasDhan = Boolean(config.clientId && config.pin && config.totpSecret);
+const config = loadConfig();
 const db = openDb();
 const connectionStatus = createConnectionStatus();
 const aggregator = new CandleAggregator();
@@ -42,9 +41,6 @@ function todayTradeDate() {
 }
 
 async function startIngestion() {
-  if (!hasDhan) {
-    throw new Error('Dhan credentials not configured — live feed disabled (Market Breadth still works via Yahoo/NSE)');
-  }
   const { accessToken } = await fetchAccessToken(config);
 
   const instrumentMap = await resolveNifty50InstrumentMap();
@@ -92,9 +88,9 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 httpServer.listen(config.port, () => {
-  console.log(`PowerBull Pro listening on http://localhost:${config.port}`);
-  if (!hasDhan) {
-    console.log('Dhan credentials missing — live feed off. Market Breadth uses Yahoo Finance + NSE universe.');
+  console.log(`F&O Intelligence Terminal listening on http://localhost:${config.port}`);
+  if (!config.hasDhan) {
+    console.log('Dhan credentials not set — F&O uses NSE public / labeled MOCK. Set DHAN_* for live option chain + equity feed.');
     return;
   }
   if (isMarketOpen()) {
@@ -103,6 +99,6 @@ httpServer.listen(config.port, () => {
       console.error('Ingestion failed to start:', err);
     });
   } else {
-    console.log('Market closed — ingestion will not start until 9:30 IST on a trading day. Restart the server during market hours.');
+    console.log('Market closed — equity ingestion waits for 9:30 IST. F&O APIs remain available.');
   }
 });

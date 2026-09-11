@@ -16,6 +16,7 @@ const { resolveNseInstrumentMap } = require('./instrumentMap');
 const { exportFromDb } = require('./obsidianExport');
 const { getMarketBreadth, readBreadthCache, isRefreshRunning } = require('./marketBreadth');
 const { getMarketOverview } = require('./marketOverview');
+const { createFnoRouter } = require('./fno/routes');
 
 function createApiRouter({
   db,
@@ -27,6 +28,8 @@ function createApiRouter({
   const router = express.Router();
   let instrumentMapCache = null;
   let breadthProgress = null;
+
+  router.use('/fno', createFnoRouter({ config }));
 
   router.get('/status', (req, res) => {
     res.json({
