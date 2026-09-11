@@ -72,6 +72,19 @@ describe('mock provider + service', () => {
     const service = new FnoService({ provider: new MockProvider() });
     const sm = await service.getSmartMoney(5);
     assert.match(sm.data.disclaimer, /PROXY/i);
+    assert.ok(sm.data.market?.bias);
+    assert.ok(sm.data.rankings?.topLongs);
+    assert.ok(Array.isArray(sm.data.rows));
+    assert.ok(sm.data.rows[0]?.confidence != null || sm.data.rows.length === 0);
+  });
+
+  it('smart money detail returns explainable panel', async () => {
+    const service = new FnoService({ provider: new MockProvider() });
+    const detail = await service.getSmartMoneyDetail('HDFCBANK');
+    assert.equal(detail.data.symbol, 'HDFCBANK');
+    assert.ok(detail.data.score != null);
+    assert.ok(detail.data.explanation);
+    assert.ok(detail.data.components?.priceOi);
   });
 
   it('watchlist add/remove', async () => {
