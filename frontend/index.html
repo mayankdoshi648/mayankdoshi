@@ -2,29 +2,74 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>PowerBull Pro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f14" />
+  <title>PowerBull Pro — Markets</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="header">
-    <div class="brand">⚡ <span>PowerBull Pro</span></div>
-    <nav class="nav">
-      <button id="tab-live" class="tab active">Live Signals</button>
-      <button id="tab-darvax" class="tab">DarvaX Scanner</button>
-      <button id="tab-track" class="tab">Track Record</button>
+    <div class="brand-block">
+      <div class="brand">⚡ <span>PowerBull Pro</span></div>
+      <div id="auth-chip" class="auth-chip mode-demo" title="Dhan auth status">Demo</div>
+    </div>
+    <nav class="nav" aria-label="Primary">
+      <button id="tab-markets" class="tab active" type="button">Markets</button>
+      <button id="tab-live" class="tab" type="button">Live</button>
+      <button id="tab-darvax" class="tab" type="button">DarvaX</button>
+      <button id="tab-track" class="tab" type="button">Track</button>
     </nav>
-    <input type="date" id="date-picker" />
+    <input type="date" id="date-picker" class="date-picker" aria-label="Trade date" />
   </header>
 
-  <div id="market-banner" class="banner hidden"></div>
+  <div id="market-banner" class="banner hidden" role="status"></div>
+  <div id="error-toast" class="error-toast hidden" role="alert"></div>
 
-  <section id="counters" class="counters">
+  <section id="view-markets">
+    <div class="markets-hero">
+      <div>
+        <p class="markets-kicker">NSE · Dhan</p>
+        <h1 class="markets-title">Indian Market Pulse</h1>
+        <p class="markets-sub">Sector filter, rankings, and 52-week context — built for your phone first.</p>
+      </div>
+      <div class="markets-actions">
+        <select id="markets-universe" aria-label="Universe">
+          <option value="nifty50">Nifty 50</option>
+          <option value="nifty500">Nifty 500</option>
+        </select>
+        <button id="markets-refresh" class="btn accent" type="button">Refresh</button>
+      </div>
+    </div>
+
+    <div class="ranking-scroll" role="tablist" aria-label="Rankings">
+      <button class="rank-chip active" data-ranking="all" type="button">All</button>
+      <button class="rank-chip" data-ranking="gainers" type="button">Gainers</button>
+      <button class="rank-chip" data-ranking="losers" type="button">Losers</button>
+      <button class="rank-chip" data-ranking="near52wHigh" type="button">Near 52W High</button>
+      <button class="rank-chip" data-ranking="near52wLow" type="button">Near 52W Low</button>
+      <button class="rank-chip" data-ranking="volume" type="button">Volume</button>
+    </div>
+
+    <div id="sector-chips" class="sector-scroll" aria-label="Sectors"></div>
+
+    <div class="markets-meta">
+      <span id="markets-status">Loading market board…</span>
+      <span id="markets-count"></span>
+    </div>
+
+    <div id="markets-list" class="markets-list" aria-live="polite"></div>
+  </section>
+
+  <section id="counters" class="counters hidden">
     <div class="counter"><span id="count-total">0</span><label>Total</label></div>
     <div class="counter buy"><span id="count-buy">0</span><label>Buy</label></div>
     <div class="counter sell"><span id="count-sell">0</span><label>Sell</label></div>
   </section>
 
-  <section id="view-live">
+  <section id="view-live" class="hidden">
     <table class="signal-table">
       <thead><tr><th>Symbol</th><th>Side</th><th>Price</th><th>Time</th></tr></thead>
       <tbody id="signal-rows"></tbody>
@@ -39,9 +84,9 @@
         <option value="US">US</option>
       </select>
       <input type="number" id="darvax-min-score" value="55" min="0" max="100" title="Min score" />
-      <button id="darvax-refresh" class="btn">Refresh</button>
-      <button id="darvax-run-scan" class="btn accent">Run Scan</button>
-      <button id="darvax-export-obsidian" class="btn">Export Obsidian</button>
+      <button id="darvax-refresh" class="btn" type="button">Refresh</button>
+      <button id="darvax-run-scan" class="btn accent" type="button">Run Scan</button>
+      <button id="darvax-export-obsidian" class="btn" type="button">Export Obsidian</button>
       <span id="darvax-status" class="darvax-status"></span>
     </div>
     <table class="signal-table darvax-table">
@@ -77,14 +122,14 @@
 
   <div id="chart-modal" class="modal hidden">
     <div class="modal-content">
-      <button id="chart-close">&times;</button>
+      <button id="chart-close" type="button">&times;</button>
       <h3 id="chart-title"></h3>
       <canvas id="chart-canvas"></canvas>
     </div>
   </div>
 
   <p class="disclaimer">
-    Personal experiment, not investment advice. DarvaX orders require manual approval unless DARVAX_AUTO_TRADE=true.
+    Personal experiment, not investment advice. Quotes via DhanHQ when credentials are set; otherwise demo data.
     Not affiliated with any SEBI-registered research analyst.
   </p>
 

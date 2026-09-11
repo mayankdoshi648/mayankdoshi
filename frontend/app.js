@@ -1,14 +1,69 @@
 // frontend/app.js
-const state = { signals: [], date: new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10) };
+const state = {
+  signals: [],
+  date: new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10),
+  markets: {
+    universe: 'nifty50',
+    sector: 'all',
+    ranking: 'all',
+    rows: [],
+    sectors: [],
+    loading: false,
+  },
+};
 
 function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, (ch) => ({
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
     '&': '&amp;',
     '<': '&lt;',
     '>': '&gt;',
     '"': '&quot;',
     "'": '&#39;',
   }[ch]));
+}
+
+function formatNumber(n, digits = 2) {
+  if (n == null || Number.isNaN(Number(n))) return '—';
+  return Number(n).toLocaleString('en-IN', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+function formatVolume(n) {
+  if (n == null) return '—';
+  const v = Number(n);
+  if (v >= 1e7) return `${(v / 1e7).toFixed(2)} Cr`;
+  if (v >= 1e5) return `${(v / 1e5).toFixed(2)} L`;
+  if (v >= 1e3) return `${(v / 1e3).toFixed(1)} K`;
+  return String(v);
+}
+
+function showErrorToast(message) {
+  const el = document.getElementById('error-toast');
+  if (!message) {
+    el.classList.add('hidden');
+    el.textContent = '';
+    return;
+  }
+  el.textContent = message;
+  el.classList.remove('hidden');
+}
+
+function updateAuthChip(auth, dashboardMode) {
+  const chip = document.getElementById('auth-chip');
+  const mode = auth?.mode || dashboardMode || 'demo';
+  chip.classList.remove('mode-live', 'mode-demo', 'mode-error');
+  if (mode === 'live' || auth?.authenticated) {
+    chip.textContent = 'Dhan Live';
+    chip.classList.add('mode-live');
+  } else if (auth?.lastError && auth?.hasCredentials) {
+    chip.textContent = 'Auth Error';
+    chip.classList.add('mode-error');
+  } else {
+    chip.textContent = 'Demo';
+    chip.classList.add('mode-demo');
+  }
 }
 
 function updateCounters(signals) {
@@ -43,39 +98,56 @@ function renderTrackRow(signal) {
 }
 
 async function loadSignals(date) {
-  const resp = await fetch(`/api/signals?date=${date}`);
-  const signals = await resp.json();
-  state.signals = signals;
-  updateCounters(signals);
+  try {
+    const resp = await fetch(`/api/signals?date=${date}`);
+    if (!resp.ok) throw new Error(`Signals HTTP ${resp.status}`);
+    const signals = await resp.json();
+    state.signals = signals;
+    updateCounters(signals);
 
-  const liveBody = document.getElementById('signal-rows');
-  liveBody.innerHTML = '';
-  signals.forEach((s) => liveBody.appendChild(renderSignalRow(s)));
+    const liveBody = document.getElementById('signal-rows');
+    liveBody.innerHTML = '';
+    signals.forEach((s) => liveBody.appendChild(renderSignalRow(s)));
 
-  const trackBody = document.getElementById('track-rows');
-  trackBody.innerHTML = '';
-  signals.forEach((s) => trackBody.appendChild(renderTrackRow(s)));
+    const trackBody = document.getElementById('track-rows');
+    trackBody.innerHTML = '';
+    signals.forEach((s) => trackBody.appendChild(renderTrackRow(s)));
+  } catch (err) {
+    showErrorToast(`Could not load signals: ${err.message}`);
+  }
 }
 
 async function loadStatus() {
-  const resp = await fetch('/api/status');
-  const status = await resp.json();
-  const banner = document.getElementById('market-banner');
-  if (!status.feedConnected) {
-    banner.textContent = status.lastError
-      ? `Dhan feed disconnected (${status.lastError}) — check DHAN_CLIENT_ID/DHAN_PIN/DHAN_TOTP_SECRET in .env and restart the server.`
-      : 'Dhan feed not connected — check DHAN_CLIENT_ID/DHAN_PIN/DHAN_TOTP_SECRET in .env and restart the server.';
-    banner.classList.remove('hidden');
-  } else if (!status.marketOpen) {
-    banner.textContent = 'Market closed — showing last saved session.';
-    banner.classList.remove('hidden');
-  } else {
-    banner.classList.add('hidden');
+  try {
+    const resp = await fetch('/api/status');
+    if (!resp.ok) throw new Error(`Status HTTP ${resp.status}`);
+    const status = await resp.json();
+    updateAuthChip(status.auth, status.dashboardMode);
+    const banner = document.getElementById('market-banner');
+    if (status.dashboardMode === 'demo') {
+      banner.textContent = status.auth?.lastError
+        ? `Demo mode — ${status.auth.lastError}`
+        : 'Demo mode — add DHAN_CLIENT_ID / DHAN_PIN / DHAN_TOTP_SECRET to .env for live Dhan quotes.';
+      banner.classList.remove('hidden');
+    } else if (!status.feedConnected && status.marketOpen) {
+      banner.textContent = status.lastError
+        ? `Dhan feed disconnected (${status.lastError}) — check credentials and restart.`
+        : 'Dhan feed not connected — check DHAN credentials in .env and restart the server.';
+      banner.classList.remove('hidden');
+    } else if (!status.marketOpen) {
+      banner.textContent = 'Market closed — Markets board still available via Dhan REST / demo.';
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+    }
+  } catch (err) {
+    showErrorToast(`Status check failed: ${err.message}`);
   }
 }
 
 function connectLiveSocket() {
-  const ws = new WebSocket(`ws://${location.host}/live`);
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${proto}://${location.host}/live`);
   ws.addEventListener('message', (event) => {
     const msg = JSON.parse(event.data);
     if (msg.type === 'signal') {
@@ -102,6 +174,32 @@ function playAlert(signal) {
   }
 }
 
+function showView(name) {
+  const views = {
+    markets: 'view-markets',
+    live: 'view-live',
+    darvax: 'view-darvax',
+    track: 'view-track',
+  };
+  const tabs = {
+    markets: 'tab-markets',
+    live: 'tab-live',
+    darvax: 'tab-darvax',
+    track: 'tab-track',
+  };
+  Object.values(views).forEach((id) => document.getElementById(id).classList.add('hidden'));
+  Object.values(tabs).forEach((id) => document.getElementById(id).classList.remove('active'));
+  document.getElementById(views[name]).classList.remove('hidden');
+  document.getElementById(tabs[name]).classList.add('active');
+  document.getElementById('counters').classList.toggle('hidden', name !== 'live' && name !== 'track');
+  document.getElementById('date-picker').classList.toggle('hidden', name === 'markets');
+}
+
+document.getElementById('tab-markets').addEventListener('click', () => {
+  showView('markets');
+  loadMarkets();
+});
+
 document.getElementById('tab-live').addEventListener('click', () => {
   showView('live');
 });
@@ -116,16 +214,6 @@ document.getElementById('tab-track').addEventListener('click', () => {
   showView('track');
 });
 
-function showView(name) {
-  const views = { live: 'view-live', darvax: 'view-darvax', track: 'view-track' };
-  const tabs = { live: 'tab-live', darvax: 'tab-darvax', track: 'tab-track' };
-  Object.values(views).forEach((id) => document.getElementById(id).classList.add('hidden'));
-  Object.values(tabs).forEach((id) => document.getElementById(id).classList.remove('active'));
-  document.getElementById(views[name]).classList.remove('hidden');
-  document.getElementById(tabs[name]).classList.add('active');
-  document.getElementById('counters').classList.toggle('hidden', name === 'darvax');
-}
-
 document.getElementById('date-picker').value = state.date;
 document.getElementById('date-picker').addEventListener('change', (e) => {
   state.date = e.target.value;
@@ -136,12 +224,153 @@ if (window.Notification && Notification.permission === 'default') {
   Notification.requestPermission();
 }
 
-loadSignals(state.date);
-loadStatus();
-connectLiveSocket();
-setInterval(loadStatus, 30000);
+// --- Markets dashboard ---
+function changeClass(pct) {
+  if (pct == null) return 'flat';
+  if (pct > 0) return 'up';
+  if (pct < 0) return 'down';
+  return 'flat';
+}
 
-// --- appended to frontend/app.js ---
+function renderSectorChips(sectors) {
+  const host = document.getElementById('sector-chips');
+  host.innerHTML = '';
+
+  const allBtn = document.createElement('button');
+  allBtn.type = 'button';
+  allBtn.className = `sector-chip${state.markets.sector === 'all' ? ' active' : ''}`;
+  allBtn.dataset.sector = 'all';
+  allBtn.textContent = 'All sectors';
+  allBtn.addEventListener('click', () => {
+    state.markets.sector = 'all';
+    loadMarkets();
+  });
+  host.appendChild(allBtn);
+
+  sectors.forEach((s) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `sector-chip${state.markets.sector === s.sector ? ' active' : ''}`;
+    btn.dataset.sector = s.sector;
+    const cls = changeClass(s.avgChangePct);
+    btn.innerHTML = `${escapeHtml(s.sectorShort || s.sector)}<span class="chip-meta ${cls}">${s.avgChangePct > 0 ? '+' : ''}${formatNumber(s.avgChangePct, 1)}%</span>`;
+    btn.addEventListener('click', () => {
+      state.markets.sector = s.sector;
+      loadMarkets();
+    });
+    host.appendChild(btn);
+  });
+}
+
+function renderStockRow(row) {
+  const el = document.createElement('article');
+  el.className = 'stock-row';
+  const chgCls = changeClass(row.changePct);
+  const chgSign = row.changePct > 0 ? '+' : '';
+  const pos = Math.max(0, Math.min(100, row.rangePosition ?? 0));
+  el.innerHTML = `
+    <div class="stock-main">
+      <div class="stock-symbol">${escapeHtml(row.symbol)}</div>
+      <div class="stock-name">${escapeHtml(row.name || row.symbol)}</div>
+      <span class="stock-sector">${escapeHtml(row.sectorShort || row.sector || '—')}</span>
+    </div>
+    <div class="stock-price">
+      <div class="stock-ltp">${formatNumber(row.ltp)}</div>
+      <div class="stock-chg ${chgCls}">${chgSign}${formatNumber(row.changePct)}%</div>
+      <div class="stock-name">Vol ${formatVolume(row.volume)}</div>
+    </div>
+    <div class="stock-52" title="52-week range">
+      <div class="range-track">
+        <div class="range-fill" style="width:${pos}%"></div>
+        <div class="range-marker" style="left:${pos}%"></div>
+      </div>
+      <div class="range-labels">
+        <span>L ${formatNumber(row.low52)}</span>
+        <span>${row.pctFromHigh == null ? '—' : `${formatNumber(row.pctFromHigh)}% vs H`}</span>
+        <span>H ${formatNumber(row.high52)}</span>
+      </div>
+    </div>
+  `;
+  return el;
+}
+
+function renderMarketsList(rows) {
+  const host = document.getElementById('markets-list');
+  host.innerHTML = '';
+  if (!rows.length) {
+    host.innerHTML = '<div class="markets-empty">No stocks match this sector / ranking filter.</div>';
+    return;
+  }
+  rows.forEach((row) => host.appendChild(renderStockRow(row)));
+}
+
+async function loadMarkets({ force = false } = {}) {
+  if (state.markets.loading) return;
+  state.markets.loading = true;
+  const statusEl = document.getElementById('markets-status');
+  const countEl = document.getElementById('markets-count');
+  const refreshBtn = document.getElementById('markets-refresh');
+  statusEl.textContent = force ? 'Refreshing from Dhan…' : 'Loading market board…';
+  refreshBtn.disabled = true;
+  showErrorToast('');
+
+  try {
+    const params = new URLSearchParams({
+      universe: state.markets.universe,
+      sector: state.markets.sector,
+      ranking: state.markets.ranking,
+      limit: '100',
+    });
+    if (force) params.set('refresh', '1');
+
+    const resp = await fetch(`/api/dashboard?${params}`);
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+
+    state.markets.rows = data.rows || [];
+    state.markets.sectors = data.sectors || [];
+    updateAuthChip(data.auth, data.mode);
+    renderSectorChips(state.markets.sectors);
+    renderMarketsList(state.markets.rows);
+
+    const modeLabel = data.mode === 'demo' ? 'Demo' : 'Live';
+    statusEl.textContent = `${modeLabel} · ${new Date(data.scannedAt).toLocaleTimeString()} · ${escapeHtml(data.ranking)}`;
+    countEl.textContent = `${data.count} / ${data.totalInUniverse} stocks`;
+    if (data.warning) {
+      document.getElementById('market-banner').textContent = data.warning;
+      document.getElementById('market-banner').classList.remove('hidden');
+    }
+  } catch (err) {
+    statusEl.textContent = 'Failed to load';
+    showErrorToast(`Markets error: ${err.message}`);
+    document.getElementById('markets-list').innerHTML =
+      `<div class="markets-empty">Could not load dashboard. ${escapeHtml(err.message)}</div>`;
+  } finally {
+    state.markets.loading = false;
+    refreshBtn.disabled = false;
+  }
+}
+
+document.querySelectorAll('.rank-chip').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.rank-chip').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.markets.ranking = btn.dataset.ranking;
+    loadMarkets();
+  });
+});
+
+document.getElementById('markets-universe').addEventListener('change', (e) => {
+  state.markets.universe = e.target.value;
+  state.markets.sector = 'all';
+  loadMarkets({ force: true });
+});
+
+document.getElementById('markets-refresh').addEventListener('click', () => {
+  loadMarkets({ force: true });
+});
+
+// --- Chart modal ---
 let activeChart = null;
 
 function formatCandleTime(epochMs) {
@@ -152,38 +381,43 @@ function formatCandleTime(epochMs) {
 }
 
 async function openChartModal(symbol) {
-  const resp = await fetch(`/api/candles/${symbol}`);
-  const candles = await resp.json();
-  const modal = document.getElementById('chart-modal');
-  document.getElementById('chart-title').textContent = symbol;
-  modal.classList.remove('hidden');
+  try {
+    const resp = await fetch(`/api/candles/${symbol}`);
+    if (!resp.ok) throw new Error(`Candles HTTP ${resp.status}`);
+    const candles = await resp.json();
+    const modal = document.getElementById('chart-modal');
+    document.getElementById('chart-title').textContent = symbol;
+    modal.classList.remove('hidden');
 
-  const ohlc = candles.map((c) => ({ x: formatCandleTime(c.time), o: c.open, h: c.high, l: c.low, c: c.close }));
-  const markers = state.signals
-    .filter((s) => s.symbol === symbol)
-    .map((s) => ({ x: formatCandleTime(new Date(s.candle_time).getTime()), y: s.price, side: s.side }));
+    const ohlc = candles.map((c) => ({ x: formatCandleTime(c.time), o: c.open, h: c.high, l: c.low, c: c.close }));
+    const markers = state.signals
+      .filter((s) => s.symbol === symbol)
+      .map((s) => ({ x: formatCandleTime(new Date(s.candle_time).getTime()), y: s.price, side: s.side }));
 
-  if (activeChart) activeChart.destroy();
-  const ctx = document.getElementById('chart-canvas').getContext('2d');
-  activeChart = new Chart(ctx, {
-    type: 'candlestick',
-    data: {
-      datasets: [
-        { label: symbol, data: ohlc },
-        {
-          type: 'scatter',
-          label: 'Signals',
-          data: markers.map((m) => ({ x: m.x, y: m.y })),
-          pointBackgroundColor: markers.map((m) => (m.side === 'BUY' ? '#21c55d' : '#ef4444')),
-          pointStyle: markers.map((m) => (m.side === 'BUY' ? 'triangle' : 'rectRot')),
-          pointRadius: 6,
-        },
-      ],
-    },
-    options: {
-      scales: { x: { type: 'category' } },
-    },
-  });
+    if (activeChart) activeChart.destroy();
+    const ctx = document.getElementById('chart-canvas').getContext('2d');
+    activeChart = new Chart(ctx, {
+      type: 'candlestick',
+      data: {
+        datasets: [
+          { label: symbol, data: ohlc },
+          {
+            type: 'scatter',
+            label: 'Signals',
+            data: markers.map((m) => ({ x: m.x, y: m.y })),
+            pointBackgroundColor: markers.map((m) => (m.side === 'BUY' ? '#21c55d' : '#ef4444')),
+            pointStyle: markers.map((m) => (m.side === 'BUY' ? 'triangle' : 'rectRot')),
+            pointRadius: 6,
+          },
+        ],
+      },
+      options: {
+        scales: { x: { type: 'category' } },
+      },
+    });
+  } catch (err) {
+    showErrorToast(`Chart error: ${err.message}`);
+  }
 }
 
 document.getElementById('chart-close').addEventListener('click', () => {
@@ -257,6 +491,7 @@ async function loadDarvaxScans() {
   statusEl.textContent = 'Loading...';
   try {
     const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const items = await resp.json();
     const body = document.getElementById('darvax-rows');
     body.innerHTML = '';
@@ -268,31 +503,37 @@ async function loadDarvaxScans() {
     statusEl.textContent = `${items.length} results for ${date}`;
   } catch (err) {
     statusEl.textContent = `Error: ${err.message}`;
+    showErrorToast(`DarvaX load failed: ${err.message}`);
   }
 }
 
 async function loadPendingOrders() {
-  const resp = await fetch('/api/darvax/orders/pending');
-  const orders = await resp.json();
-  const body = document.getElementById('darvax-order-rows');
-  body.innerHTML = '';
-  orders.forEach((o) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${escapeHtml(o.id)}</td>
-      <td>${escapeHtml(o.symbol)}</td>
-      <td>${escapeHtml(o.side)}</td>
-      <td>${escapeHtml(o.quantity)}</td>
-      <td>${escapeHtml(o.price)}</td>
-      <td>${escapeHtml(o.status)}</td>
-      <td><button class="btn approve-btn">Approve</button></td>
-    `;
-    tr.querySelector('.approve-btn').addEventListener('click', async () => {
-      await fetch(`/api/darvax/orders/${o.id}/approve`, { method: 'POST' });
-      loadPendingOrders();
+  try {
+    const resp = await fetch('/api/darvax/orders/pending');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const orders = await resp.json();
+    const body = document.getElementById('darvax-order-rows');
+    body.innerHTML = '';
+    orders.forEach((o) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(o.id)}</td>
+        <td>${escapeHtml(o.symbol)}</td>
+        <td>${escapeHtml(o.side)}</td>
+        <td>${escapeHtml(o.quantity)}</td>
+        <td>${escapeHtml(o.price)}</td>
+        <td>${escapeHtml(o.status)}</td>
+        <td><button class="btn approve-btn">Approve</button></td>
+      `;
+      tr.querySelector('.approve-btn').addEventListener('click', async () => {
+        await fetch(`/api/darvax/orders/${o.id}/approve`, { method: 'POST' });
+        loadPendingOrders();
+      });
+      body.appendChild(tr);
     });
-    body.appendChild(tr);
-  });
+  } catch (err) {
+    showErrorToast(`Orders failed: ${err.message}`);
+  }
 }
 
 async function submitDarvaxOrder(item) {
@@ -337,10 +578,9 @@ document.getElementById('darvax-run-scan').addEventListener('click', async () =>
     const resp = await fetch('/api/darvax/scan', { method: 'POST' });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
-    const obs = data.obsidian ? ` | Obsidian: ${data.obsidian.exportedCount} notes` : '';
-    if (data.telegram?.sent) {
-      statusEl.textContent += ` | Telegram: ${data.telegram.count} alerts`;
-    }
+    statusEl.textContent = `Scan done NSE=${data.nse?.count ?? 0} US=${data.us?.count ?? 0}`;
+    if (data.obsidian) statusEl.textContent += ` | Obsidian: ${data.obsidian.exportedCount} notes`;
+    if (data.telegram?.sent) statusEl.textContent += ` | Telegram: ${data.telegram.count} alerts`;
     loadDarvaxScans();
   } catch (err) {
     statusEl.textContent = `Scan failed: ${err.message}`;
@@ -365,3 +605,23 @@ document.getElementById('darvax-export-obsidian').addEventListener('click', asyn
     statusEl.textContent = `Export failed: ${err.message}`;
   }
 });
+
+// Deep-link support
+const params = new URLSearchParams(location.search);
+const initialTab = params.get('tab') || 'markets';
+if (['markets', 'live', 'darvax', 'track'].includes(initialTab)) {
+  showView(initialTab);
+} else {
+  showView('markets');
+}
+
+loadSignals(state.date);
+loadStatus();
+loadMarkets();
+connectLiveSocket();
+setInterval(loadStatus, 30000);
+setInterval(() => {
+  if (!document.getElementById('view-markets').classList.contains('hidden')) {
+    loadMarkets();
+  }
+}, 60000);

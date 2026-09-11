@@ -8,7 +8,7 @@ Intraday EMA/RSI dashboard (Dhan live feed) plus **DarvaX box scanner** for NSE 
 
 - **Node.js 22.5+** (`node -v`)
 - Git
-- Dhan account (for NSE historical data and orders)
+- Dhan account (for NSE historical data, quotes, and orders)
 - Obsidian vault path (optional, for second-brain export)
 - Telegram bot (optional, for alerts)
 
@@ -17,12 +17,9 @@ Intraday EMA/RSI dashboard (Dhan live feed) plus **DarvaX box scanner** for NSE 
 ```bash
 git clone https://github.com/mayankdoshi648/mayankdoshi.git
 cd mayankdoshi
-git checkout cursor/darvax-engine-dashboard-213b
 npm install
 npm test
 ```
-
-All DarvaX work is on branch `cursor/darvax-engine-dashboard-213b` ([PR #1](https://github.com/mayankdoshi648/mayankdoshi/pull/1)). After the PR is merged, use `master` instead.
 
 ### 3. Configure environment
 
@@ -34,20 +31,32 @@ Edit `.env`:
 
 | Variable | Purpose |
 |----------|---------|
-| `DHAN_CLIENT_ID`, `DHAN_PIN`, `DHAN_TOTP_SECRET` | Dhan login + NSE EOD history |
+| `DHAN_CLIENT_ID`, `DHAN_PIN`, `DHAN_TOTP_SECRET` | Dhan login + NSE quotes / EOD history |
+| `DEMO_MODE` | Force synthetic Markets data (`true` / `false`) |
 | `OBSIDIAN_VAULT_PATH` | Full path to your Obsidian vault |
 | `OBSIDIAN_MIN_SCORE` | Min score for Obsidian notes (default 55) |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Alerts via @BotFather + @userinfobot |
 | `TELEGRAM_MIN_SCORE` | Alert threshold (default 85) |
 | `DARVAX_AUTO_TRADE` | Keep `false` until paper-trading validates picks |
 
+Without Dhan credentials the app starts in **demo mode** so the Markets dashboard remains usable.
+
 ### 4. Run locally
 
-**Dashboard** (DarvaX Scanner tab at http://localhost:3000):
+**Dashboard** (Markets tab at http://localhost:3000 — sector filters, rankings, 52-week range):
 
 ```bash
 npm start
 ```
+
+Deep-link: `http://localhost:3000/?tab=markets` (also `live`, `darvax`, `track`).
+
+**Markets API**
+
+- `GET /api/dashboard?universe=nifty50&sector=all&ranking=gainers`
+- `GET /api/dashboard/sectors`
+- `GET /api/dashboard/rankings`
+- `GET /api/auth/status` · `POST /api/auth/refresh`
 
 **One-off daily scan** (~20 min for full Nifty 500 + S&P 500):
 

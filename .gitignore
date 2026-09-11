@@ -5,4 +5,5 @@ data/*.db-journal
 data/*.db-wal
 data/*.db-shm
 data/screener-cache/
+data/dashboard-cache.json
 data/darvax-cron.log
