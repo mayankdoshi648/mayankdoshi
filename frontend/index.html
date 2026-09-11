@@ -74,6 +74,7 @@
             </div>
           </div>
           <button type="button" class="btn accent block-cta" data-jump="heatmap">Smart Money Heatmap →</button>
+          <button type="button" class="btn accent block-cta" data-jump="playbook">Daily Playbook →</button>
           <button type="button" class="btn block-cta" data-jump="opportunity">Opportunity Checklist →</button>
         </article>
 
@@ -240,6 +241,95 @@
         <div id="smart-detail-body"></div>
       </div>
       </div>
+    </section>
+
+
+    <!-- DAILY TRADING PLAYBOOK -->
+    <section class="view" data-view="playbook">
+      <div class="playbook-head">
+        <div>
+          <h1 class="view-title">Daily Trading Playbook</h1>
+          <p class="disclaimer-inline tiny">Decision-support cockpit — not buy/sell advice. READY / WAIT / EARLY / CONFLICTED are checklist states from existing scores, not profit guarantees.</p>
+        </div>
+        <div class="playbook-controls">
+          <label class="field compact">
+            <span>Timeframe</span>
+            <select id="playbook-tf" aria-label="Playbook timeframe">
+              <option value="INTRADAY" selected>Intraday</option>
+              <option value="15M">15M</option>
+              <option value="30M">30M</option>
+              <option value="60M">60M</option>
+              <option value="DAILY">Daily</option>
+            </select>
+          </label>
+          <div id="playbook-tf-note" class="tiny muted">TIMEFRAME: INTRADAY · using board primary signals</div>
+        </div>
+      </div>
+
+      <article class="home-block playbook-summary" id="playbook-summary">
+        <h2 class="section-label section-label-hero">Today's Playbook</h2>
+        <div id="playbook-summary-grid" class="playbook-summary-grid muted">Loading…</div>
+      </article>
+
+      <article class="home-block playbook-context" id="playbook-context">
+        <h2 class="section-label">Market Context</h2>
+        <div id="playbook-context-body" class="muted">Loading…</div>
+      </article>
+
+      <article class="home-block playbook-priority" id="playbook-priority">
+        <h2 class="section-label">What Matters Most Right Now</h2>
+        <ol id="playbook-priority-list" class="playbook-priority-list muted"><li>Loading…</li></ol>
+      </article>
+
+      <article class="home-block playbook-ready-block" id="playbook-ready-block">
+        <h2 class="section-label section-label-hero">🔥 Ready Now</h2>
+        <p class="tiny muted">Checklist confirmation complete from the Opportunity engine — not a profit guarantee.</p>
+        <div id="playbook-ready" class="playbook-cards"></div>
+      </article>
+
+      <div class="playbook-grid playbook-top-ops">
+        <article class="home-block playbook-bull">
+          <h2 class="section-label section-label-hero">🔥 Top 3 Bullish Opportunities</h2>
+          <p class="tiny muted">Potential bullish setups from Opportunity + Smart Money rankings — not guaranteed longs.</p>
+          <div id="playbook-bullish" class="playbook-cards"></div>
+        </article>
+        <article class="home-block playbook-bear">
+          <h2 class="section-label section-label-hero">🔻 Top 3 Bearish Opportunities</h2>
+          <p class="tiny muted">Potential short / downside setups — not guaranteed shorts.</p>
+          <div id="playbook-bearish" class="playbook-cards"></div>
+        </article>
+      </div>
+
+      <article class="home-block playbook-wait">
+        <h2 class="section-label section-label-hero">🎯 What To Wait For Today</h2>
+        <div id="playbook-wait-list" class="playbook-wait-list muted">Loading…</div>
+      </article>
+
+      <article class="home-block playbook-early">
+        <h2 class="section-label section-label-hero">👀 Early Opportunities</h2>
+        <p class="tiny muted">Promising but not fully confirmed — see exact wait triggers from the confirmation engine.</p>
+        <div id="playbook-early" class="playbook-cards"></div>
+      </article>
+
+      <div class="playbook-grid playbook-risk-ops">
+        <article class="home-block playbook-conflict">
+          <h2 class="section-label section-label-hero">⚠️ Conflicted Setups</h2>
+          <div id="playbook-conflicted" class="playbook-cards"></div>
+        </article>
+        <article class="home-block playbook-avoid">
+          <h2 class="section-label section-label-hero">🚫 Avoid / Overextended</h2>
+          <div id="playbook-avoid" class="playbook-cards"></div>
+        </article>
+      </div>
+
+      <article class="home-block playbook-alerts-block">
+        <h2 class="section-label">Alert Hooks</h2>
+        <p class="tiny muted">Uses existing alert rules. Thresholds below are read-only from the Alerts engine.</p>
+        <div id="playbook-alerts" class="playbook-alerts muted">—</div>
+        <button type="button" class="btn block-cta" data-jump="alerts">Open Alerts →</button>
+      </article>
+
+      <div id="playbook-detail" class="opp-detail hidden" aria-live="polite"></div>
     </section>
 
     <!-- OPPORTUNITY / TRADE READINESS -->
@@ -614,9 +704,9 @@
 
   <nav class="bottom-nav" aria-label="Primary">
     <button type="button" data-nav="overview" class="active"><span>⌂</span>Home</button>
+    <button type="button" data-nav="playbook"><span>▦</span>Playbook</button>
     <button type="button" data-nav="opportunity"><span>◎</span>Opp</button>
     <button type="button" data-nav="smart"><span>◆</span>Smart</button>
-    <button type="button" data-nav="intel"><span>▣</span>F&amp;O</button>
     <button type="button" data-nav="more"><span>⋯</span>More</button>
   </nav>
 
@@ -626,6 +716,7 @@
         <span>More</span>
         <button type="button" id="sheet-close" class="btn">Close</button>
       </div>
+      <button type="button" data-nav="playbook">Daily Playbook</button>
       <button type="button" data-nav="markets">Equity Markets</button>
       <button type="button" data-nav="chain">Options Chain</button>
       <button type="button" data-nav="opportunity">Opportunity Checklist</button>

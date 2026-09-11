@@ -3377,3 +3377,356 @@ html[data-theme="night"] .dense-table tbody tr:nth-child(even) td {
 @media (min-width: 900px) {
   .banner { font-size: 0.7rem !important; padding: 0.28rem 1rem !important; }
 }
+
+/* ========== Daily Trading Playbook ========== */
+.view[data-view="playbook"] {
+  display: none;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.view[data-view="playbook"].active {
+  display: flex;
+}
+.playbook-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.playbook-controls {
+  display: grid;
+  gap: 0.35rem;
+  min-width: min(100%, 220px);
+}
+.playbook-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+@media (min-width: 720px) {
+  .playbook-summary-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+.pb-sum,
+.pb-bias,
+.pb-idx {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.65rem;
+}
+.pb-sum .k,
+.pb-bias .k,
+.pb-idx .k {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+.pb-sum .v,
+.pb-bias .v,
+.pb-idx .v {
+  font-family: var(--mono);
+  font-weight: 800;
+  font-size: 0.92rem;
+  color: var(--text);
+  line-height: 1.25;
+}
+.bias-bullish { color: var(--up) !important; }
+.bias-bearish { color: var(--down) !important; }
+.bias-neutral { color: var(--accent) !important; }
+.bias-mixed { color: var(--warn) !important; }
+
+.pb-idx-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.65rem;
+}
+@media (min-width: 720px) {
+  .pb-idx-row {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+.pb-idx.up .v,
+.pb-idx.up .chg { color: var(--up); }
+.pb-idx.down .v,
+.pb-idx.down .chg { color: var(--down); }
+.pb-idx .chg {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  margin-top: 0.1rem;
+}
+.pb-bias-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+@media (min-width: 900px) {
+  .pb-bias-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.pb-why-market,
+.pb-why,
+.pb-miss,
+.pb-conflict,
+.pb-avoid,
+.pb-wait-box {
+  margin-top: 0.65rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  text-align: left;
+}
+.pb-why-market .k,
+.pb-why .k,
+.pb-miss .k,
+.pb-conflict .k,
+.pb-avoid .k,
+.pb-wait-box .k {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  margin-bottom: 0.3rem;
+}
+.pb-why-market ul,
+.pb-why ul,
+.pb-miss ul,
+.pb-avoid ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.84rem;
+  color: var(--text-dim);
+}
+.pb-wait-box {
+  border-color: rgba(217, 119, 6, 0.35);
+  background: var(--warn-bg);
+}
+.pb-conflict {
+  border-color: rgba(217, 119, 6, 0.4);
+  background: var(--warn-bg);
+}
+.pb-avoid {
+  border-color: rgba(220, 38, 38, 0.3);
+  background: var(--down-bg);
+}
+.pb-tag.early {
+  display: inline-flex;
+  margin-top: 0.45rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--warn);
+  background: var(--warn-bg);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+}
+
+.playbook-priority-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.55rem;
+}
+.playbook-priority-list li {
+  color: var(--text);
+}
+
+.playbook-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+@media (min-width: 900px) {
+  .playbook-grid {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.playbook-cards {
+  display: grid;
+  gap: 0.65rem;
+}
+.pb-card {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+  padding: 0.75rem;
+  color: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.pb-card:hover,
+.pb-card:focus-visible {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  outline: none;
+  transform: translateY(-1px);
+}
+.pb-card.mode-ready {
+  border-left: 3px solid var(--up);
+}
+.pb-card.mode-early {
+  border-left: 3px solid var(--warn);
+}
+.pb-card.mode-conflict {
+  border-left: 3px solid var(--warn);
+}
+.pb-card.mode-avoid {
+  border-left: 3px solid var(--down);
+}
+.pb-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+.pb-rank-sym {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+.pb-rank {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--muted);
+}
+.pb-price {
+  font-family: var(--mono);
+  font-size: 0.84rem;
+  margin-top: 0.15rem;
+}
+.pb-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  justify-content: flex-end;
+}
+.pb-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.55rem;
+}
+.pb-meta .pill.smart {
+  color: var(--smart);
+  background: var(--smart-bg);
+  border-color: rgba(124, 58, 237, 0.25);
+}
+.pb-meta .pill.options {
+  color: var(--options);
+  background: var(--options-bg);
+  border-color: rgba(8, 145, 178, 0.25);
+}
+.pb-inv {
+  margin-top: 0.45rem;
+}
+
+.playbook-wait-list {
+  display: grid;
+  gap: 0.5rem;
+}
+.pb-wait-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.65rem;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: inherit;
+  cursor: pointer;
+}
+.pb-wait-row:hover,
+.pb-wait-row:focus-visible {
+  border-color: rgba(217, 119, 6, 0.45);
+  outline: none;
+}
+.pb-wait-rank {
+  width: 1.6rem;
+  height: 1.6rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-weight: 800;
+  font-size: 0.75rem;
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.pb-wait-label {
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+.pb-alert-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.55rem;
+}
+.pb-alert-grid > div {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.6rem;
+  font-size: 0.82rem;
+}
+
+/* Mobile reading order: context → opportunities → wait → early → risk */
+@media (max-width: 899px) {
+  .view[data-view="playbook"].active {
+    display: flex;
+  }
+  .view[data-view="playbook"] > .playbook-head { order: 0; }
+  .view[data-view="playbook"] > .playbook-context { order: 1; }
+  .view[data-view="playbook"] > .playbook-summary { order: 2; }
+  .view[data-view="playbook"] > .playbook-priority { order: 3; }
+  .view[data-view="playbook"] > .playbook-ready-block { order: 4; }
+  .view[data-view="playbook"] > .playbook-top-ops { order: 5; }
+  .view[data-view="playbook"] > .playbook-wait { order: 6; }
+  .view[data-view="playbook"] > .playbook-early { order: 7; }
+  .view[data-view="playbook"] > .playbook-risk-ops { order: 8; }
+  .view[data-view="playbook"] > .playbook-alerts-block { order: 9; }
+  .view[data-view="playbook"] > #playbook-detail { order: 10; }
+}
+
+.home-block.playbook-summary,
+.home-block.playbook-context,
+.home-block.playbook-priority,
+.home-block.playbook-ready-block,
+.home-block.playbook-bull,
+.home-block.playbook-bear,
+.home-block.playbook-early,
+.home-block.playbook-wait,
+.home-block.playbook-conflict,
+.home-block.playbook-avoid,
+.home-block.playbook-alerts-block {
+  border-top: 2px solid transparent;
+}
+.home-block.playbook-summary { border-top-color: var(--accent); }
+.home-block.playbook-context { border-top-color: var(--accent); }
+.home-block.playbook-ready-block,
+.home-block.playbook-bull { border-top-color: var(--up); }
+.home-block.playbook-bear { border-top-color: var(--down); }
+.home-block.playbook-early,
+.home-block.playbook-wait { border-top-color: var(--warn); }
+.home-block.playbook-conflict { border-top-color: var(--warn); }
+.home-block.playbook-avoid { border-top-color: var(--down); }
