@@ -856,11 +856,13 @@
     try {
       const env = await api('/api/fno/credentials/dhan');
       paintDhanStatus(env.data || env);
-      if (state.forceStaticDemo || env.data?.staticOnly) {
-        $('#dhan-form')?.classList.add('disabled');
-        $$('#dhan-form input, #dhan-form button').forEach((n) => { n.disabled = true; });
-        setDhanMsg(env.data?.note || 'Live Dhan needs the Node server (npm start). Static hosts cannot store secrets safely.', false);
+      const staticOnly = Boolean(state.forceStaticDemo || env.data?.staticOnly);
+      $('#dhan-static-block')?.classList.toggle('hidden', !staticOnly);
+      if (staticOnly) {
+        $('#dhan-form')?.classList.add('hidden');
+        setDhanMsg('');
       } else {
+        $('#dhan-form')?.classList.remove('hidden');
         $('#dhan-form')?.classList.remove('disabled');
         $$('#dhan-form input, #dhan-form button').forEach((n) => { n.disabled = false; });
       }
