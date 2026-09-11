@@ -109,7 +109,7 @@
   function showView(name) {
     state.view = name;
     $$('.view').forEach((v) => v.classList.toggle('active', v.dataset.view === name));
-    const primary = new Set(['overview', 'intel', 'opportunity', 'smart']);
+    const primary = new Set(['overview', 'playbook', 'opportunity', 'smart']);
     $$('.bottom-nav [data-nav]').forEach((b) => {
       const nav = b.dataset.nav;
       if (nav === 'more') {
@@ -138,6 +138,7 @@
       if (name === 'alerts') await renderAlerts();
       if (name === 'watch') await renderWatch();
       if (name === 'settings') await renderSettings();
+      if (name === 'playbook') await renderPlaybook();
       if (name === 'opportunity') await renderOpportunity();
       if (name === 'markets') await window.MarketsBoard?.render?.();
       if (name === 'legacy') await renderFuturesTable();
@@ -1156,12 +1157,14 @@
     });
   }
 
-  async function openOpportunityDetail(symbol) {
+  async function openOpportunityDetail(symbol, mountSel = '#opp-detail') {
+    const mount = $(mountSel) || $('#opp-detail');
+    if (!mount) return;
     const env = await api(`/api/fno/opportunity/${encodeURIComponent(symbol)}`);
     const d = env.data;
     if (!d) {
-      $('#opp-detail').classList.remove('hidden');
-      $('#opp-detail').innerHTML = `<p class="muted">No detail for ${escapeHtml(symbol)}</p>`;
+      mount.classList.remove('hidden');
+      mount.innerHTML = `<p class="muted">No detail for ${escapeHtml(symbol)}</p>`;
       return;
     }
     const cats = d.categories || {};
@@ -1210,9 +1213,9 @@
       return `<div>${escapeHtml(cat)} ${icon}</div>`;
     }).join('');
 
-    $('#opp-detail').classList.remove('hidden');
-    $('#opp-detail').classList.add('opp-drawer');
-    $('#opp-detail').innerHTML = `
+    mount.classList.remove('hidden');
+    mount.classList.add('opp-drawer');
+    mount.innerHTML = `
       <div class="opp-detail-head">
         <div>
           <h2 class="view-title" style="margin:0">${escapeHtml(d.symbol)}</h2>
@@ -1259,8 +1262,8 @@
       ${d.expectedMove ? `<p class="muted">Expected move context: ${fmt(d.expectedMove.lower)} – ${fmt(d.expectedMove.upper)} (spot ${fmt(d.expectedMove.spot)})</p>` : '<p class="muted">Expected move: DATA UNAVAILABLE at stock level unless index chain attached</p>'}
       <p class="disclaimer-inline tiny">${escapeHtml(d.disclaimer || '')}</p>
     `;
-    $('#opp-detail-close')?.addEventListener('click', () => $('#opp-detail')?.classList.add('hidden'));
-    $('#opp-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    mount.querySelector('#opp-detail-close')?.addEventListener('click', () => mount.classList.add('hidden'));
+    mount.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function initTheme() {
@@ -1357,7 +1360,356 @@
       await renderTicker();
       await loadView(state.view);
     });
+    $('#playbook-tf')?.addEventListener('change', () => {
+      if (state.view === 'playbook') renderPlaybook();
+    });
+    document.querySelector('[data-view="playbook"]')?.addEventListener('click', (e) => {
+      const jump = e.target.closest('[data-jump]');
+      if (jump?.dataset?.jump) showView(jump.dataset.jump);
+    });
   }
+
+
+  function playbookConflictText(r) {
+    const parts = [];
+    const c = r?.conflict || {};
+    const oi = String(r.oiSignal || r.setup || '');
+    const opt = String(r.optionsAlignment || '');
+    const vwap = String(r.vwapRelation || '');
+    const sm = Number(r.smartMoneyScore);
+    const sector = Number(r.sectorStrength);
+    const dir = String(r.direction || '');
+
+    if (/BULLISH/i.test(dir) && /SHORT_BUILDUP|LONG_UNWINDING|BEAR/i.test(oi)) {
+      parts.push('Price bullish, but OI / buildup signal is opposing.');
+    }
+    if (/BEARISH/i.test(dir) && /LONG_BUILDUP|SHORT_COVERING/i.test(oi)) {
+      parts.push('Price bearish, but OI / buildup signal is opposing.');
+    }
+    if (Number.isFinite(sm) && sm > 20 && /BEAR|WEAK|AGAINST|OPPOS/i.test(opt)) {
+      parts.push('Smart Money positive, but options positioning is conflicting.');
+    }
+    if (Number.isFinite(sm) && sm < -20 && /BULL|SUPPORT|ALIGN/i.test(opt)) {
+      parts.push('Smart Money negative, but options look supportive.');
+    }
+    if (Number.isFinite(sector) && sector < 45 && /BULLISH/i.test(dir)) {
+      parts.push('Stock setup constructive, but sector strength is weak.');
+    }
+    if (/ABOVE/i.test(vwap) && /BEARISH/i.test(dir)) {
+      parts.push('Above VWAP, but higher-level direction is bearish.');
+    }
+    if (/BELOW/i.test(vwap) && /BULLISH/i.test(dir)) {
+      parts.push('Below VWAP while trying a bullish setup.');
+    }
+    if ((r.opportunityScore ?? 0) >= 70 && (r.confidence ?? 100) < 55) {
+      parts.push('High opportunity score with low confidence.');
+    }
+    if (/HIGH|OVEREXTEND|EXTENDED/i.test(String(r.extension || ''))) {
+      parts.push('Strong momentum but extension / late-move risk.');
+    }
+    if (!parts.length && c.level && c.level !== 'NONE' && c.level !== 'LOW') {
+      const bull = (c.bullish || []).slice(0, 2).join(', ') || '—';
+      const bear = (c.bearish || []).slice(0, 2).join(', ') || '—';
+      parts.push(`Conflict ${c.level}: supportive (${bull}) vs opposing (${bear}).`);
+    }
+    return parts.slice(0, 2).join(' ');
+  }
+
+  function playbookWhy(r) {
+    const reasons = [];
+    for (const f of (r.strongestFactors || []).slice(0, 4)) {
+      if (f?.text) reasons.push(f.text);
+    }
+    if (!reasons.length && r.why) {
+      reasons.push(...String(r.why).split('.').map((s) => s.trim()).filter(Boolean).slice(0, 3));
+    }
+    if (r.setup) reasons.unshift(`Setup: ${String(r.setup).replace(/_/g, ' ')}`);
+    if (r.smartMoneyScore != null) reasons.push(`Smart Money ${r.smartMoneyScore >= 0 ? '+' : ''}${r.smartMoneyScore}`);
+    return [...new Set(reasons)].slice(0, 4);
+  }
+
+  function playbookWait(r) {
+    return r.waitFor || r.waitFor || {};
+  }
+
+  function playbookMissing(r) {
+    const waits = playbookWait(r).triggers || [];
+    return waits.filter((t) => !/pass|met|yes|true|ok/i.test(String(t.status || ''))).slice(0, 4);
+  }
+
+  function playbookOiPct(r) {
+    return r.oiChangePct
+      ?? r.stats?.oiChangePct
+      ?? r.smartMoneyBreakdown?.priceOi?.detail?.oiChangePct
+      ?? r.smartMoneyBreakdown?.priceOi?.detail?.oiPct
+      ?? null;
+  }
+
+  function playbookCard(r, opts = {}) {
+    const mode = opts.mode || 'ready';
+    const rank = opts.rank;
+    const reasons = playbookWhy(r);
+    const waits = playbookMissing(r);
+    const conflict = playbookConflictText(r);
+    const rvol = r.relativeVolume ?? r.relativeVol ?? null;
+    const vwap = r.vwapRelation || r.vwapStatus || '—';
+    const oi = playbookOiPct(r);
+    const top = playbookWait(r).topTrigger || waits[0];
+    const sectorLabel = r.sectorStrength == null
+      ? 'DATA UNAVAILABLE'
+      : (r.sectorStrength >= 65 ? 'Strong' : r.sectorStrength >= 45 ? 'Mixed' : 'Weak');
+    let extra = '';
+    if (mode === 'early') {
+      extra = `
+        <div class="pb-tag early">EARLY SETUP</div>
+        <div class="pb-miss">
+          <div class="k">What is missing?</div>
+          <ul>${waits.length ? waits.map((t) => `<li>${escapeHtml(t.label)}${t.current != null ? ` · now ${escapeHtml(String(t.current))}` : ''}${t.required != null ? ` · need ${escapeHtml(String(t.required))}` : ''}</li>`).join('') : '<li class="muted">DATA UNAVAILABLE</li>'}</ul>
+        </div>
+        ${top ? `<div class="pb-wait-box"><div class="k">🎯 What to wait for</div><div>${escapeHtml(top.label)}${top.required != null ? ` — ${escapeHtml(String(top.required))}` : ''}</div><div class="muted tiny">${escapeHtml(top.why || '')}</div></div>` : ''}
+        ${r.invalidation?.summary ? `<div class="pb-inv muted tiny">Invalidation: ${escapeHtml(r.invalidation.summary)}</div>` : ''}`;
+    } else if (mode === 'conflict') {
+      extra = `<div class="pb-conflict"><div class="k">Conflict</div><p>${escapeHtml(conflict || 'Indicators disagree — open detail for factor split.')}</p></div>`;
+    } else if (mode === 'avoid') {
+      const avoidWhy = [];
+      if (r.extension && r.extension !== 'LOW_RISK') avoidWhy.push(`Extension: ${prettyLabel(r.extension)}`);
+      if (r.grade === 'AVOID') avoidWhy.push('Grade AVOID from opportunity engine');
+      if ((r.conflict?.level || '') === 'HIGH') avoidWhy.push('High conflict across factors');
+      if ((r.confidence ?? 100) < 55) avoidWhy.push(`Low confidence ${r.confidence}%`);
+      if (r.invalidation?.summary) avoidWhy.push(r.invalidation.summary);
+      for (const w of (r.weakestFactors || []).slice(0, 2)) if (w?.text) avoidWhy.push(w.text);
+      extra = `<div class="pb-avoid"><div class="k">Why avoid?</div><ul>${(avoidWhy.length ? avoidWhy : ['See opportunity checklist']).slice(0, 4).map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul></div>`;
+    } else {
+      extra = `
+        <div class="pb-why"><div class="k">Why this is interesting</div><ul>${reasons.map((t) => `<li>${escapeHtml(t)}</li>`).join('') || '<li class="muted">—</li>'}</ul></div>
+        ${top && r.readiness?.status !== 'READY' ? `<div class="pb-wait-box"><div class="k">Still waiting</div><div>${escapeHtml(top.label)}${top.required != null ? ` — ${escapeHtml(String(top.required))}` : ''}</div></div>` : ''}
+        ${r.invalidation?.summary ? `<div class="pb-inv muted tiny">Invalidation: ${escapeHtml(r.invalidation.summary)}</div>` : ''}`;
+    }
+    return `
+      <button type="button" class="pb-card mode-${mode} ${gradeClass(r.grade)}" data-pb-sym="${escapeHtml(r.symbol)}">
+        <div class="pb-card-top">
+          <div>
+            <div class="pb-rank-sym">${rank != null ? `<span class="pb-rank">#${rank}</span>` : ''}<span class="sym">${escapeHtml(r.symbol)}</span></div>
+            <div class="pb-price">₹${r.ltp != null ? fmt(r.ltp) : 'DATA UNAVAILABLE'} <span class="${clsDir(r.priceChangePct)}">${r.priceChangePct != null ? fmtPct(r.priceChangePct) : '—'}</span></div>
+          </div>
+          <div class="pb-badges">
+            <span class="grade-badge ${gradeClass(r.grade)}">${escapeHtml(r.grade || '—')}</span>
+            <span class="pill ${readinessClass(r.readiness?.status)}">${readinessLabel(r.readiness)}</span>
+          </div>
+        </div>
+        <div class="setup-badge">${escapeHtml(prettyLabel(r.setup || r.oiSignal || r.direction || '—'))} · ${escapeHtml(/BEAR/i.test(r.direction || '') ? 'Bearish setup' : /BULL/i.test(r.direction || '') ? 'Bullish setup' : 'Potential opportunity')}</div>
+        <div class="opp-scores">
+          ${scoreBar('Opportunity', r.opportunityScore, 100, false)}
+          ${scoreBar('Confidence', r.confidence, 100, true)}
+        </div>
+        <div class="pb-meta">
+          <span class="pill smart">SM ${r.smartMoneyScore != null ? `${r.smartMoneyScore >= 0 ? '+' : ''}${r.smartMoneyScore}` : 'n/a'}</span>
+          <span class="pill">Sector ${escapeHtml(r.sector || '—')} · ${sectorLabel}${r.sectorStrength != null ? ` (${fmt(r.sectorStrength, 0)})` : ''}</span>
+          <span class="pill">VWAP ${escapeHtml(prettyLabel(vwap))}</span>
+          <span class="pill">RVOL ${rvol != null ? `${fmt(rvol)}x` : 'DATA UNAVAILABLE'}</span>
+          <span class="pill ${clsDir(oi)}">OI ${oi != null ? fmtPct(oi) : 'DATA UNAVAILABLE'}</span>
+          <span class="pill options">${escapeHtml(prettyLabel(r.optionsAlignment || 'DATA UNAVAILABLE'))}</span>
+        </div>
+        ${extra}
+      </button>`;
+  }
+
+  function bindPlaybookCards(root) {
+    root?.querySelectorAll('[data-pb-sym]').forEach((btn) => {
+      btn.addEventListener('click', () => openOpportunityDetail(btn.dataset.pbSym, '#playbook-detail'));
+    });
+  }
+
+  function deriveMarketBias(regime, sectors, fii) {
+    const label = String(regime?.label || '');
+    let bias = 'MIXED';
+    if (/STRONG_BULLISH|BULLISH|RISK_ON/i.test(label)) bias = 'BULLISH';
+    else if (/STRONG_BEARISH|BEARISH|RISK_OFF/i.test(label)) bias = 'BEARISH';
+    else if (/NEUTRAL|RANGE/i.test(label)) bias = 'NEUTRAL';
+    const vixFactor = (regime?.factors || []).find((f) => /vix/i.test(f.name || ''));
+    const vix = Number(vixFactor?.value);
+    let regimeType = 'MIXED';
+    if (Number.isFinite(vix) && vix >= 18) regimeType = 'HIGH VOLATILITY';
+    else if (Number.isFinite(vix) && vix <= 13) regimeType = 'LOW VOLATILITY';
+    else if (/BULLISH|BEARISH/i.test(label)) regimeType = 'TRENDING';
+    else if (/NEUTRAL|RANGE/i.test(label)) regimeType = 'RANGE';
+    const topSec = (sectors || [])[0];
+    const weakSec = (sectors || [])[(sectors || []).length - 1];
+    const ads = (sectors || []).map((s) => Number(s.advanceDecline)).filter(Number.isFinite);
+    const breadth = ads.length ? ads.reduce((a, b) => a + b, 0) / ads.length : null;
+    const why = [];
+    for (const f of (regime?.factors || []).slice(0, 4)) {
+      if (f.evidence) why.push(f.evidence);
+    }
+    if (fii?.cash?.fiiNet != null) why.push(`FII cash net ${fmt(fii.cash.fiiNet, 0)} cr (${fii.label || 'source tagged'})`);
+    if (topSec) why.push(`Leading sector ${topSec.name || topSec.sector} (${fmtPct(topSec.returnPct)})`);
+    if (breadth != null) why.push(`Sector A/D breadth avg ${fmt(breadth)} (≥1 favors advances)`);
+    return { bias, regimeType, why, topSec, weakSec, vix, breadth };
+  }
+
+  function derivePriorities({ regime, bias, sectors, fii, rankings, ticker }) {
+    const items = [];
+    if (regime?.label) items.push({ title: `Market regime ${prettyLabel(regime.label)}`, detail: `Score ${regime.score != null ? Math.round(Math.abs(Number(regime.score))) : '—'}/100 · Confidence ${regime.confidence != null ? (regime.confidence <= 1 ? Math.round(regime.confidence * 100) : Math.round(regime.confidence)) : '—'}%` });
+    const vixQ = (ticker || []).find((q) => /VIX/i.test(q.symbol || ''));
+    if (vixQ) items.push({ title: `India VIX ${fmt(vixQ.ltp)} (${fmtPct(vixQ.changePct)})`, detail: Number(vixQ.ltp) >= 18 ? 'Elevated volatility — favor confirmation over aggression' : 'Volatility contained — trend setups cleaner if breadth agrees' });
+    if (sectors?.[0]) items.push({ title: `Strongest sector ${sectors[0].name || sectors[0].sector}`, detail: `${fmtPct(sectors[0].returnPct)} · score ${fmt(sectors[0].score, 0)}` });
+    if (sectors?.length) {
+      const weak = sectors[sectors.length - 1];
+      items.push({ title: `Weakest sector ${weak.name || weak.sector}`, detail: `${fmtPct(weak.returnPct)} · score ${fmt(weak.score, 0)}` });
+    }
+    if (fii?.cash?.fiiNet != null) items.push({ title: `FII/DII cash ${fii.positioningRegime?.label || '—'}`, detail: `FII ${fmt(fii.cash.fiiNet, 0)} · DII ${fmt(fii.cash.diiNet, 0)} cr` });
+    const ready = rankings.readyNow || [];
+    if (ready.length) items.push({ title: `${ready.length} READY opportunity checklist(s)`, detail: ready.slice(0, 3).map((r) => r.symbol).join(', ') });
+    else items.push({ title: 'No READY setups right now', detail: 'Focus on EARLY confirmations and wait triggers' });
+    return items.slice(0, 5);
+  }
+
+  async function renderPlaybook() {
+    state.playbookTf = $('#playbook-tf')?.value || state.playbookTf || 'INTRADAY';
+    if ($('#playbook-tf')) $('#playbook-tf').value = state.playbookTf;
+    const mtfNote = state.playbookTf === 'INTRADAY'
+      ? 'board primary signals (intraday path)'
+      : `${state.playbookTf} preference labeled — multi-TF candles may be DATA UNAVAILABLE in F&O path`;
+    if ($('#playbook-tf-note')) {
+      $('#playbook-tf-note').textContent = `TIMEFRAME: ${state.playbookTf} · ${mtfNote}`;
+    }
+
+    const [overview, opp, sectorsEnv, fiiEnv, alertsEnv, tickerEnv] = await Promise.all([
+      api('/api/fno/overview'),
+      api('/api/fno/opportunity?limit=80&sort=opportunityScore&dir=desc'),
+      api('/api/fno/sectors').catch(() => ({ data: [] })),
+      api('/api/fno/fii-dii').catch(() => ({ data: null })),
+      api('/api/fno/alerts/rules').catch(() => ({ data: null })),
+      api('/api/fno/ticker').catch(() => ({ data: [] })),
+    ]);
+
+    const regime = overview.data?.regime || {};
+    const sectors = sectorsEnv.data || [];
+    const fii = fiiEnv.data || null;
+    const rankings = opp.data?.rankings || {};
+    const rows = opp.data?.rows || [];
+    const ticker = tickerEnv.data || overview.data?.ticker || [];
+    const { bias, regimeType, why, topSec, weakSec, vix, breadth } = deriveMarketBias(regime, sectors, fii);
+
+    const idx = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'INDIAVIX'];
+    const idxHtml = idx.map((sym) => {
+      const q = ticker.find((t) => t.symbol === sym) || {};
+      return `<div class="pb-idx ${clsDir(q.changePct)}"><div class="k">${sym === 'INDIAVIX' ? 'INDIA VIX' : sym}</div><div class="v">${q.ltp != null ? fmt(q.ltp) : 'DATA UNAVAILABLE'}</div><div class="chg">${q.changePct != null ? fmtPct(q.changePct) : '—'}</div></div>`;
+    }).join('');
+
+    const confPct = regime.confidence != null
+      ? (regime.confidence <= 1 ? Math.round(regime.confidence * 100) : Math.round(regime.confidence))
+      : null;
+    const vixQuote = ticker.find((t) => /VIX/i.test(t.symbol || ''));
+
+    $('#playbook-context-body').innerHTML = `
+      <div class="pb-idx-row">${idxHtml}</div>
+      <div class="pb-bias-row">
+        <div class="pb-bias"><div class="k">Market Bias</div><div class="v bias-${bias.toLowerCase()}">${bias}</div></div>
+        <div class="pb-bias"><div class="k">Regime</div><div class="v">${escapeHtml(prettyLabel(regime.label || '—'))}</div></div>
+        <div class="pb-bias"><div class="k">Regime Type</div><div class="v">${regimeType}</div></div>
+        <div class="pb-bias"><div class="k">Regime Score</div><div class="v">${regime.score != null ? Math.round(Math.abs(Number(regime.score))) : '—'} / 100</div></div>
+        <div class="pb-bias"><div class="k">Regime Confidence</div><div class="v">${confPct != null ? `${confPct}%` : '—'}</div></div>
+        <div class="pb-bias"><div class="k">Market Breadth</div><div class="v">${breadth != null ? `${fmt(breadth)} A/D` : 'DATA UNAVAILABLE'}</div></div>
+        <div class="pb-bias"><div class="k">India VIX</div><div class="v">${vix != null && Number.isFinite(vix) ? fmt(vix) : (vixQuote?.ltp != null ? fmt(vixQuote.ltp) : 'DATA UNAVAILABLE')}</div></div>
+        <div class="pb-bias"><div class="k">FII / DII</div><div class="v">${fii?.cash?.fiiNet != null ? `FII ${fmt(fii.cash.fiiNet, 0)} · DII ${fmt(fii.cash.diiNet, 0)}` : 'DATA UNAVAILABLE'}</div></div>
+      </div>
+      <div class="pb-why-market">
+        <div class="k">Why is the market behaving this way?</div>
+        <ul>${why.length ? why.map((w) => `<li>${escapeHtml(w)}</li>`).join('') : '<li class="muted">DATA UNAVAILABLE</li>'}</ul>
+        <p class="tiny muted">FII/DII: ${fii?.available ? escapeHtml(fii.label || 'available') : 'DATA UNAVAILABLE'}${fii?.positioningRegime?.label ? ` · positioning ${escapeHtml(fii.positioningRegime.label)}` : ''}</p>
+      </div>`;
+
+    const bullish = (rankings.topBullish || rows.filter((r) => r.direction === 'BULLISH'))
+      .filter((r) => r.grade !== 'AVOID')
+      .slice(0, 3);
+    const bearish = (rankings.topBearish || rows.filter((r) => r.direction === 'BEARISH'))
+      .filter((r) => r.grade !== 'AVOID')
+      .slice(0, 3);
+    const early = (rankings.early || rankings.watchlist || []).slice(0, 5);
+    const conflicted = (rankings.conflicted || []).slice(0, 5);
+    const avoid = (rankings.avoid || []).slice(0, 5);
+    const ready = rankings.readyNow || [];
+
+    if ($('#playbook-ready')) {
+      $('#playbook-ready').innerHTML = ready.length
+        ? ready.slice(0, 6).map((r, i) => playbookCard(r, { mode: 'ready', rank: i + 1 })).join('')
+        : '<p class="muted">No READY NOW setups — focus on EARLY confirmations below.</p>';
+      bindPlaybookCards($('#playbook-ready'));
+    }
+
+    $('#playbook-bullish').innerHTML = bullish.map((r, i) => playbookCard(r, { mode: 'ready', rank: i + 1 })).join('') || '<p class="muted">No bullish setups in current board</p>';
+    $('#playbook-bearish').innerHTML = bearish.map((r, i) => playbookCard(r, { mode: 'ready', rank: i + 1 })).join('') || '<p class="muted">No bearish setups in current board</p>';
+    $('#playbook-early').innerHTML = early.map((r, i) => playbookCard(r, { mode: 'early', rank: i + 1 })).join('') || '<p class="muted">No early setups</p>';
+    $('#playbook-conflicted').innerHTML = conflicted.map((r, i) => playbookCard(r, { mode: 'conflict', rank: i + 1 })).join('') || '<p class="muted">No conflicted setups</p>';
+    $('#playbook-avoid').innerHTML = avoid.map((r, i) => playbookCard(r, { mode: 'avoid', rank: i + 1 })).join('') || '<p class="muted">No avoid list items</p>';
+
+    bindPlaybookCards($('#playbook-bullish'));
+    bindPlaybookCards($('#playbook-bearish'));
+    bindPlaybookCards($('#playbook-early'));
+    bindPlaybookCards($('#playbook-conflicted'));
+    bindPlaybookCards($('#playbook-avoid'));
+
+    // Aggregate wait triggers across early + top names + ready
+    const waitPool = [...ready, ...early, ...bullish, ...bearish];
+    const waitItems = [];
+    const seen = new Set();
+    for (const r of waitPool) {
+      for (const t of (playbookWait(r).triggers || [])) {
+        if (/pass|met|yes|true|ok/i.test(String(t.status || ''))) continue;
+        const key = `${r.symbol}:${t.id || t.label}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        waitItems.push({ symbol: r.symbol, trigger: t, ltp: r.ltp });
+      }
+    }
+    waitItems.sort((a, b) => (b.trigger.priority || 0) - (a.trigger.priority || 0));
+    $('#playbook-wait-list').innerHTML = waitItems.slice(0, 8).map((w, i) => `
+      <button type="button" class="pb-wait-row" data-pb-sym="${escapeHtml(w.symbol)}">
+        <div class="pb-wait-rank">${i + 1}</div>
+        <div>
+          <div class="sym">${escapeHtml(w.symbol)}</div>
+          <div class="pb-wait-label">${escapeHtml(w.trigger.label)}</div>
+          <div class="muted tiny">Price: ${w.ltp != null ? `₹${fmt(w.ltp)}` : '—'}</div>
+          <div class="muted tiny">Now: ${escapeHtml(String(w.trigger.current ?? 'DATA UNAVAILABLE'))} · Trigger: ${escapeHtml(String(w.trigger.required ?? 'DATA UNAVAILABLE'))}</div>
+        </div>
+        <div class="pill opp-wait">WAITING</div>
+      </button>
+    `).join('') || '<p class="muted">No measurable wait triggers on the current board</p>';
+    bindPlaybookCards($('#playbook-wait-list'));
+
+    const priorities = derivePriorities({ regime, bias, sectors, fii, rankings, ticker });
+    $('#playbook-priority-list').innerHTML = priorities.map((p) => `<li><strong>${escapeHtml(p.title)}</strong><div class="muted tiny">${escapeHtml(p.detail)}</div></li>`).join('');
+
+    const strongest = ready[0] || bullish[0] || early[0];
+    const mainWait = waitItems[0];
+    const mainRisk = avoid[0] || conflicted[0];
+    $('#playbook-summary-grid').innerHTML = `
+      <div class="pb-sum"><div class="k">Market</div><div class="v bias-${bias.toLowerCase()}">${bias}</div></div>
+      <div class="pb-sum"><div class="k">Best Environment</div><div class="v">${regimeType}</div></div>
+      <div class="pb-sum"><div class="k">Best Sector</div><div class="v">${escapeHtml((topSec?.name || topSec?.sector || 'DATA UNAVAILABLE'))}</div></div>
+      <div class="pb-sum"><div class="k">Weakest Sector</div><div class="v">${escapeHtml((weakSec?.name || weakSec?.sector || 'DATA UNAVAILABLE'))}</div></div>
+      <div class="pb-sum"><div class="k">Strongest Setup</div><div class="v">${strongest ? escapeHtml(`${strongest.symbol} · ${prettyLabel(strongest.setup || strongest.primarySetup || '')}`) : '—'}</div></div>
+      <div class="pb-sum"><div class="k">Best Opportunities</div><div class="v">${bullish.slice(0, 3).map((r) => r.symbol).join(', ') || '—'}</div></div>
+      <div class="pb-sum"><div class="k">Early Opportunities</div><div class="v">${early.length} · ${early.slice(0, 3).map((r) => r.symbol).join(', ') || '—'}</div></div>
+      <div class="pb-sum"><div class="k">Major Confirmation</div><div class="v">${mainWait ? escapeHtml(`${mainWait.symbol}: ${mainWait.trigger.label}`) : 'None queued'}</div></div>
+      <div class="pb-sum"><div class="k">Main Invalidation / Risk</div><div class="v">${mainRisk ? escapeHtml(`${mainRisk.symbol} (${mainRisk.grade || mainRisk.conflict?.level || 'risk'})`) : '—'}</div></div>
+      <div class="pb-sum"><div class="k">Ready Now</div><div class="v">${ready.length}</div></div>
+    `;
+
+    const rules = alertsEnv.rules || alertsEnv.data?.rules || {};
+    $('#playbook-alerts').innerHTML = `
+      <div class="pb-alert-grid">
+        <div>Opportunity ≥ <strong>${rules.opportunityScoreAbove ?? '—'}</strong></div>
+        <div>Confidence ≥ <strong>${rules.opportunityConfidenceAbove ?? '—'}%</strong></div>
+        <div>READY alert: <strong>${rules.opportunityReady ? 'ON' : 'OFF'}</strong></div>
+        <div>Smart Money ≥ <strong>${rules.smartMoneyScoreAbove ?? '—'}</strong></div>
+        <div>Grade A+: <strong>${rules.opportunityGradeAPlus ? 'ON' : 'OFF'}</strong></div>
+        <div>SM confidence ≥ <strong>${rules.smartMoneyConfidenceAbove ?? '—'}%</strong></div>
+      </div>
+      <p class="tiny muted">Playbook reuses existing Alerts rules — Opportunity READY, score/confidence thresholds, Smart Money confirmation. It does not create a parallel scoring system.</p>`;
+  }
+
 
   // Desktop: dedicated secondary nav (do not pollute mobile bottom nav)
   function expandDesktopNav() {
@@ -1368,6 +1720,7 @@
       ['overview', 'Home'],
       ['opportunity', 'Opportunity'],
       ['smart', 'Smart Money'],
+      ['playbook', 'Daily Playbook'],
       ['intel', 'F&O'],
       ['chain', 'Options'],
       ['sectors', 'Sectors'],
@@ -1411,7 +1764,11 @@
     await renderTicker();
     const tab = new URLSearchParams(location.search).get('tab')
       || new URLSearchParams(location.search).get('view');
-    const initial = tab === 'markets' ? 'markets' : 'overview';
+    const allowed = new Set([
+      'overview', 'playbook', 'opportunity', 'smart', 'intel', 'chain', 'oi',
+      'heatmap', 'sectors', 'scanner', 'fii', 'alerts', 'watch', 'markets', 'settings', 'legacy',
+    ]);
+    const initial = allowed.has(tab) ? tab : 'overview';
     await showView(initial);
     setInterval(renderTicker, 60_000);
   }
