@@ -5,6 +5,15 @@ const { DhanProvider, UNDERLYINGS } = require('./dhanProvider');
 const { NseProvider, NsePublicProvider } = require('./nseProvider');
 const { MockProvider } = require('./mockProvider');
 const { dataEnvelope } = require('../normalize');
+const {
+  ALL_SECTOR_FO_SYMBOLS,
+  SYMBOL_TO_SECTOR,
+  sectorForSymbol,
+} = require('../universe/sectors');
+const {
+  loadFuturesSecurityMap,
+  toQuoteRequests,
+} = require('../futuresSecurityMap');
 
 /**
  * Hybrid: NSE for public indices / FII-DII, Dhan for option chain & futures.
@@ -16,13 +25,25 @@ class HybridProvider extends FoDataProvider {
    * @param {NseProvider} options.nse
    * @param {DhanProvider} options.dhan
    * @param {MockProvider} options.mock
+   * @param {typeof loadFuturesSecurityMap} [options.loadFuturesMap]
+   * @param {string[]} [options.defaultSymbols]
    */
-  constructor({ nse, dhan, mock }) {
+  constructor({
+    nse,
+    dhan,
+    mock,
+    loadFuturesMap = loadFuturesSecurityMap,
+    defaultSymbols = ALL_SECTOR_FO_SYMBOLS,
+  } = {}) {
     super();
     this.name = 'hybrid';
     this.nse = nse;
     this.dhan = dhan;
     this.mock = mock;
+    this.loadFuturesMap = loadFuturesMap;
+    this.defaultSymbols = defaultSymbols;
+    /** @type {Map<string, number>} */
+    this._prevOiBySymbol = new Map();
   }
 
   async getIndexQuotes(symbols) {
@@ -67,18 +88,30 @@ class HybridProvider extends FoDataProvider {
     }
   }
 
+  /**
+   * Resolve string symbols (or empty = full FO universe) to Dhan security ids,
+   * then fetch live futures quotes. Falls back to labeled mock only if mapping/API fails.
+   */
   async getFuturesQuotes(symbols) {
     try {
-      // Without a security-id map, Dhan returns empty — use labeled mock for scanners.
-      if (!symbols || !symbols.length) {
+      const resolved = await this._resolveFuturesRequests(symbols);
+      if (!resolved.length) {
         const fallback = await this.mock.getFuturesQuotes(symbols);
         return dataEnvelope(fallback.data, {
           ...fallback.meta,
           isMock: true,
-          warning: 'Dhan futures security-id map not provided; using mock',
+          warning: 'Dhan futures security-id map returned no contracts; using mock',
         });
       }
-      return await this.dhan.getFuturesQuotes(symbols);
+
+      const env = await this.dhan.getFuturesQuotes(resolved);
+      const enriched = this._enrichFuturesRows(env.data || []);
+      return dataEnvelope(enriched, {
+        ...env.meta,
+        source: env.meta?.source || 'dhan',
+        isMock: false,
+        mappedCount: resolved.length,
+      });
     } catch (err) {
       const fallback = await this.mock.getFuturesQuotes(symbols);
       return dataEnvelope(fallback.data, {
@@ -88,6 +121,63 @@ class HybridProvider extends FoDataProvider {
         error: err.message,
       });
     }
+  }
+
+  async _resolveFuturesRequests(symbols) {
+    // Already security-id objects / numbers — pass through.
+    if (Array.isArray(symbols) && symbols.length && symbols.every((s) => (
+      typeof s === 'number'
+      || (s && typeof s === 'object' && (s.securityId != null || s.scrip != null))
+    ))) {
+      return symbols;
+    }
+
+    const want = (Array.isArray(symbols) && symbols.length)
+      ? symbols.map((s) => String(typeof s === 'object' ? (s.symbol || s) : s).toUpperCase())
+      : [...this.defaultSymbols];
+
+    const map = await this.loadFuturesMap(want);
+    return toQuoteRequests(want, map);
+  }
+
+  _enrichFuturesRows(rows) {
+    return rows.map((q) => {
+      const symbol = String(q.symbol || '').toUpperCase();
+      const priceChangePct = q.changePct ?? null;
+
+      let oiChangePct = null;
+      let oiChange = q.oiChange ?? null;
+      if (q.oi != null && Number.isFinite(Number(q.oi))) {
+        const oi = Number(q.oi);
+        const prevOi = this._prevOiBySymbol.get(symbol);
+        if (prevOi != null && prevOi > 0) {
+          oiChange = oi - prevOi;
+          oiChangePct = Number((((oi - prevOi) / prevOi) * 100).toFixed(4));
+        }
+        this._prevOiBySymbol.set(symbol, oi);
+      }
+
+      const vwap = q.vwap;
+      const ltp = q.ltp;
+      let vwapRelation = null;
+      if (ltp != null && vwap != null) vwapRelation = ltp >= vwap ? 'above' : 'below';
+
+      return {
+        ...q,
+        symbol,
+        oiChange,
+        priceChangePct,
+        oiChangePct,
+        relativeVolume: q.relativeVolume ?? null,
+        vwapRelation,
+        ivChangePct: q.ivChangePct ?? null,
+        pcr: q.pcr ?? null,
+        high52w: q.high52w ?? null,
+        low52w: q.low52w ?? null,
+        sector: SYMBOL_TO_SECTOR[symbol] || sectorForSymbol(symbol),
+        label: 'LIVE',
+      };
+    });
   }
 
   async getFoUniverse() {
