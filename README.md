@@ -2,19 +2,28 @@
 
 Professional **mobile-first Indian NSE F&O market intelligence terminal**, built on the existing PowerBull Pro + DarvaX equity stack.
 
+## Live demo (shareable · mobile)
+
+| Host | Link |
+|------|------|
+| **GitHub Pages** | **https://mayankdoshi648.github.io/mayankdoshi/** |
+| Vercel | https://mayankdoshi.vercel.app |
+
+On static hosts the app runs in **labeled MOCK / static-demo mode** (full UI + Smart Money WHY panel). For live Dhan/NSE feeds, run the Node server locally.
+
+> First-time GitHub Pages: after merge, open **Repo → Settings → Pages → Source = GitHub Actions**, then re-run the **Deploy GitHub Pages** workflow if needed.
+
 ## What you get
 
 | Section | Purpose |
 |---------|---------|
-| Market Overview | Index ticker, explainable Market Regime score 0–100 |
-| F&O Intelligence | Long/short buildup & covering scanners with transparent scores |
-| Option Chain | ATM-aware chain, PCR, max pain, expected move + evidence panel |
-| OI Analysis | Call/Put OI walls visualization |
-| Smart Money Proxy | Behavioural proxy scores with mandatory WHY + disclaimer |
-| Sector / Stock Scanner | Sector strength + F&O stock ranking/filters |
-| FII/DII | Cash positioning (futures long/short left null when unavailable) |
-| Alerts / Watchlist | Configurable thresholds; channel hooks prepared |
-| Equity / DarvaX | Preserved live EMA/RSI signals + DarvaX scanner/orders |
+| Home | Regime + Smart Money + options + sectors + alerts |
+| F&O | Long/short buildup scanners |
+| Options | Chain, PCR, max pain, expected move |
+| Scan | Smart Money Proxy rankings |
+| Heatmap | Sector Smart Money → stock drill-down |
+| WHY drawer | Explainable positioning checklist |
+| Equity / DarvaX | Preserved live EMA/RSI + DarvaX scanner |
 
 ## Architecture
 
@@ -24,19 +33,21 @@ Layers: **Providers → Normalize → Calculations → Service/Engines → API �
 
 - **Dhan** (optional): option chain + equity live feed
 - **NSE public**: indices / FII-DII cash when reachable
-- **Mock** (explicitly labeled): UI/dev when credentials or live calls unavailable
+- **Mock / static-demo** (explicitly labeled): shareable GitHub Pages & Vercel, or local `FNO_FORCE_MOCK=1`
 
 ## Setup
 
 ```bash
 git clone https://github.com/mayankdoshi648/mayankdoshi.git
 cd mayankdoshi
-git checkout cursor/fo-trading-terminal-368a   # or master after merge
+git checkout master
 npm install
 cp .env.example .env
 npm test
-npm start
+FNO_FORCE_MOCK=1 npm start
 ```
+
+Open **http://localhost:3000**
 
 Open http://localhost:3000
 

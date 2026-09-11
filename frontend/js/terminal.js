@@ -49,11 +49,30 @@
     }
   }
 
-  async function api(path) {
-    const resp = await fetch(path);
-    const json = await resp.json();
+  async function api(path, options) {
+    // Prefer live Express API; fall back to labeled static demo for GitHub Pages / Vercel.
+    try {
+      if (!state.forceStaticDemo) {
+        const resp = await fetch(path, options);
+        const ct = resp.headers.get('content-type') || '';
+        if (resp.ok && ct.includes('application/json')) {
+          const json = await resp.json();
+          if (json && (json.data !== undefined || json.meta || json.rules || json.symbols || json.alerts)) {
+            if (json.meta) setMeta(json.meta);
+            if (!resp.ok && json.error) throw new Error(json.error);
+            return json;
+          }
+        }
+        // HTML / 404 from static host → enable demo mode
+        state.forceStaticDemo = true;
+      }
+    } catch {
+      state.forceStaticDemo = true;
+    }
+    if (!window.FnoStaticDemoApi) throw new Error('Static demo API unavailable');
+    const json = await window.FnoStaticDemoApi.handle(path, options);
     if (json.meta) setMeta(json.meta);
-    if (!resp.ok && json.error) throw new Error(json.error);
+    if (json.meta?.error && json.data == null) throw new Error(json.meta.error);
     return json;
   }
 
@@ -790,7 +809,7 @@
     $$('.watch-del').forEach((btn) => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        await fetch(`/api/fno/watchlist/${btn.dataset.sym}`, { method: 'DELETE' });
+        await api(`/api/fno/watchlist/${btn.dataset.sym}`, { method: 'DELETE' });
         renderWatch();
       });
     });
@@ -855,7 +874,7 @@
     $('#watch-add')?.addEventListener('click', async () => {
       const symbol = $('#watch-input').value.trim().toUpperCase();
       if (!symbol) return;
-      await fetch('/api/fno/watchlist', {
+      await api('/api/fno/watchlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ symbol }),
