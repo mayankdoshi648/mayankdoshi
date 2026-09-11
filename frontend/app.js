@@ -75,9 +75,15 @@ async function loadStatus() {
     const banner = document.getElementById('market-banner');
     if (!banner) return;
     if (!status.feedConnected) {
-      banner.textContent = status.lastError
-        ? `Dhan feed disconnected (${status.lastError}) — check DHAN_CLIENT_ID/DHAN_PIN/DHAN_TOTP_SECRET in .env and restart the server.`
-        : 'Dhan feed not connected — check DHAN_CLIENT_ID/DHAN_PIN/DHAN_TOTP_SECRET in .env and restart the server.';
+      if (status.hasDhan) {
+        banner.textContent = status.lastError
+          ? `Equity live socket disconnected (${status.lastError}) — F&O hybrid may still use Dhan; reconnect/restart if quotes stall.`
+          : 'Equity live socket not connected — F&O can still pull via Dhan API credentials (More → Dhan API).';
+      } else {
+        banner.textContent = status.lastError
+          ? `Dhan feed disconnected (${status.lastError}) — set credentials in More → Dhan API or .env, then restart if needed.`
+          : 'Dhan feed not connected — set Client ID / PIN / TOTP in More → Dhan API (or .env) for live data.';
+      }
       banner.classList.remove('hidden');
     } else if (!status.marketOpen) {
       banner.textContent = 'Market closed — showing last saved session.';
