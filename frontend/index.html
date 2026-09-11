@@ -246,7 +246,12 @@
     <!-- SETTINGS / DHAN -->
     <section class="view" data-view="settings">
       <h1 class="view-title">Dhan API</h1>
-      <p class="disclaimer-inline tiny">Enter Dhan Client ID, PIN, and TOTP secret so the Node server can pull live option chains. Secrets are never shown after save. Static hosts (GitHub Pages / Vercel) stay mock-only — run <code>npm start</code> locally for live data.</p>
+      <p class="disclaimer-inline tiny">Enter Dhan Client ID, PIN, and TOTP secret so the Node server can pull live option chains. Secrets are never shown after save.</p>
+      <div id="dhan-static-block" class="dhan-static-block hidden" role="status">
+        <strong>Live Dhan input is off on this link</strong>
+        <p>GitHub Pages / Vercel are static demo only — they cannot safely store your PIN/TOTP or call Dhan from the phone browser.</p>
+        <p>To enter credentials: run <code>npm start</code> on a computer (or use a live tunnel URL to that server), then open that URL on your phone → More → Dhan API.</p>
+      </div>
       <div id="dhan-status" class="dhan-status muted">Checking credentials…</div>
       <form id="dhan-form" class="dhan-form" autocomplete="off">
         <label>
