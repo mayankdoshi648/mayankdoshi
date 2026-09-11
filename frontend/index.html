@@ -110,16 +110,63 @@
     <!-- SMART -->
     <section class="view" data-view="smart">
       <h1 class="view-title">Smart Money Proxy</h1>
-      <p class="disclaimer-inline">Heuristic proxy from price · OI · volume · IV — not institutional order flow. Not advice.</p>
+      <p class="disclaimer-inline" id="smart-disclaimer">
+        Smart Money Proxy — A quantitative positioning signal based on price, OI, volume, VWAP, options positioning, sector strength and institutional positioning. It does not identify actual institutional trades.
+      </p>
+
+      <div class="smart-market strip-cards" id="smart-market">
+        <div class="strip-card">
+          <div class="k">Market</div>
+          <div class="v" id="smart-market-bias">—</div>
+        </div>
+        <div class="strip-card">
+          <div class="k">Score</div>
+          <div class="v" id="smart-market-score">—</div>
+        </div>
+        <div class="strip-card">
+          <div class="k">Confidence</div>
+          <div class="v" id="smart-market-conf">—</div>
+        </div>
+      </div>
+
+      <h2 class="section-label">Index Positioning</h2>
+      <div class="smart-indices" id="smart-indices"></div>
+
+      <div class="smart-tabs" id="smart-rank-tabs" role="tablist">
+        <button type="button" class="active" data-rank="topLongs">Top Longs</button>
+        <button type="button" data-rank="topShorts">Top Shorts</button>
+        <button type="button" data-rank="topShortCovering">Short Covering</button>
+        <button type="button" data-rank="topLongUnwinding">Long Unwinding</button>
+        <button type="button" data-rank="topEmerging">Emerging</button>
+      </div>
+
+      <h2 class="section-label">Top Stock Signals</h2>
       <div class="table-wrap">
         <table id="smart-table" class="dense-table">
           <thead>
             <tr>
-              <th>Symbol</th><th>Score</th><th>Signals</th><th>Chg%</th><th>OI%</th><th>RVol</th><th>Why</th>
+              <th>#</th>
+              <th>Symbol</th>
+              <th>Score</th>
+              <th>Conf%</th>
+              <th>Setup</th>
+              <th>Price%</th>
+              <th>OI%</th>
+              <th>RVol</th>
+              <th>VWAP</th>
+              <th>Sector</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
+      </div>
+
+      <div id="smart-detail" class="smart-detail hidden" aria-live="polite">
+        <div class="smart-detail-head">
+          <h2 id="smart-detail-title" class="section-label">Signal Explanation</h2>
+          <button type="button" id="smart-detail-close" class="ghost-btn" aria-label="Close">×</button>
+        </div>
+        <div id="smart-detail-body"></div>
       </div>
     </section>
 

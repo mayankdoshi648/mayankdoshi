@@ -123,8 +123,13 @@ describe('smartMoney', () => {
       sectorReturnPct: 1.4,
     });
     assert.equal(r.disclaimer, DISCLAIMER);
-    assert.ok(r.signals.includes('STRONG_LONG_BUILDUP') || r.signals.includes('LONG_BUILDUP'));
-    assert.ok(r.why.some((w) => w.includes('Price')));
+    assert.ok(
+      r.setup === 'LONG BUILDUP' ||
+        r.signals.includes('LONG_BUILDUP') ||
+        /LONG/i.test(r.signal)
+    );
+    assert.ok(r.why.some((w) => /Price/i.test(w)));
+    assert.ok(r.confidence >= 0 && r.confidence <= 100);
   });
 });
 

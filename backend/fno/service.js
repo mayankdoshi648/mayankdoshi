@@ -4,7 +4,7 @@ const { createProvider } = require('./providers');
 const { analyzeOptionChain } = require('./calculations/optionChainMetrics');
 const { computeMarketRegime } = require('./calculations/marketRegime');
 const { explainBuildup, classifyBuildup } = require('./calculations/oiBuildup');
-const { computeSmartMoneyProxy } = require('./calculations/smartMoney');
+const { computeSmartMoneyProxy, buildRankings, summarizeMarketBias, evaluateSmartMoneyAlert, DISCLAIMER } = require('./calculations/smartMoney');
 const { computeSectorStrength, rankSectors } = require('./calculations/sectorStrength');
 const { SECTOR_MAP, sectorForSymbol } = require('./universe/sectors');
 const { TICKER_ORDER } = require('./universe/underlyings');
@@ -25,6 +25,10 @@ class FnoService {
     this.watchlist = new Set(['NIFTY', 'BANKNIFTY', 'HDFCBANK', 'RELIANCE', 'TCS']);
     this.alertRules = defaultAlertRules();
     this.alertHistory = [];
+    /** @type {Map<string, {score:number,confidence:number,setup:string,signal:string,at:string}>} */
+    this._smartMoneyPrev = new Map();
+    /** @type {Map<string, Array<{at:string,score:number,confidence:number,priceChangePct:number|null,oiChangePct:number|null,relativeVolume:number|null,ltp:number|null}>>} */
+    this._smartMoneyHistory = new Map();
   }
 
   _getCache(key) {
@@ -144,6 +148,27 @@ class FnoService {
     const regimeEnv = await this.getMarketOverviewIntelligence();
     const regimeScore = regimeEnv.data?.regime?.score ?? 50;
 
+    // Sector map for confirmation (reuse analysis; tolerate cold cache)
+    let sectorByName = new Map();
+    try {
+      const sectorsEnv = await this._sectorStatsFromRows(env.data || []);
+      sectorByName = new Map((sectorsEnv || []).map((s) => [s.sector, s]));
+    } catch {
+      sectorByName = new Map();
+    }
+
+    let fiiCtx = null;
+    try {
+      const fii = await this.getFiiDii();
+      fiiCtx = {
+        fiiNetCash: fii.data?.cash?.fiiNet ?? null,
+        fiiNetFutures: fii.data?.futures?.netFutures ?? null,
+        fiiLongShortRatio: fii.data?.futures?.longShortRatio ?? null,
+      };
+    } catch {
+      fiiCtx = null;
+    }
+
     let rows = (env.data || []).map((row) => {
       const explained = explainBuildup({
         priceChangePct: row.priceChangePct,
@@ -155,12 +180,27 @@ class FnoService {
         sectorReturnPct: null,
         marketRegimeScore: regimeScore,
       });
-      const smart = computeSmartMoneyProxy(row, { marketRegimeScore: regimeScore });
+      const sectorName = row.sector || sectorForSymbol(row.symbol);
+      const sectorStats = sectorByName.get(sectorName);
+      const isIndex = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY'].includes(String(row.symbol).toUpperCase());
+      const smart = computeSmartMoneyProxy(row, {
+        marketRegimeScore: regimeScore,
+        buildup: explained.classification,
+        sector: sectorName,
+        sectorChangePct: sectorStats?.returnPct ?? null,
+        sectorScore: sectorStats?.score ?? null,
+        isIndex,
+        fiiNetCash: fiiCtx?.fiiNetCash ?? null,
+        fiiNetFutures: fiiCtx?.fiiNetFutures ?? null,
+        fiiLongShortRatio: fiiCtx?.fiiLongShortRatio ?? null,
+        ivChange: row.ivChangePct,
+      });
+      this._recordSmartMoneyHistory(row.symbol, smart, row);
       const distHigh = row.high52w && row.ltp ? ((row.high52w - row.ltp) / row.high52w) * 100 : null;
       const distLow = row.low52w && row.ltp ? ((row.ltp - row.low52w) / row.low52w) * 100 : null;
       return {
         ...row,
-        sector: row.sector || sectorForSymbol(row.symbol),
+        sector: sectorName,
         buildup: explained.classification,
         score: explained.score,
         why: explained.why,
@@ -176,6 +216,104 @@ class FnoService {
 
     rows.sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
     return dataEnvelope(rows, env.meta);
+  }
+
+  _sectorStatsFromRows(rows) {
+    const bySector = new Map();
+    for (const row of rows) {
+      const sector = row.sector || sectorForSymbol(row.symbol) || 'OTHER';
+      if (!bySector.has(sector)) {
+        bySector.set(sector, {
+          sector,
+          returns: [],
+          oiChanges: [],
+          advances: 0,
+          declines: 0,
+          longBuildupCount: 0,
+          shortBuildupCount: 0,
+          shortCoveringCount: 0,
+          longUnwindingCount: 0,
+          rvols: [],
+        });
+      }
+      const s = bySector.get(sector);
+      if (row.priceChangePct != null) {
+        s.returns.push(row.priceChangePct);
+        if (row.priceChangePct >= 0) s.advances += 1;
+        else s.declines += 1;
+      }
+      if (row.oiChangePct != null) s.oiChanges.push(row.oiChangePct);
+      const b = classifyBuildup({ priceChangePct: row.priceChangePct, oiChangePct: row.oiChangePct });
+      if (b === 'LONG_BUILDUP') s.longBuildupCount += 1;
+      if (b === 'SHORT_BUILDUP') s.shortBuildupCount += 1;
+      if (b === 'SHORT_COVERING') s.shortCoveringCount += 1;
+      if (b === 'LONG_UNWINDING') s.longUnwindingCount += 1;
+      if (row.relativeVolume != null) s.rvols.push(row.relativeVolume);
+    }
+    const avg = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+    return [...bySector.values()].map((s) => {
+      const stats = {
+        sector: s.sector,
+        returnPct: avg(s.returns),
+        avgOiChangePct: avg(s.oiChanges),
+        advanceDecline: s.declines === 0 ? (s.advances > 0 ? s.advances : null) : s.advances / s.declines,
+        longBuildupCount: s.longBuildupCount,
+        shortBuildupCount: s.shortBuildupCount,
+        shortCoveringCount: s.shortCoveringCount,
+        longUnwindingCount: s.longUnwindingCount,
+        relativeVolume: avg(s.rvols),
+      };
+      return { ...stats, score: computeSectorStrength(stats) };
+    });
+  }
+
+  _recordSmartMoneyHistory(symbol, smart, row) {
+    if (!symbol || !smart) return;
+    const key = String(symbol).toUpperCase();
+    const point = {
+      at: new Date().toISOString(),
+      score: smart.score,
+      confidence: smart.confidence,
+      priceChangePct: row?.priceChangePct ?? null,
+      oiChangePct: row?.oiChangePct ?? null,
+      relativeVolume: row?.relativeVolume ?? null,
+      ltp: row?.ltp ?? null,
+      setup: smart.setup,
+      signal: smart.signal,
+    };
+    const arr = this._smartMoneyHistory.get(key) || [];
+    const last = arr[arr.length - 1];
+    // Dedupe identical consecutive snapshots within ~30s
+    if (last && Math.abs(new Date(point.at) - new Date(last.at)) < 30_000 && last.score === point.score) {
+      return;
+    }
+    arr.push(point);
+    this._smartMoneyHistory.set(key, arr.slice(-500));
+  }
+
+  _toSmartMoneyRow(r) {
+    const sm = r.smartMoney || {};
+    return {
+      symbol: r.symbol,
+      sector: r.sector,
+      ltp: r.ltp,
+      score: sm.score ?? r.proxyScore ?? r.score,
+      confidence: sm.confidence ?? null,
+      signal: sm.signal ?? null,
+      setup: sm.setup ?? null,
+      label: sm.label ?? null,
+      quality: sm.quality ?? null,
+      conflicting: Boolean(sm.conflicting),
+      priceChangePct: r.priceChangePct,
+      oiChangePct: r.oiChangePct,
+      relativeVolume: r.relativeVolume,
+      vwap: r.vwap,
+      vwapRelation: r.vwapRelation,
+      pcr: r.pcr,
+      iv: r.iv,
+      why: sm.why || r.why || [],
+      smartMoney: sm,
+    };
   }
 
   async getBuildupBuckets() {
@@ -194,14 +332,199 @@ class FnoService {
 
   async getSmartMoney(limit = 25) {
     const scan = await this.getFoScanner();
-    const ranked = [...(scan.data || [])]
-      .map((r) => ({ ...r, proxyScore: r.smartMoney?.score ?? r.score }))
-      .sort((a, b) => Math.abs(b.proxyScore) - Math.abs(a.proxyScore))
+    const mapped = (scan.data || []).map((r) => this._toSmartMoneyRow(r));
+    const market = summarizeMarketBias(mapped);
+    const rankings = buildRankings(mapped);
+
+    const indexSymbols = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY'];
+    const bySym = new Map(mapped.map((r) => [r.symbol, r]));
+    const ticker = await this.getTicker();
+    const fii = await this.getFiiDii().catch(() => null);
+
+    const indices = [];
+    for (const sym of indexSymbols) {
+      let row = bySym.get(sym);
+      if (!row) {
+        const q = (ticker.data || []).find((t) => t.symbol === sym);
+        if (q) {
+          const smart = computeSmartMoneyProxy({
+            symbol: sym,
+            ltp: q.ltp,
+            vwap: q.vwap,
+            priceChangePct: q.changePct,
+            oiChangePct: null,
+            relativeVolume: null,
+            isIndex: true,
+            fiiNetCash: fii?.data?.cash?.fiiNet ?? null,
+            fiiNetFutures: fii?.data?.futures?.netFutures ?? null,
+          });
+          row = {
+            symbol: sym,
+            score: smart.score,
+            confidence: smart.confidence,
+            signal: smart.signal,
+            setup: smart.setup,
+            label: smart.label,
+            priceChangePct: q.changePct,
+            oiChangePct: null,
+            relativeVolume: null,
+            vwap: q.vwap,
+            smartMoney: smart,
+          };
+        }
+      } else {
+        // Recompute with isIndex + FII for index cards if scanner row lacked FII application
+        const smart = computeSmartMoneyProxy(row.smartMoney ? scan.data.find((x) => x.symbol === sym) || row : row, {
+          isIndex: true,
+          fiiNetCash: fii?.data?.cash?.fiiNet ?? null,
+          fiiNetFutures: fii?.data?.futures?.netFutures ?? null,
+          buildup: row.setup?.replace(/\s+/g, '_') || row.smartMoney?.buildup,
+        });
+        row = { ...row, score: smart.score, confidence: smart.confidence, signal: smart.signal, setup: smart.setup, smartMoney: smart };
+      }
+      if (row) {
+        indices.push({
+          symbol: sym,
+          score: row.score,
+          confidence: row.confidence,
+          signal: row.signal,
+          setup: row.setup,
+          priceChangePct: row.priceChangePct,
+          oiChangePct: row.oiChangePct,
+          pcr: row.pcr ?? row.smartMoney?.components?.options?.detail?.pcr ?? null,
+          vwap: row.vwap,
+          fiiApplied: Boolean(row.smartMoney?.components?.fii?.available && row.smartMoney?.components?.fii?.score !== 0),
+          smartMoney: row.smartMoney,
+        });
+      }
+    }
+
+    const ranked = [...mapped]
+      .sort((a, b) => {
+        if (Math.abs(b.score) !== Math.abs(a.score)) return Math.abs(b.score) - Math.abs(a.score);
+        return (b.confidence || 0) - (a.confidence || 0);
+      })
       .slice(0, limit);
+
     return dataEnvelope({
-      disclaimer: 'Smart Money Proxy — based on market behaviour; does NOT identify actual institutional trades.',
+      disclaimer: DISCLAIMER,
+      market: {
+        bias: market.bias,
+        avgScore: market.avgScore,
+        bullish: market.bullish,
+        bearish: market.bearish,
+        neutral: market.neutral,
+        score: Math.round(market.avgScore),
+        confidence: mapped.length
+          ? Math.round(mapped.reduce((a, r) => a + (r.confidence || 0), 0) / mapped.length)
+          : 0,
+      },
+      rankings: {
+        topLongs: rankings.topLongs.slice(0, limit),
+        topShorts: rankings.topShorts.slice(0, limit),
+        topShortCovering: rankings.topShortCovering,
+        topLongUnwinding: rankings.topLongUnwinding,
+        topEmerging: rankings.topEmerging,
+      },
+      indices,
       rows: ranked,
     }, scan.meta);
+  }
+
+  async getSmartMoneyDetail(symbol) {
+    const sym = String(symbol || '').toUpperCase();
+    if (!sym) throw new Error('symbol required');
+    const scan = await this.getFoScanner();
+    const row = (scan.data || []).find((r) => r.symbol === sym);
+    let smart;
+    let base = row;
+    if (!row) {
+      const ticker = await this.getTicker();
+      const q = (ticker.data || []).find((t) => t.symbol === sym);
+      if (!q) {
+        return dataEnvelope(null, {
+          asOf: new Date().toISOString(),
+          source: scan.meta.source,
+          isMock: scan.meta.isMock,
+          error: `No data for ${sym}`,
+        });
+      }
+      const fii = await this.getFiiDii().catch(() => null);
+      const isIndex = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY'].includes(sym);
+      smart = computeSmartMoneyProxy({
+        symbol: sym,
+        ltp: q.ltp,
+        vwap: q.vwap,
+        priceChangePct: q.changePct,
+        isIndex,
+        fiiNetCash: fii?.data?.cash?.fiiNet ?? null,
+        fiiNetFutures: fii?.data?.futures?.netFutures ?? null,
+      });
+      base = { symbol: sym, ltp: q.ltp, vwap: q.vwap, priceChangePct: q.changePct };
+    } else {
+      smart = row.smartMoney || computeSmartMoneyProxy(row);
+    }
+
+    const history = this.getSmartMoneyHistory(sym, '1M');
+
+    return dataEnvelope({
+      symbol: sym,
+      disclaimer: DISCLAIMER,
+      quote: {
+        ltp: base.ltp,
+        priceChangePct: base.priceChangePct,
+        oiChangePct: base.oiChangePct ?? null,
+        relativeVolume: base.relativeVolume ?? null,
+        vwap: base.vwap ?? null,
+        vwapRelation: base.vwapRelation ?? null,
+        sector: base.sector ?? null,
+        pcr: base.pcr ?? null,
+        iv: base.iv ?? null,
+        buildup: base.buildup ?? smart.buildup,
+      },
+      score: smart.score,
+      confidence: smart.confidence,
+      signal: smart.signal,
+      setup: smart.setup,
+      label: smart.label,
+      quality: smart.quality,
+      conflicting: smart.conflicting,
+      conflicts: smart.conflicts,
+      components: smart.components,
+      componentScores: smart.componentScores,
+      bullishFactors: smart.bullishFactors,
+      bearishFactors: smart.bearishFactors,
+      conflictingFactors: smart.conflictingFactors,
+      timeframes: smart.timeframes,
+      why: smart.why,
+      explanation: smart.explanation,
+      interpretation: smart.interpretation,
+      history,
+    }, scan.meta);
+  }
+
+  getSmartMoneyHistory(symbol, range = '5D') {
+    const key = String(symbol || '').toUpperCase();
+    const all = this._smartMoneyHistory.get(key) || [];
+    const now = Date.now();
+    const windows = {
+      '1D': 1 * 24 * 3600_000,
+      '5D': 5 * 24 * 3600_000,
+      '10D': 10 * 24 * 3600_000,
+      '1M': 30 * 24 * 3600_000,
+    };
+    const ms = windows[range] || windows['5D'];
+    const sliced = all.filter((p) => now - new Date(p.at).getTime() <= ms);
+    let trend = 'STABLE';
+    if (sliced.length >= 2) {
+      const delta = sliced[sliced.length - 1].score - sliced[0].score;
+      if (delta >= 15) trend = 'INCREASING';
+      else if (delta <= -15) trend = 'DECREASING';
+      else if (Math.abs(delta) >= 8 && Math.sign(sliced[0].score) !== Math.sign(sliced[sliced.length - 1].score)) {
+        trend = 'REVERSING';
+      }
+    }
+    return { range, trend, points: sliced };
   }
 
   async getSectorAnalysis() {
@@ -373,12 +696,35 @@ class FnoService {
         Math.abs(row.oiChangePct) >= rules.unusualOiPct;
       if (priceOiDiv) reasons.push('Price/OI divergence');
 
+      const sm = row.smartMoney;
+      if (sm) {
+        const prev = this._smartMoneyPrev.get(row.symbol) || null;
+        const smRules = {
+          scoreAbove: rules.smartMoneyScoreAbove,
+          scoreBelow: rules.smartMoneyScoreBelow,
+          crossAbove: rules.smartMoneyCrossAbove,
+          crossBelow: rules.smartMoneyCrossBelow,
+          confidenceAbove: rules.smartMoneyConfidenceAbove,
+        };
+        const triggers = evaluateSmartMoneyAlert(prev, sm, smRules);
+        for (const t of triggers) reasons.push(t.message);
+        this._smartMoneyPrev.set(row.symbol, {
+          score: sm.score,
+          confidence: sm.confidence,
+          setup: sm.setup,
+          signal: sm.signal,
+          at: new Date().toISOString(),
+        });
+      }
+
       if (reasons.length) {
         fired.push({
           symbol: row.symbol,
           sector: row.sector,
           reasons,
           score: row.score,
+          smartMoneyScore: sm?.score ?? null,
+          smartMoneyConfidence: sm?.confidence ?? null,
           buildup: row.buildup,
           at: new Date().toISOString(),
           channels: { push: false, telegram: false, whatsapp: false, email: false },
@@ -404,6 +750,11 @@ function defaultAlertRules() {
     largeCallOiAdd: 500000,
     largePutOiAdd: 500000,
     pcrChange: 0.15,
+    smartMoneyScoreAbove: 80,
+    smartMoneyScoreBelow: -80,
+    smartMoneyCrossAbove: 60,
+    smartMoneyCrossBelow: -60,
+    smartMoneyConfidenceAbove: 80,
   };
 }
 

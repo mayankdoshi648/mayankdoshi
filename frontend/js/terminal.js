@@ -242,17 +242,113 @@
 
   async function renderSmart() {
     const env = await api('/api/fno/smart-money?limit=40');
-    $('#smart-table tbody').innerHTML = (env.data?.rows || []).map((r) => `
-      <tr>
+    const data = env.data || {};
+    if (data.disclaimer) $('#smart-disclaimer').textContent = data.disclaimer;
+
+    const m = data.market || {};
+    $('#smart-market-bias').textContent = m.bias || '—';
+    $('#smart-market-bias').className = `v ${m.bias === 'BULLISH' ? 'up' : m.bias === 'BEARISH' ? 'down' : ''}`;
+    $('#smart-market-score').textContent = m.score != null ? `${m.score >= 0 ? '+' : ''}${m.score}` : '—';
+    $('#smart-market-score').className = `v ${clsDir(m.score)}`;
+    $('#smart-market-conf').textContent = m.confidence != null ? `${m.confidence}%` : '—';
+
+    $('#smart-indices').innerHTML = (data.indices || []).map((ix) => `
+      <button type="button" class="index-chip" data-symbol="${escapeHtml(ix.symbol)}">
+        <span class="sym">${escapeHtml(ix.symbol)}</span>
+        <span class="sc ${clsDir(ix.score)}">${ix.score >= 0 ? '+' : ''}${ix.score ?? '—'}</span>
+        <span class="cf">${ix.confidence != null ? `${ix.confidence}%` : '—'}</span>
+      </button>
+    `).join('');
+
+    state.smartRankings = data.rankings || {};
+    state.smartRankKey = state.smartRankKey || 'topLongs';
+    bindSmartRankTabs();
+    paintSmartTable(state.smartRankings[state.smartRankKey] || data.rows || []);
+
+    $('#smart-indices').querySelectorAll('[data-symbol]').forEach((btn) => {
+      btn.addEventListener('click', () => openSmartDetail(btn.dataset.symbol));
+    });
+    $('#smart-detail-close')?.addEventListener('click', () => {
+      $('#smart-detail')?.classList.add('hidden');
+    }, { once: true });
+  }
+
+  function bindSmartRankTabs() {
+    const tabs = $('#smart-rank-tabs');
+    if (!tabs || tabs.dataset.bound) return;
+    tabs.dataset.bound = '1';
+    tabs.querySelectorAll('[data-rank]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        tabs.querySelectorAll('[data-rank]').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.smartRankKey = btn.dataset.rank;
+        paintSmartTable(state.smartRankings?.[state.smartRankKey] || []);
+      });
+    });
+  }
+
+  function paintSmartTable(rows) {
+    $('#smart-table tbody').innerHTML = (rows || []).map((r, i) => `
+      <tr data-symbol="${escapeHtml(r.symbol)}" class="smart-row">
+        <td>${i + 1}</td>
         <td>${escapeHtml(r.symbol)}</td>
-        <td class="${clsDir(r.proxyScore)}">${r.proxyScore ?? r.score}</td>
-        <td>${escapeHtml((r.smartMoney?.signals || [r.buildup]).slice(0, 2).join(', ').replace(/_/g, ' '))}</td>
+        <td class="${clsDir(r.score)}">${r.score != null ? `${r.score >= 0 ? '+' : ''}${r.score}` : '—'}</td>
+        <td>${r.confidence != null ? `${r.confidence}%` : '—'}</td>
+        <td>${escapeHtml(r.setup || r.signal || '')}</td>
         <td class="${clsDir(r.priceChangePct)}">${fmtPct(r.priceChangePct)}</td>
         <td class="${clsDir(r.oiChangePct)}">${fmtPct(r.oiChangePct)}</td>
-        <td>${fmt(r.relativeVolume)}</td>
-        <td title="${escapeHtml((r.smartMoney?.why || r.why || []).join(' | '))}">${escapeHtml((r.smartMoney?.why || r.why || []).slice(0, 3).join(' · '))}</td>
+        <td>${r.relativeVolume != null ? `${fmt(r.relativeVolume)}×` : '—'}</td>
+        <td>${escapeHtml(r.vwapRelation || (r.vwap != null ? fmt(r.vwap) : '—'))}</td>
+        <td>${escapeHtml(r.sector || '')}</td>
       </tr>
     `).join('');
+    $('#smart-table tbody').querySelectorAll('tr[data-symbol]').forEach((tr) => {
+      tr.addEventListener('click', () => openSmartDetail(tr.dataset.symbol));
+    });
+  }
+
+  async function openSmartDetail(symbol) {
+    const env = await api(`/api/fno/smart-money/${encodeURIComponent(symbol)}`);
+    const d = env.data;
+    if (!d) return;
+    const panel = $('#smart-detail');
+    const body = $('#smart-detail-body');
+    $('#smart-detail-title').textContent = `${d.symbol} — Smart Money Proxy`;
+    const comps = d.components || {};
+    const list = (arr, cls) => (arr || []).map((f) => `<li class="${cls}">${escapeHtml(f.text || f)}</li>`).join('') || '<li>—</li>';
+    body.innerHTML = `
+      <p class="disclaimer-inline">${escapeHtml(d.disclaimer || '')}</p>
+      <div class="smart-detail-scoreline">
+        <div><span class="k">Score</span><span class="v ${clsDir(d.score)}">${d.score >= 0 ? '+' : ''}${d.score}</span></div>
+        <div><span class="k">Confidence</span><span class="v">${d.confidence}%</span></div>
+        <div><span class="k">Signal</span><span class="v">${escapeHtml(d.signal || '')}</span></div>
+        <div><span class="k">Setup</span><span class="v">${escapeHtml(d.setup || '')}</span></div>
+        <div><span class="k">Quality</span><span class="v">${escapeHtml(d.quality || '')}</span></div>
+      </div>
+      ${d.conflicting ? '<p class="conflict-banner">CONFLICTING SIGNALS — confidence reduced</p>' : ''}
+      <h3 class="section-label">WHY?</h3>
+      <pre class="smart-why">${escapeHtml(d.explanation || (d.why || []).join('\n'))}</pre>
+      <h3 class="section-label">Components</h3>
+      <ul class="smart-comps">
+        ${Object.entries(comps).map(([id, c]) => `
+          <li><strong>${escapeHtml(id)}</strong>: <span class="${clsDir(c.score)}">${c.score}</span>/${c.max}
+          ${c.available ? '' : ' <em>(unavailable)</em>'}
+          — ${escapeHtml((c.reasons || []).join('; '))}</li>
+        `).join('')}
+      </ul>
+      <h3 class="section-label">Multi-timeframe</h3>
+      <p>${escapeHtml(d.timeframes?.overall || 'N/A')} · ${escapeHtml(JSON.stringify(d.timeframes?.labels || {}))}</p>
+      <div class="factor-grid">
+        <div><h3 class="section-label">Bullish factors</h3><ul>${list(d.bullishFactors, 'up')}</ul></div>
+        <div><h3 class="section-label">Bearish factors</h3><ul>${list(d.bearishFactors, 'down')}</ul></div>
+        <div><h3 class="section-label">Conflicting factors</h3><ul>${list(d.conflictingFactors, 'warn')}</ul></div>
+      </div>
+      <h3 class="section-label">Final interpretation</h3>
+      <p>${escapeHtml(d.interpretation || '')}</p>
+      <p class="muted">Positioning proxy only — not a BUY/SELL recommendation and not proof of institutional intent.</p>
+    `;
+    panel.classList.remove('hidden');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   async function renderSectors() {

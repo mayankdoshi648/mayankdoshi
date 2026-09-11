@@ -39,6 +39,11 @@ function createFnoRouter({ config }) {
   })));
   router.get('/buildups', wrap(() => service.getBuildupBuckets()));
   router.get('/smart-money', wrap((req) => service.getSmartMoney(Number(req.query.limit || 25))));
+  router.get('/smart-money/:symbol/history', wrap((req) => {
+    const history = service.getSmartMoneyHistory(req.params.symbol, req.query.range || '5D');
+    return { data: history, meta: { asOf: new Date().toISOString() } };
+  }));
+  router.get('/smart-money/:symbol', wrap((req) => service.getSmartMoneyDetail(req.params.symbol)));
   router.get('/sectors', wrap(() => service.getSectorAnalysis()));
   router.get('/sectors/:sector', wrap((req) => service.getSectorStocks(req.params.sector)));
   router.get('/fii-dii', wrap(() => service.getFiiDii()));
