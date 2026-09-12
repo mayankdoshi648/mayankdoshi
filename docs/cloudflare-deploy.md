@@ -2,7 +2,24 @@
 
 PowerBull Pro can run **without Render** on Cloudflare’s free tier.
 
-## Recommended path (matches your existing project)
+This is the **only free HTTPS host** in this repo that can accept **Dhan Client ID + Access Token** and return **live quotes** (GitHub Pages / Vercel are MOCK-only).
+
+## Fastest path — GitHub Actions deploy
+
+1. Cloudflare dashboard → **My Profile → API Tokens → Create Token**
+   - Use template **Edit Cloudflare Workers** (needs Workers Scripts:Edit + Account:Read)
+2. Cloudflare dashboard → right sidebar **Account ID** (copy it)
+3. GitHub repo → **Settings → Secrets and variables → Actions** → add:
+   - `CLOUDFLARE_API_TOKEN`
+   - `CLOUDFLARE_ACCOUNT_ID`
+4. Cloudflare → **Workers → mayankdoshi → Settings → Variables** → add secret:
+   - `SESSION_SECRET` = any long random string (required for Dhan cookie encryption)
+5. GitHub → **Actions → Deploy Cloudflare Workers (live) → Run workflow**
+6. Open the workers URL from the job log / Cloudflare Overview, e.g.  
+   `https://mayankdoshi.<subdomain>.workers.dev`
+7. On phone: **More → Dhan API** → paste Client ID + Access Token → **Save & use live**
+
+## Recommended path (Workers Builds — matches your existing project)
 
 You already have Workers Builds project **`mayankdoshi`**. Use **Worker + Assets** (not Pages `wrangler pages deploy`).
 
@@ -113,6 +130,7 @@ npx wrangler dev
 | Dhan HTTP 429 / code 805 Too many requests | Wait 1–2 min; refresh less often. App now throttles marketfeed + serves cached quotes on 429 |
 | Equity Markets share prices always demo on CF | Connect Dhan — Markets board now uses live Dhan OHLC when `hasDhan` (52w history still Node-only) |
 | Vercel CI red (`esbuild` / build failed) | Expected if `build` ran Worker bundle without devDeps. `vercel.json` now skips CF build and serves `frontend/` MOCK only |
+| Vercel CI red (`Deployment rate limited — retry in 24 hours`) | Hobby plan quota. Live F&O is on Cloudflare — Vercel auto-deploy is **disabled** in `vercel.json` (`git.deploymentEnabled: false`) so PR checks are not blocked. Re-enable manually only if you need the MOCK host |
 | 401 from Dhan | Paste a fresh Access Token |
 
 ## Updating later
