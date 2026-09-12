@@ -34,6 +34,15 @@ export const api = {
       body: JSON.stringify({ clientId, accessToken }),
     }),
   clearDhanSettings: () => req('/api/settings/dhan', { method: 'DELETE' }),
+  getFuturesSettings: () =>
+    req<{ mappings: Array<{ instrumentId: string; securityId: string | null }> }>(
+      '/api/settings/futures',
+    ),
+  saveFuturesSettings: (ids: Record<string, string>) =>
+    req('/api/settings/futures', {
+      method: 'PUT',
+      body: JSON.stringify({ ids }),
+    }),
   casHistory: () => req<{ rows: any[]; notice: string }>('/api/cas/history'),
   backtests: () => req<{ runs: any[]; notice: string }>('/api/backtests'),
 };

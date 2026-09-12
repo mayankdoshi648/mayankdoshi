@@ -9,6 +9,20 @@ export function SettingsPage() {
   const [masked, setMasked] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [futIds, setFutIds] = useState<Record<string, string>>({ NIFTY: '', BANKNIFTY: '' });
+
+  const refreshFutures = () =>
+    api
+      .getFuturesSettings()
+      .then((r) => {
+        const next: Record<string, string> = { NIFTY: '', BANKNIFTY: '' };
+        for (const m of r.mappings ?? []) {
+          next[m.instrumentId] = m.securityId ?? '';
+        }
+        setFutIds(next);
+      })
+      .catch((e) => setErr(e.message));
+
 
   const refresh = () =>
     api
@@ -21,6 +35,7 @@ export function SettingsPage() {
 
   useEffect(() => {
     refresh();
+    refreshFutures();
   }, []);
 
   return (
@@ -93,6 +108,44 @@ export function SettingsPage() {
         {msg ? <p className="mt-3 text-xs text-terminal-ok">{msg}</p> : null}
         {err ? <p className="mt-3 text-xs text-terminal-danger">{err}</p> : null}
       </Panel>
+
+      <Panel title="Futures Security IDs" subtitle="Required for basis" tone="accent">
+        <p className="mb-3 text-sm text-slate-400">
+          Dhan futures security IDs change with the contract month. Leave blank to keep Futures / Basis as UNAVAILABLE.
+          Values are stored server-side only.
+        </p>
+        <div className="space-y-3">
+          {['NIFTY', 'BANKNIFTY'].map((id) => (
+            <label key={id} className="block text-xs text-slate-400">
+              {id} futures security ID
+              <input
+                className="mt-1 w-full rounded-lg border border-terminal-border bg-terminal-bg px-3 py-2 text-sm"
+                value={futIds[id] ?? ''}
+                onChange={(e) => setFutIds((prev) => ({ ...prev, [id]: e.target.value }))}
+                autoComplete="off"
+                placeholder="UNAVAILABLE until set"
+              />
+            </label>
+          ))}
+        </div>
+        <button
+          className="mt-4 rounded-lg bg-terminal-accent/20 px-4 py-2 text-sm text-terminal-accent"
+          onClick={async () => {
+            setErr(null);
+            setMsg(null);
+            try {
+              await api.saveFuturesSettings(futIds);
+              setMsg('Futures IDs saved.');
+              refreshFutures();
+            } catch (e: any) {
+              setErr(e.message);
+            }
+          }}
+        >
+          Save Futures IDs
+        </button>
+      </Panel>
+
     </div>
   );
 }

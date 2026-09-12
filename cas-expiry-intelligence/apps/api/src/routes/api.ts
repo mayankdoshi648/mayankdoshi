@@ -62,6 +62,37 @@ router.delete('/settings/dhan', (_req, res) => {
   res.json({ ok: true, configured: false });
 });
 
+
+router.get('/settings/futures', (_req, res) => {
+  const instruments = listInstruments();
+  res.json({
+    mappings: instruments.map((i) => ({
+      instrumentId: i.id,
+      displayName: i.displayName,
+      futuresSegment: i.futuresSegment,
+      securityId: getSetting(`futures.${i.id}.securityId`) ?? i.futuresSecurityId ?? null,
+    })),
+  });
+});
+
+router.put('/settings/futures', (req, res) => {
+  const schema = z.object({
+    ids: z.record(z.string()),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid payload', details: parsed.error.flatten() });
+    return;
+  }
+  for (const [instrumentId, securityId] of Object.entries(parsed.data.ids)) {
+    const key = `futures.${instrumentId.toUpperCase()}.securityId`;
+    const val = String(securityId ?? '').trim();
+    if (!val) deleteSetting(key);
+    else setSetting(key, val);
+  }
+  res.json({ ok: true });
+});
+
 router.get('/instruments/:id/expiries', async (req, res) => {
   try {
     const expiries = await listExpiries(req.params.id);

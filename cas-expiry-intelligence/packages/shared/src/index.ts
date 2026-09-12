@@ -5,5 +5,6 @@ export * from './instruments.js';
 export * from './calc/marketMath.js';
 export * from './calc/alignment.js';
 export * from './calc/optionMath.js';
+export * from './calc/factorDerivations.js';
 export * from './calc/settlementZone.js';
 export * from './engines/analyticsEngines.js';

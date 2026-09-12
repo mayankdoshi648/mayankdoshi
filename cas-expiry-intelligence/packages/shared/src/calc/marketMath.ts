@@ -43,3 +43,23 @@ export function computeBasisPct(spot: number | null, futures: number | null): nu
   if (b == null || !spot) return null;
   return (b / spot) * 100;
 }
+
+/** Intraday momentum proxy in [-1, 1] from recent candle returns. */
+export function computeMomentum(candles: Candle[], lookback = 15): number | null {
+  if (candles.length < 3) return null;
+  const slice = candles.slice(-Math.max(3, lookback));
+  const first = slice[0]?.close;
+  const last = slice[slice.length - 1]?.close;
+  if (first == null || last == null || !Number.isFinite(first) || !Number.isFinite(last) || first === 0) {
+    return null;
+  }
+  return clamp((last - first) / first / 0.004, -1, 1);
+}
+
+/** VWAP over a trailing window ending at the last candle. */
+export function computeWindowVwap(candles: Candle[], windowMinutes: number): number | null {
+  if (!candles.length) return null;
+  const end = normalizeTsMs(candles[candles.length - 1]!.ts);
+  const start = end - windowMinutes * 60_000;
+  return computeVwap(filterCandlesByTime(candles, start, end + 1));
+}

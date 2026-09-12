@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { Metric, Panel, Pill, fmtNum } from '../components/ui';
+import { CasTimeline } from '../components/CasTimeline';
+import { TerminalCharts } from '../components/TerminalCharts';
 
 export function TerminalPage() {
   const [instruments, setInstruments] = useState<any[]>([]);
@@ -105,6 +107,12 @@ export function TerminalPage() {
 
       {error ? <Panel title="Data Error" tone="danger"><p className="text-sm text-terminal-danger">{error}</p></Panel> : null}
 
+      <CasTimeline
+        timeline={data?.cas?.timeline}
+        displayName={data?.cas?.displayName}
+        isSimulation={simulation}
+      />
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Panel title="Spot" tone="accent"><Metric label="LTP" value={fmtNum(q.spot?.value)} health={q.spot?.health} /></Panel>
         <Panel title="Futures"><Metric label="LTP" value={fmtNum(q.futures?.value)} health={q.futures?.health} /></Panel>
@@ -146,6 +154,7 @@ export function TerminalPage() {
           <div className="mono text-sm text-slate-300">{data?.settlementZone?.lower != null ? `${fmtNum(data.settlementZone.lower)} — ${fmtNum(data.settlementZone.upper)}` : 'UNAVAILABLE'}</div>
           <div className="mono mt-2 text-2xl">{fmtNum(data?.settlementZone?.central)}</div>
           <div className="mt-1 text-xs text-slate-500">Confidence {data?.settlementZone?.confidence ?? 0}%</div>
+          <ul className="mt-3 space-y-1 text-xs text-slate-400">{(data?.settlementZone?.explanation ?? []).slice(0, 6).map((x: string) => <li key={x}>• {x}</li>)}</ul>
         </Panel>
         <Panel title="Signal Score" tone={locked ? 'warn' : 'default'}>
           <div className="mono text-3xl">{locked ? 'LOCKED' : (data?.signalScore?.score ?? '—')}</div>
@@ -185,6 +194,8 @@ export function TerminalPage() {
           </table>
         </div>
       </Panel>
+
+      <TerminalCharts charts={data?.charts} />
 
       {(data?.notices ?? []).length ? (
         <Panel title="Notices">

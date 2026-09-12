@@ -37,6 +37,8 @@ export interface InstrumentDef {
   spotSegment: string;
   futuresUnderlying: string;
   futuresSegment: string;
+  /** Optional static override; monthly IDs usually come from Settings. */
+  futuresSecurityId?: string | null;
   optionUnderlying: string;
   optionSegment: string;
   lotSize: number;

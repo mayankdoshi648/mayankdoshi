@@ -2,17 +2,23 @@ import {
   CAS_CONFIG,
   DEFAULT_CAS_MODE,
   assessAlignment,
+  computeAtmIv,
   computeBasis,
   computeBasisPct,
   computeCasIntelligence,
   computeCasRisk,
   computeMarketState,
   computeMaxPain,
+  computeMomentum,
+  computeOiChangePressure,
+  computeOiConcentration,
+  computeOiMagnetScore,
   computePcrOi,
   computePcrVolume,
   computeSettlementZone,
   computeSignalScore,
   computeVwap,
+  computeWindowVwap,
   detectWalls,
   enabledInstruments,
   filterCandlesByTime,
@@ -28,7 +34,7 @@ import {
   type CasMode,
   type OptionStrikeRow,
 } from '@cas/shared';
-import { getDb } from '../db/client.js';
+import { getDb, getSetting } from '../db/client.js';
 import * as dhan from './dhanClient.js';
 
 function istWindowMs(dateIst: string, startHms: string, endHms: string): { startMs: number; endMs: number } {
@@ -223,10 +229,25 @@ export async function buildAnalytics(input: {
     }
 
     try {
-      // Nearest futures via option/expiry infrastructure is preferred; for Phase 1 use index quote as fallback marker.
-      // Futures LTP requires futures security id mapping — until mapped, mark UNAVAILABLE rather than fabricating.
-      futLtp = null;
-      futTs = null;
+      const futId =
+        getSetting(`futures.${inst.id}.securityId`)?.trim() ||
+        inst.futuresSecurityId?.trim() ||
+        null;
+      if (!futId) {
+        futLtp = null;
+        futTs = null;
+        dataErrors.push(
+          `Futures security ID not configured for ${inst.id} — set it in Settings (never fabricated)`,
+        );
+      } else {
+        const futQuote: any = await dhan.fetchMarketQuote({
+          [inst.futuresSegment]: [Number(futId)],
+        });
+        const fut = extractLtp(futQuote, inst.futuresSegment, futId);
+        futLtp = fut.ltp;
+        futTs = fut.ts;
+        if (futLtp == null) dataErrors.push(`Futures quote UNAVAILABLE for securityId ${futId}`);
+      }
     } catch (e: any) {
       dataErrors.push(`Futures quote failed: ${e.message}`);
     }
@@ -266,10 +287,13 @@ export async function buildAnalytics(input: {
   }
 
   const sessionVwap = computeVwap(candles);
+  const vwap15 = computeWindowVwap(candles, 15);
+  const vwap30 = computeWindowVwap(candles, 30);
   const ref = config.referenceWindow;
   const { startMs, endMs } = istWindowMs(istDate, ref.start, ref.end);
   const refCandles = filterCandlesByTime(candles, startMs, endMs);
   const referenceVwap = computeVwap(refCandles);
+  const momentum = computeMomentum(candles, 15);
 
   const basis = computeBasis(spotLtp, futLtp);
   const basisPct = computeBasisPct(spotLtp, futLtp);
@@ -285,6 +309,16 @@ export async function buildAnalytics(input: {
   const maxPain = optionRows.length ? computeMaxPain(optionRows) : null;
   const walls =
     spotLtp != null && optionRows.length ? detectWalls(optionRows, spotLtp) : detectWalls([], 0);
+  const oiChangePressure = optionRows.length ? computeOiChangePressure(optionRows) : null;
+  const oiConcentration = optionRows.length ? computeOiConcentration(optionRows) : null;
+  const oiMagnetScore = computeOiMagnetScore({
+    spot: spotLtp,
+    maxPain,
+    callWall: walls.callWall,
+    putWall: walls.putWall,
+  });
+  const atmIv = computeAtmIv(optionRows, spotLtp);
+  const ivHigh = atmIv != null ? atmIv >= 22 : null;
 
   const settlement = computeSettlementZone({
     spot: spotLtp,
@@ -295,8 +329,8 @@ export async function buildAnalytics(input: {
     callWall: walls.callWall,
     putWall: walls.putWall,
     pcrOi,
-    oiChangePressure: null,
-    ivScore: null,
+    oiChangePressure,
+    ivScore: atmIv != null ? Math.min(1, atmIv / 40) : null,
   });
 
   const locked = phase.lockDirectionalSignals;
@@ -306,10 +340,10 @@ export async function buildAnalytics(input: {
     referenceVwap,
     basis,
     basisExpanding: null,
-    momentum: null,
+    momentum,
     callWall: walls.callWall,
     putWall: walls.putWall,
-    ivHigh: null,
+    ivHigh,
   });
 
   const casIntel = computeCasIntelligence({
@@ -320,7 +354,7 @@ export async function buildAnalytics(input: {
     putWall: walls.putWall,
     basis,
     pcrOi,
-    oiMagnetScore: null,
+    oiMagnetScore,
     lockedDirectional: locked,
   });
 
@@ -332,25 +366,25 @@ export async function buildAnalytics(input: {
     referenceVwap,
     basis,
     basisWeakening: null,
-    momentum: null,
+    momentum,
     callWall: walls.callWall,
     putWall: walls.putWall,
-    oiChangePressure: null,
+    oiChangePressure,
     pcrOi,
   });
 
   const casRisk = computeCasRisk({
     isExpiryDay: Boolean(expiry && expiry === istDate),
-    iv: null,
+    iv: atmIv,
     spotFuturesDivergencePct: basisPct,
     distanceFromRefPct:
       spotLtp != null && referenceVwap != null ? ((spotLtp - referenceVwap) / spotLtp) * 100 : null,
-    oiConcentration: null,
+    oiConcentration,
     nearWall:
       spotLtp != null &&
       ((walls.callDistance != null && walls.callDistance / spotLtp < 0.0025) ||
         (walls.putDistance != null && walls.putDistance / spotLtp < 0.0025)),
-    rapidOiChange: null,
+    rapidOiChange: oiChangePressure != null ? Math.abs(oiChangePressure) >= 0.55 : null,
     ivExpanding: null,
     dataQuality: alignment.aligned ? 0.8 : 0.4,
     timestampMismatch: !alignment.aligned,
@@ -402,14 +436,20 @@ export async function buildAnalytics(input: {
       basis: makeTimedValue(basis, spotTs ?? futTs, 'DERIVED'),
       basisPct: makeTimedValue(basisPct, spotTs ?? futTs, 'DERIVED'),
       sessionVwap: makeTimedValue(sessionVwap, candles.at(-1) ? new Date(candles.at(-1)!.ts).toISOString() : null, 'DERIVED'),
+      vwap15: makeTimedValue(vwap15, candles.at(-1) ? new Date(candles.at(-1)!.ts).toISOString() : null, 'DERIVED'),
+      vwap30: makeTimedValue(vwap30, candles.at(-1) ? new Date(candles.at(-1)!.ts).toISOString() : null, 'DERIVED'),
       referenceVwap: makeTimedValue(referenceVwap, refCandles.length ? new Date(endMs).toISOString() : null, 'DERIVED'),
     },
     optionMetrics: {
       pcrOi: makeTimedValue(pcrOi, optionTs, 'DERIVED'),
       pcrVolume: makeTimedValue(pcrVol, optionTs, 'DERIVED'),
       maxPain: makeTimedValue(maxPain, optionTs, 'DERIVED'),
+      atmIv: makeTimedValue(atmIv, optionTs, 'DERIVED'),
       walls,
       atm,
+      oiChangePressure,
+      oiConcentration,
+      oiMagnetScore,
     },
     settlementZone: settlement,
     marketState,
@@ -417,6 +457,21 @@ export async function buildAnalytics(input: {
     signalScore: signal,
     casRisk,
     optionChain: chainSlice,
+    charts: {
+      spotSeries: candles.map((c) => ({ t: c.ts, close: c.close })),
+      sessionVwap,
+      referenceVwap,
+      settlementCentral: settlement.central,
+      settlementLower: settlement.lower,
+      settlementUpper: settlement.upper,
+      callOiByStrike: chainSlice.map((r) => ({ strike: r.strike, oi: r.call.oi })),
+      putOiByStrike: chainSlice.map((r) => ({ strike: r.strike, oi: r.put.oi })),
+      oiChangeByStrike: chainSlice.map((r) => ({
+        strike: r.strike,
+        call: r.call.oiChange,
+        put: r.put.oiChange,
+      })),
+    },
     dataErrors,
     notices: [
       ...(config.isSimulation
