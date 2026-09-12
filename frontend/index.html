@@ -469,10 +469,21 @@
     <section class="view" data-view="settings">
       <h1 class="view-title">Dhan API</h1>
       <p class="disclaimer-inline tiny">Connect with Client ID + Access token. On Cloudflare Pages, prefer Worker secrets for a shared host token, or connect per-browser via encrypted session cookie. Tokens are never shown after save, never left in the shareable URL, and never returned by GET APIs.</p>
+      <div id="dhan-live-api-wrap" class="dhan-live-api-wrap hidden">
+        <label>
+          <span>Live API host <em>(Cloudflare Worker URL)</em></span>
+          <input id="dhan-live-api" type="url" inputmode="url" placeholder="https://mayankdoshi.&lt;subdomain&gt;.workers.dev" autocomplete="off">
+        </label>
+        <div class="row-actions">
+          <button type="button" id="dhan-live-api-save" class="btn accent">Save host</button>
+          <button type="button" id="dhan-live-api-clear" class="btn">Clear host</button>
+        </div>
+        <p class="tiny muted">GitHub Pages is static — set the Worker URL once in this browser, then enter Client ID + Access Token below. Token never goes in the shareable link.</p>
+      </div>
       <div id="dhan-static-block" class="dhan-static-block hidden" role="status">
-        <strong>Live Dhan input is off on this link</strong>
-        <p>GitHub Pages / Vercel are static demo only — they cannot safely store secrets or call Dhan from the browser.</p>
-        <p>Use the permanent Cloudflare Pages URL (free) or local <code>npm start</code>, then open More → Dhan API.</p>
+        <strong>Set Live API host to enable Dhan on this link</strong>
+        <p>This GitHub Pages / Vercel URL is static UI only. Paste your Cloudflare Worker URL above (More → Dhan API), then enter Client ID + Access Token.</p>
+        <p>Or open the Worker URL itself, or run local <code>npm start</code>.</p>
       </div>
       <div id="dhan-status" class="dhan-status muted">Checking credentials…</div>
       <form id="dhan-form" class="dhan-form" autocomplete="off">
@@ -912,6 +923,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.2.1"></script>
+  <script src="live-config.js"></script>
+  <script src="js/live-api.js"></script>
   <script src="js/staticDemoApi.js"></script>
   <script src="js/markets.js"></script>
   <script src="js/connections.js"></script>

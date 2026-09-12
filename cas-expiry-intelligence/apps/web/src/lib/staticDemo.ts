@@ -245,7 +245,7 @@ export const staticDemo = {
 
   saveDhanSettings: async () => {
     throw new Error(
-      'STATIC DEMO — Dhan credentials cannot be saved on GitHub Pages. Run the CAS API locally or on a Node host.',
+      'STATIC DEMO — set Live API host (Cloudflare Worker URL) in Settings to save Dhan Client ID + Access Token, or run the CAS API on Node.',
     );
   },
 

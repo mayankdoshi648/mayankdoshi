@@ -510,6 +510,35 @@ html[data-theme="auto"] body {
   line-height: 1.45;
 }
 
+.dhan-live-api-wrap {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--border, #334) 80%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel, #111827) 92%, transparent);
+}
+
+.dhan-live-api-wrap.hidden {
+  display: none;
+}
+
+.dhan-live-api-wrap label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.dhan-live-api-wrap input[type="url"] {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--border, #334);
+  background: var(--bg, #0b1220);
+  color: inherit;
+}
+
 .dhan-static-block {
   margin: 0.5rem 0 0.85rem;
   padding: 0.85rem 0.9rem;

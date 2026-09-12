@@ -150,7 +150,8 @@
       });
       if (force) params.set('refresh', '1');
 
-      const resp = await fetch(`/api/dashboard?${params}`, { credentials: 'include' });
+      const apiFetch = window.PowerBullLiveApi?.apiFetch || ((p, o) => fetch(p, { credentials: 'include', ...o }));
+      const resp = await apiFetch(`/api/dashboard?${params}`);
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) {
         throw new Error(data.error || `HTTP ${resp.status} — run npm start for Markets (needs Node API)`);

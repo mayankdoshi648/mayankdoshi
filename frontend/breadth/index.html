@@ -32,6 +32,30 @@
       </header>
 
   <main class="breadth-main">
+    <section id="breadth-dhan-panel" class="breadth-dhan-panel" aria-label="Dhan API">
+      <h3>Dhan API</h3>
+      <p class="tiny muted">Set Live API host (Cloudflare Worker), then Client ID + Access Token. Shared cookie session with PowerBull / CAS on the same Worker.</p>
+      <div class="breadth-dhan-grid">
+        <label>
+          <span>Live API host</span>
+          <input id="breadth-live-api" type="url" inputmode="url" placeholder="https://….workers.dev" autocomplete="off">
+        </label>
+        <label>
+          <span>Client ID</span>
+          <input id="breadth-dhan-client-id" type="text" inputmode="numeric" placeholder="Dhan client id" autocomplete="off">
+        </label>
+        <label>
+          <span>Access token</span>
+          <input id="breadth-dhan-access-token" type="password" placeholder="Paste access token" autocomplete="off">
+        </label>
+      </div>
+      <div class="row-actions">
+        <button type="button" id="breadth-live-api-save" class="btn">Save host</button>
+        <button type="button" id="breadth-dhan-save" class="btn accent">Save Dhan</button>
+        <button type="button" id="breadth-dhan-clear" class="btn">Clear Dhan</button>
+      </div>
+      <p id="breadth-dhan-msg" class="tiny muted" role="status"></p>
+    </section>
 <div id="overview-headline" class="quote-strip quote-strip-headline" aria-label="Nifty Bank Nifty VIX"></div>
     <div id="overview-size" class="quote-strip quote-strip-size" aria-label="Large Mid Small Cap"></div>
 
@@ -142,6 +166,8 @@
   </p>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="./live-config.js"></script>
+  <script src="./js/live-api.js"></script>
   <script src="./breadth.js"></script>
 </body>
 </html>
