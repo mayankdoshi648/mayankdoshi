@@ -7,7 +7,8 @@
 
 const { handleRequest } = require('./handler');
 
-async function fetch(request, env, ctx) {
+/** Named workerFetch (not fetch) so bundling cannot confuse this with globalThis.fetch. */
+async function workerFetch(request, env, ctx) {
   const url = new URL(request.url);
   const path = url.pathname;
 
@@ -34,4 +35,4 @@ async function fetch(request, env, ctx) {
   return assetResponse;
 }
 
-module.exports = { fetch, default: { fetch } };
+module.exports = { fetch: workerFetch, default: { fetch: workerFetch } };

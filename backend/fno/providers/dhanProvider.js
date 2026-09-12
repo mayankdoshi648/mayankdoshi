@@ -37,7 +37,8 @@ class DhanProvider extends FoDataProvider {
     this.config = options.config || null;
     this.accessToken = options.accessToken || null;
     this.clientId = options.clientId || options.config?.clientId || null;
-    this.fetchImpl = options.fetchImpl || fetch;
+    // Prefer globalThis.fetch — a bundle named-export `fetch` can shadow the HTTP API.
+    this.fetchImpl = options.fetchImpl || globalThis.fetch.bind(globalThis);
     this.now = options.now || (() => Date.now());
     this.sleep = options.sleep || ((ms) => new Promise((r) => setTimeout(r, ms)));
     this.minIntervalMs = options.minIntervalMs ?? MIN_OPTION_CHAIN_INTERVAL_MS;

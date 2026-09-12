@@ -253,7 +253,7 @@ function hasDhanCreds(config = {}) {
 function createProvider({
   config = {},
   preferMock = false,
-  fetchImpl,
+  fetchImpl = globalThis.fetch?.bind(globalThis),
   accessToken,
   clientId,
   dataSources = null,
@@ -272,12 +272,13 @@ function createProvider({
     return mock;
   }
 
-  const nse = new NseProvider({ fetchImpl });
+  const httpFetch = fetchImpl || globalThis.fetch.bind(globalThis);
+  const nse = new NseProvider({ fetchImpl: httpFetch });
   const dhan = new DhanProvider({
     config: cfg.pin && cfg.totpSecret ? cfg : null,
     accessToken: cfg.accessToken,
     clientId: cfg.clientId,
-    fetchImpl,
+    fetchImpl: httpFetch,
   });
 
   return new HybridProvider({

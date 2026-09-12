@@ -77,11 +77,17 @@ async function buildWorker() {
     },
   });
 
+  // IMPORTANT: do NOT `export const fetch = …`.
+  // A named ESM export named `fetch` shadows globalThis.fetch for the whole
+  // bundle. Backend code then calls the Worker handler as if it were HTTP
+  // fetch → `new URL(request.url)` throws "Invalid URL string." and NSE/Dhan
+  // fall back to mock. Default export { fetch } is enough for Cloudflare.
   let raw = fs.readFileSync(workerOut, 'utf8');
   raw = raw.replace(/\nexport \{ fetch, default \};\s*$/m, '\n');
+  raw = raw.replace(/\nexport const fetch = [^;]+;\s*$/m, '\n');
   const replaced = raw.replace(
     /export default (require_[\w$]+)\(\);/,
-    `const __powerbullWorker = $1();\nexport default __powerbullWorker.default || { fetch: __powerbullWorker.fetch };\nexport const fetch = (__powerbullWorker.default || __powerbullWorker).fetch;`,
+    `const __powerbullWorker = $1();\nexport default __powerbullWorker.default || { fetch: __powerbullWorker.fetch };`,
   );
   if (replaced === raw) {
     if (/fetch/.test(raw)) {
