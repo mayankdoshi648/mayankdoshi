@@ -14,6 +14,7 @@
  */
 
 const { FnoService } = require('../backend/fno/service');
+const { createProvider } = require('../backend/fno/providers');
 const { createDataSourceManager } = require('../backend/dataSourceManager');
 const { isMarketOpen } = require('../backend/marketWindow');
 const { createStockDashboard } = require('../backend/stockDashboard');
@@ -292,7 +293,15 @@ async function handleRequest(request, env = {}, _ctx = null) {
     }
 
     // F&O service (engines unchanged)
-    const fno = new FnoService({ config, dataSources });
+    const fno = new FnoService({
+      config,
+      dataSources,
+      provider: createProvider({
+        config,
+        dataSources,
+        fetchImpl: globalThis.fetch.bind(globalThis),
+      }),
+    });
 
     if (parts[0] === 'fno') {
       const sub = parts.slice(1);

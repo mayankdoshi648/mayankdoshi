@@ -45,5 +45,6 @@ Typical messages:
 | `Missing entry-point` / `dist/worker.js` not found | Build command must include `npm run build` |
 | `Project not found` / `pages deploy` | Deploy command must be `npm run deploy` |
 | `__dirname is not defined` / code 10021 | Pull latest: CF build defines `__dirname`/`__filename` in `dist/worker.js` |
+| `Invalid URL string` / NSE mock fallback | Named ESM `export const fetch` shadowed HTTP fetch — fixed in build (default export only) |
 | Auth / API token | Settings → Builds → refresh API token |
 | Wrong branch | Production branch must be `master` |

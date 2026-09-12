@@ -27,7 +27,8 @@ class NseProvider extends FoDataProvider {
   constructor(options = {}) {
     super();
     this.name = 'nse';
-    this.fetchImpl = options.fetchImpl || fetch;
+    // Prefer globalThis.fetch — a bundle named-export `fetch` can shadow the HTTP API.
+    this.fetchImpl = options.fetchImpl || globalThis.fetch.bind(globalThis);
     this.cookieJar = '';
   }
 
