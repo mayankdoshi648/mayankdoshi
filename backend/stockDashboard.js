@@ -157,6 +157,10 @@ function createStockDashboard({
   config,
   fetchImpl = fetch,
   demoMode = false,
+  /** Skip per-symbol 52w history pulls (required on Cloudflare CPU limits). */
+  skipWeek52 = false,
+  /** Optional preloaded instruments: [{ symbol, name, sector, securityId }] */
+  bundledUniverse = null,
 }) {
   let memoryCache = null;
   let week52Cache = new Map(); // symbol -> { stats, at }
@@ -171,6 +175,24 @@ function createStockDashboard({
     if (universeCache?.universe === universe && universeCache.instruments?.length) {
       return universeCache;
     }
+
+    // Prefer bundled Nifty50 map when provided (Cloudflare — avoids 25MB scrip master).
+    if (bundledUniverse?.instruments?.length && String(universe).toLowerCase().includes('nifty50')) {
+      const instruments = bundledUniverse.instruments.map((row) => ({
+        symbol: row.symbol,
+        name: row.name || row.symbol,
+        sector: row.sector || 'Unknown',
+        securityId: String(row.securityId),
+      }));
+      universeCache = {
+        universe,
+        instruments,
+        sectors: [...new Set(instruments.map((i) => i.sector))].sort(),
+        missing: bundledUniverse.missing || [],
+      };
+      return universeCache;
+    }
+
     if (isDemo()) {
       try {
         const rows = await fetchIndexUniverse(universe, fetchImpl);
@@ -259,21 +281,30 @@ function createStockDashboard({
       });
     }
 
-    const week52List = await mapPool(instruments, 4, async (inst) => {
-      try {
-        return await loadWeek52ForInstrument(inst, accessToken);
-      } catch (err) {
-        return {
-          high52: null,
-          low52: null,
-          pctFromHigh: null,
-          pctFromLow: null,
-          rangePosition: null,
-          daysInWindow: 0,
-          error: err.message,
-        };
-      }
-    });
+    const week52List = skipWeek52
+      ? instruments.map(() => ({
+        high52: null,
+        low52: null,
+        pctFromHigh: null,
+        pctFromLow: null,
+        rangePosition: null,
+        daysInWindow: 0,
+      }))
+      : await mapPool(instruments, 4, async (inst) => {
+        try {
+          return await loadWeek52ForInstrument(inst, accessToken);
+        } catch (err) {
+          return {
+            high52: null,
+            low52: null,
+            pctFromHigh: null,
+            pctFromLow: null,
+            rangePosition: null,
+            daysInWindow: 0,
+            error: err.message,
+          };
+        }
+      });
 
     const rows = instruments.map((inst, idx) => {
       const q = quotes.get(String(inst.securityId)) || {};
@@ -318,6 +349,9 @@ function createStockDashboard({
       missing,
       rows,
       sectors: sectorSummary(rows),
+      warning: skipWeek52
+        ? 'Live Dhan OHLC quotes; 52-week history skipped on this host to stay within CPU limits.'
+        : undefined,
     };
   }
 
@@ -355,9 +389,15 @@ function createStockDashboard({
   }
 
   function getCached(universe = 'nifty50') {
-    if (memoryCache?.universe === universe && memoryCache.payload) return memoryCache;
+    if (memoryCache?.universe === universe && memoryCache.payload) {
+      if (isDemo() && memoryCache.payload.mode === 'live') return null;
+      if (!isDemo() && memoryCache.payload.mode === 'demo') return null;
+      return memoryCache;
+    }
     const disk = readDiskCache();
     if (disk?.universe === universe && disk.payload) {
+      if (isDemo() && disk.payload.mode === 'live') return null;
+      if (!isDemo() && disk.payload.mode === 'demo') return null;
       memoryCache = disk;
       return disk;
     }
