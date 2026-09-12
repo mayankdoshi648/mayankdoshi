@@ -1,51 +1,48 @@
 # Cloudflare deploy — fix “Failed: error occurred while running deploy command”
 
-## Why it fails
+## Most common cause
 
-Your Git project **`powerbullpro` is a Worker** (Workers Builds).
+Cloudflare ran deploy **without** a Worker bundle at `dist/worker.js`.
 
-If **Deploy command** is still:
+That happens if Build is `npm run build` and `build` used to be a no-op.  
+It is now fixed in the repo: **`npm run build` creates `dist/worker.js`**.
 
-```text
-npx wrangler pages deploy …
-```
-
-deploy **always** fails. That command is only for Pages projects.
-
-## Exact settings to paste
-
-Open:
+## Paste these Builds settings
 
 **Workers & Pages → powerbullpro → Settings → Builds**
 
-Set:
-
 | Field | Value |
 |--------|--------|
-| **Build command** | `npm ci && npm run build:cloudflare` |
+| **Production branch** | `master` |
+| **Build command** | `npm ci && npm run build` |
 | **Deploy command** | `npm run deploy` |
-| **Non-production branch deploy command** (if shown) | `npm run deploy` |
+| **Version command** | `npm run deploy:version` |
 
-Then click **Save** → **Retry deployment**.
+Save → **Deployments → Retry deployment**.
 
-`npm run deploy` rebuilds `dist/worker.js` and runs `wrangler deploy` (Worker + Assets). It never calls `pages deploy`.
+### Do not use
 
-## After a green build
+```text
+npx wrangler pages deploy
+```
 
-1. Open the project **Overview**
-2. Copy the `*.workers.dev` URL
-3. Optional secrets under **Settings → Variables and Secrets**:
-   - `SESSION_SECRET` (required for Dhan cookie login)
-   - `DHAN_CLIENT_ID` / `DHAN_ACCESS_TOKEN` (optional shared live account)
+That is for Pages. This project is Worker **`powerbullpro`**.
+
+## What each command does
+
+- `npm run build` → writes `dist/worker.js`
+- `npm run deploy` → rebuilds, then `wrangler deploy`
+- `npm run deploy:version` → rebuilds, then `wrangler versions upload` (preview)
 
 ## If it still fails
 
-Scroll to the bottom of the build log (red lines under **Deploying**) and check:
+Open the failed build → scroll to **Deploying** (red). Copy the last ~20 lines.
 
-| Log text | Meaning |
-|----------|---------|
-| `pages deploy` / `Project not found` | Deploy command still wrong — must be `npm run deploy` |
-| `dist/worker.js was not found` | Build command missing `npm run build:cloudflare` |
-| `Authentication error` | Reconnect Git / regenerate Workers Builds API token in Settings → Builds |
+Typical messages:
 
-Paste the last ~20 red log lines here if you want them decoded.
+| Log | Fix |
+|-----|-----|
+| `Missing entry-point` / `dist/worker.js` not found | Build command must include `npm run build` |
+| `Project not found` / `pages deploy` | Deploy command must be `npm run deploy` |
+| Auth / API token | Settings → Builds → refresh API token |
+| Wrong branch | Production branch must be `master` |
