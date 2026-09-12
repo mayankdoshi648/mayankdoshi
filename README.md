@@ -8,25 +8,29 @@ Professional **mobile-first Indian NSE F&O market intelligence terminal**, built
 
 | App | Link | Mode |
 |-----|------|------|
-| **PowerBull Pro** (F&O terminal) | **https://mayankdoshi648.github.io/mayankdoshi/powerbull/** | Labeled **MOCK** |
-| **CAS & Expiry** | **https://mayankdoshi648.github.io/mayankdoshi/cas/** | Labeled **MOCK** |
-| **Market Breadth** | **https://mayankdoshi648.github.io/mayankdoshi/breadth/** | Labeled **MOCK** |
-| Root (same as PowerBull) | https://mayankdoshi648.github.io/mayankdoshi/ | Labeled **MOCK** |
+| **PowerBull Pro** (F&O terminal) | **https://mayankdoshi648.github.io/mayankdoshi/powerbull/** | UI on Pages · **Dhan input active** via Live API host |
+| **CAS & Expiry** | **https://mayankdoshi648.github.io/mayankdoshi/cas/** | UI on Pages · **Dhan input active** via Live API host |
+| **Market Breadth** | **https://mayankdoshi648.github.io/mayankdoshi/breadth/** | UI on Pages · **Dhan input active** via Live API host |
+| Root (same as PowerBull) | https://mayankdoshi648.github.io/mayankdoshi/ | UI on Pages · **Dhan input active** via Live API host |
 
 ### Hosts
 
 | Host | Link | Mode |
 |------|------|------|
 | **Cloudflare Workers (preferred · free · live Dhan)** | Add GH secrets + run workflow — see [`docs/cloudflare-deploy.md`](docs/cloudflare-deploy.md) → `https://mayankdoshi.<subdomain>.workers.dev` | **Live F&O** — enter Client ID + Access Token in **More → Dhan API** |
-| **GitHub Pages** | App links above | Labeled **MOCK** static UI (cannot hold Dhan secrets) |
-| Vercel | https://mayankdoshi.vercel.app | Labeled **MOCK** static UI (cannot hold Dhan secrets) |
+| **GitHub Pages** | App links above | Static UI + **Live API host** field → Worker (credentials + live F&O) |
+| Vercel | https://mayankdoshi.vercel.app | Static UI + same Live API host bridge |
 | Render blueprint | `render.yaml` (optional / paid) | Full Node + SQLite + equity WS |
 
-Static hosts (GitHub Pages / Vercel) cannot store Dhan secrets. For a **bookmarkable permanent HTTPS URL** on phone + laptop **without Render**:
+### Enable Dhan on every shareable link
 
-1. Follow **[`docs/cloudflare-deploy.md`](docs/cloudflare-deploy.md)**
-2. Set secrets: `SESSION_SECRET`, optional `DHAN_CLIENT_ID` + `DHAN_ACCESS_TOKEN`
-3. Share `https://mayankdoshi.<subdomain>.workers.dev` — **never put the access token in the URL**
+1. Deploy the Cloudflare Worker ([`docs/cloudflare-deploy.md`](docs/cloudflare-deploy.md)) and copy its `https://….workers.dev` URL.
+2. On phone, open PowerBull / CAS / Breadth (GitHub Pages links above).
+3. Paste the Worker URL into **Live API host** (More → Dhan API, CAS Settings, or Breadth Dhan panel) → **Save host**.
+4. Enter **Client ID + Access Token** → **Save**. Token is stored as an encrypted httpOnly cookie on the Worker — **never in the shareable URL**.
+5. Or bookmark the Worker URL itself and use More → Dhan API there (same-origin; no host field needed).
+
+Set secrets: `SESSION_SECRET`, optional `DHAN_CLIENT_ID` + `DHAN_ACCESS_TOKEN`.
 
 In-app: **More → Dhan API** or the header **connection pill** → Data Connections.
 

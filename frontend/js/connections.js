@@ -68,12 +68,13 @@
 
 async function refreshConnections() {
     try {
-      const resp = await fetch('/api/data-connections', { credentials: 'include' });
+      const apiFetch = window.PowerBullLiveApi?.apiFetch || ((p, o) => fetch(p, { credentials: 'include', ...o }));
+      const resp = await apiFetch('/api/data-connections');
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const snapshot = await resp.json();
       let health = null;
       try {
-        const hr = await fetch('/api/data-health', { credentials: 'include' });
+        const hr = await apiFetch('/api/data-health');
         if (hr.ok) health = await hr.json();
       } catch (_) { /* optional */ }
       paintPill(health ? { ...snapshot, overall: health.overall || snapshot.overall } : snapshot);
@@ -102,9 +103,9 @@ async function refreshConnections() {
 
     if (!clientId || !token) return;
     try {
-      await fetch('/api/fno/credentials/dhan', {
+      const apiFetch = window.PowerBullLiveApi?.apiFetch || ((p, o) => fetch(p, { credentials: 'include', ...o }));
+      await apiFetch('/api/fno/credentials/dhan', {
         method: 'PUT',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clientId,
@@ -128,11 +129,12 @@ async function refreshConnections() {
     const body = $('#debug-dialog-body');
     if (!dlg || !body) return;
     try {
+      const apiFetch = window.PowerBullLiveApi?.apiFetch || ((p, o) => fetch(p, { credentials: 'include', ...o }));
       const [conn, status, dhan, health] = await Promise.all([
-        fetch('/api/data-connections', { credentials: 'include' }).then((r) => r.json()),
-        fetch('/api/status', { credentials: 'include' }).then((r) => r.json()),
-        fetch('/api/fno/credentials/dhan', { credentials: 'include' }).then((r) => r.json()).catch(() => null),
-        fetch('/api/data-health', { credentials: 'include' }).then((r) => r.json()).catch(() => null),
+        apiFetch('/api/data-connections').then((r) => r.json()),
+        apiFetch('/api/status').then((r) => r.json()),
+        apiFetch('/api/fno/credentials/dhan').then((r) => r.json()).catch(() => null),
+        apiFetch('/api/data-health').then((r) => r.json()).catch(() => null),
       ]);
       body.textContent = JSON.stringify({
         dataHealth: health,

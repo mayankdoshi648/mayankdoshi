@@ -76,10 +76,15 @@
   }
 
   async function api(path, options = {}) {
+    const live = window.PowerBullLiveApi;
+    const liveOrigin = live?.getLiveApiOrigin?.() || '';
     // Prefer live Express / Cloudflare API; fall back to labeled static demo for GitHub Pages / Vercel.
-    if (!state.forceStaticDemo) {
+    // When a Live API host is configured, never fall back to mock for credential/data calls.
+    if (!state.forceStaticDemo || liveOrigin) {
       try {
-        const resp = await fetch(path, { credentials: 'include', ...options });
+        const resp = live?.apiFetch
+          ? await live.apiFetch(path, options)
+          : await fetch(path, { credentials: 'include', ...options });
         const ct = resp.headers.get('content-type') || '';
         if (ct.includes('application/json')) {
           const json = await resp.json();
@@ -88,13 +93,18 @@
           }
           if (json && (json.data !== undefined || json.meta || json.rules || json.symbols || json.alerts)) {
             if (json.meta) setMeta(json.meta);
+            if (liveOrigin) state.forceStaticDemo = false;
             return json;
           }
+        }
+        if (liveOrigin) {
+          throw new Error(`Live API returned non-JSON for ${path} (HTTP ${resp.status})`);
         }
         state.forceStaticDemo = true;
       } catch (err) {
         // Express JSON errors (credentials, validation) must surface — not fall into mock.
         if (err && !(err instanceof TypeError)) throw err;
+        if (liveOrigin) throw err;
         state.forceStaticDemo = true;
       }
     }
@@ -948,12 +958,39 @@
 
   async function renderSettings() {
     setDhanMsg('');
+    const live = window.PowerBullLiveApi;
+    const liveOrigin = live?.getLiveApiOrigin?.() || '';
+    const hostInput = $('#dhan-live-api');
+    if (hostInput && liveOrigin && !hostInput.value) hostInput.value = liveOrigin;
+
+    // On static hosts, allow live Dhan once a Live API host is set.
+    const staticHost = Boolean(live?.isStaticHost?.());
+    const canLive = Boolean(liveOrigin) || !staticHost;
+
     try {
+      if (!canLive) {
+        $('#dhan-static-block')?.classList.remove('hidden');
+        $('#dhan-form')?.classList.add('hidden');
+        $('#dhan-live-api-wrap')?.classList.remove('hidden');
+        paintDhanStatus({
+          hasDhan: false,
+          liveCapable: false,
+          note: 'Set Live API host (Cloudflare Worker URL) to enable Dhan Client ID + Access Token on this link.',
+          source: 'static',
+          staticOnly: true,
+        });
+        return;
+      }
+
+      // Prefer live API — do not stay stuck in mock mode once host is configured.
+      if (liveOrigin) state.forceStaticDemo = false;
+
       const env = await api('/api/fno/credentials/dhan');
       const status = env.data || env;
       paintDhanStatus(status);
-      const staticOnly = Boolean(state.forceStaticDemo || status.staticOnly);
+      const staticOnly = Boolean(!canLive || (status.staticOnly && !liveOrigin));
       $('#dhan-static-block')?.classList.toggle('hidden', !staticOnly);
+      $('#dhan-live-api-wrap')?.classList.remove('hidden');
       if (staticOnly) {
         $('#dhan-form')?.classList.add('hidden');
         setDhanMsg('');
@@ -961,8 +998,8 @@
         $('#dhan-form')?.classList.remove('hidden');
         $('#dhan-form')?.classList.remove('disabled');
         $$('#dhan-form input, #dhan-form button').forEach((n) => { n.disabled = false; });
-        const pinOk = status.pinTotpSupported !== false;
-        const persistOk = status.persistSupported !== false;
+        const pinOk = status.pinTotpSupported !== false && !liveOrigin;
+        const persistOk = status.persistSupported !== false && !liveOrigin;
         $('#dhan-pin')?.closest('label')?.classList.toggle('hidden', !pinOk);
         $('#dhan-totp')?.closest('label')?.classList.toggle('hidden', !pinOk);
         $('#dhan-persist')?.closest('label')?.classList.toggle('hidden', !persistOk);
@@ -970,12 +1007,14 @@
         if (hint) {
           hint.textContent = pinOk
             ? 'Use Client ID + Access token (simplest), or Client ID + PIN + TOTP secret.'
-            : 'Cloudflare host: use Client ID + Access token only. Token is stored in an encrypted httpOnly cookie — never in the shareable URL.';
+            : 'Live host: use Client ID + Access token. Token is stored in an encrypted httpOnly cookie — never in the shareable URL.';
         }
       }
     } catch (err) {
       paintDhanStatus({ hasDhan: false, liveCapable: false, note: err.message, source: 'error' });
       setDhanMsg(err.message, false);
+      $('#dhan-live-api-wrap')?.classList.remove('hidden');
+      $('#dhan-form')?.classList.remove('hidden');
     }
   }
 
@@ -1366,6 +1405,24 @@
     $('#dhan-form')?.addEventListener('submit', saveDhanCredentials);
     $('#dhan-test')?.addEventListener('click', testDhanCredentials);
     $('#dhan-clear')?.addEventListener('click', clearDhanCredentials);
+    $('#dhan-live-api-save')?.addEventListener('click', () => {
+      const live = window.PowerBullLiveApi;
+      if (!live) return;
+      const origin = live.setLiveApiOrigin($('#dhan-live-api')?.value || '');
+      if (!origin) {
+        setDhanMsg('Enter a valid https:// Worker URL (e.g. https://name.workers.dev)', false);
+        return;
+      }
+      state.forceStaticDemo = false;
+      setDhanMsg(`Live API host saved: ${origin}`, true);
+      renderSettings();
+    });
+    $('#dhan-live-api-clear')?.addEventListener('click', () => {
+      window.PowerBullLiveApi?.setLiveApiOrigin('');
+      if ($('#dhan-live-api')) $('#dhan-live-api').value = '';
+      setDhanMsg('Live API host cleared — this static link is demo-only until a host is set again.', true);
+      renderSettings();
+    });
     $('#opp-filter')?.addEventListener('change', () => renderOpportunity());
     $('#opp-sort')?.addEventListener('change', () => renderOpportunity());
     $$('#opp-buckets .opp-bucket').forEach((btn) => {

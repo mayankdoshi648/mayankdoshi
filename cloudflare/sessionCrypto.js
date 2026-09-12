@@ -82,10 +82,11 @@ function readCookie(request, name = COOKIE) {
 }
 
 function setCookieHeader(value, { clear = false } = {}) {
+  // SameSite=None so GitHub Pages / Vercel can send the cookie on cross-origin API calls.
   if (clear || !value) {
-    return `${COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+    return `${COOKIE}=; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=0`;
   }
-  return `${COOKIE}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${12 * 60 * 60}`;
+  return `${COOKIE}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=${12 * 60 * 60}`;
 }
 
 module.exports = {

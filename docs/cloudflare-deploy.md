@@ -2,7 +2,18 @@
 
 PowerBull Pro can run **without Render** on Cloudflare’s free tier.
 
-This is the **only free HTTPS host** in this repo that can accept **Dhan Client ID + Access Token** and return **live quotes** (GitHub Pages / Vercel are MOCK-only).
+This is the **live API host** that accepts **Dhan Client ID + Access Token** and returns **live F&O quotes**. GitHub Pages / Vercel stay as shareable UI; point their **Live API host** field at this Worker so Dhan input works on every bookmark.
+
+## Use with GitHub Pages (all app links)
+
+After the Worker is deployed:
+
+1. Open any Pages link (PowerBull / CAS / Breadth / root).
+2. Set **Live API host** = your `https://….workers.dev` URL (saved in that browser).
+3. Enter Client ID + Access Token → Save.
+4. CORS + `SameSite=None` cookies allow the Pages origin to call the Worker with credentials.
+
+Optional: open the Worker URL directly (same-origin UI + API) — no Live API host field needed.
 
 ## Fastest path — GitHub Actions deploy
 

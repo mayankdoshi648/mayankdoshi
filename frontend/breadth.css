@@ -53,3 +53,45 @@
 .breadth-app .disclaimer {
   padding: 1rem 1.25rem 2rem;
 }
+
+.breadth-dhan-panel {
+  margin: 0 0 1.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border, #334);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel, #111827) 94%, transparent);
+}
+
+.breadth-dhan-panel h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.breadth-dhan-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin: 0.75rem 0;
+}
+
+.breadth-dhan-panel label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.breadth-dhan-panel input {
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--border, #334);
+  background: var(--bg, #0b1220);
+  color: inherit;
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+#breadth-dhan-msg.ok { color: var(--ok, #21c55d); }
+#breadth-dhan-msg.err { color: var(--danger, #ef4444); }

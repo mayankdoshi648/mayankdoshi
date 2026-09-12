@@ -88,7 +88,89 @@ function staticBreadthDemo(universe) {
 }
 
 function isStaticHost() {
+  const live = window.PowerBullLiveApi;
+  if (live?.getLiveApiOrigin?.()) return false;
   return /github\.io$/i.test(location.hostname) || /vercel\.app$/i.test(location.hostname);
+}
+
+function apiFetch(path, options) {
+  const live = window.PowerBullLiveApi;
+  if (live?.apiFetch) return live.apiFetch(path, options);
+  return fetch(path, { credentials: 'include', ...options });
+}
+
+function setBreadthDhanMsg(text, ok = null) {
+  const el = document.getElementById('breadth-dhan-msg');
+  if (!el) return;
+  el.textContent = text || '';
+  el.classList.toggle('ok', ok === true);
+  el.classList.toggle('err', ok === false);
+}
+
+function wireBreadthDhanPanel() {
+  const live = window.PowerBullLiveApi;
+  const hostInput = document.getElementById('breadth-live-api');
+  if (hostInput && live?.getLiveApiOrigin) {
+    const origin = live.getLiveApiOrigin() || '';
+    if (origin && !hostInput.value) hostInput.value = origin;
+  }
+
+  document.getElementById('breadth-live-api-save')?.addEventListener('click', () => {
+    if (!live) {
+      setBreadthDhanMsg('Live API helper missing — hard-refresh the page.', false);
+      return;
+    }
+    const origin = live.setLiveApiOrigin(hostInput?.value || '');
+    if (!origin) {
+      setBreadthDhanMsg('Enter a valid https:// Worker URL.', false);
+      return;
+    }
+    setBreadthDhanMsg(`Live API host saved: ${origin}`, true);
+    loadOverview({ force: true });
+    loadBreadth({ force: false });
+  });
+
+  document.getElementById('breadth-dhan-save')?.addEventListener('click', async () => {
+    const clientId = document.getElementById('breadth-dhan-client-id')?.value.trim() || '';
+    const accessToken = document.getElementById('breadth-dhan-access-token')?.value.trim() || '';
+    if (!clientId || !accessToken) {
+      setBreadthDhanMsg('Need Client ID + Access Token.', false);
+      return;
+    }
+    if (!live?.getLiveApiOrigin?.() && isStaticHost()) {
+      setBreadthDhanMsg('Save Live API host first (Cloudflare Worker URL).', false);
+      return;
+    }
+    setBreadthDhanMsg('Saving Dhan credentials…');
+    try {
+      const resp = await apiFetch('/api/fno/credentials/dhan', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId, accessToken, persistEnv: false }),
+      });
+      const json = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(json.error || json.message || `HTTP ${resp.status}`);
+      const tok = document.getElementById('breadth-dhan-access-token');
+      if (tok) tok.value = '';
+      setBreadthDhanMsg('Dhan saved on live host (encrypted cookie). Breadth DMA still needs Node for full live scan.', true);
+    } catch (err) {
+      setBreadthDhanMsg(err.message || 'Save failed', false);
+    }
+  });
+
+  document.getElementById('breadth-dhan-clear')?.addEventListener('click', async () => {
+    setBreadthDhanMsg('Clearing…');
+    try {
+      const resp = await apiFetch('/api/fno/credentials/dhan', { method: 'DELETE' });
+      const json = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(json.error || `HTTP ${resp.status}`);
+      document.getElementById('breadth-dhan-client-id').value = '';
+      document.getElementById('breadth-dhan-access-token').value = '';
+      setBreadthDhanMsg('Dhan credentials cleared on live host.', true);
+    } catch (err) {
+      setBreadthDhanMsg(err.message || 'Clear failed', false);
+    }
+  });
 }
 
 // --- Market Overview (Nifty / VIX / size / sectors) ---
@@ -178,12 +260,12 @@ function renderOverview(data) {
 async function loadOverview({ force = false } = {}) {
   const statusEl = document.getElementById('breadth-status');
   try {
-    if (isStaticHost()) throw new Error('static-host');
+    if (isStaticHost() && !window.PowerBullLiveApi?.getLiveApiOrigin?.()) throw new Error('static-host');
     const url = force ? '/api/overview?refresh=1' : '/api/overview';
-    const resp = await fetch(url);
+    const resp = await apiFetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
-    if (data.error) throw new Error(data.error);
+    if (data.error) throw new Error(data.error || data.message || 'overview error');
     renderOverview(data);
     if (statusEl && !statusEl.textContent.includes('Scanning')) {
       const stamp = data.scannedAt ? new Date(data.scannedAt).toLocaleTimeString() : '';
@@ -404,7 +486,7 @@ function startBreadthPoll(statusEl) {
   let seenScanning = false;
   breadthPollTimer = setInterval(async () => {
     try {
-      const s = await fetch('/api/breadth/status').then((r) => r.json());
+      const s = await apiFetch('/api/breadth/status').then((r) => r.json());
       if (s.scanning) {
         seenScanning = true;
         if (s.progress?.total) {
@@ -434,14 +516,14 @@ async function loadBreadth({ force = false, quiet = false } = {}) {
   btn.disabled = true;
 
   try {
-    if (isStaticHost()) throw new Error('static-host');
+    if (isStaticHost() && !window.PowerBullLiveApi?.getLiveApiOrigin?.()) throw new Error('static-host');
     const url = force
       ? `/api/breadth?universe=${universe}&refresh=1`
       : `/api/breadth?universe=${universe}`;
-    const resp = await fetch(url);
+    const resp = await apiFetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
-    if (data.error) throw new Error(data.error);
+    if (data.error) throw new Error(data.error || data.message || 'breadth error');
     renderBreadthReport(data);
     if (data.refreshing) {
       statusEl.textContent = `${data.stockCount || 0} stocks · showing cache · refreshing in background…`;
@@ -466,5 +548,6 @@ document.getElementById('breadth-refresh').addEventListener('click', () => {
 });
 document.getElementById('breadth-universe').addEventListener('change', () => loadBreadth({ force: false }));
 
+wireBreadthDhanPanel();
 loadOverview();
 loadBreadth();
