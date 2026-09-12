@@ -130,6 +130,7 @@ npx wrangler dev
 | Dhan HTTP 429 / code 805 Too many requests | Wait 1–2 min; refresh less often. App now throttles marketfeed + serves cached quotes on 429 |
 | Equity Markets share prices always demo on CF | Connect Dhan — Markets board now uses live Dhan OHLC when `hasDhan` (52w history still Node-only) |
 | Vercel CI red (`esbuild` / build failed) | Expected if `build` ran Worker bundle without devDeps. `vercel.json` now skips CF build and serves `frontend/` MOCK only |
+| Vercel CI red (`Deployment rate limited — retry in 24 hours`) | Hobby plan quota. Live F&O is on Cloudflare — Vercel auto-deploy is **disabled** in `vercel.json` (`git.deploymentEnabled: false`) so PR checks are not blocked. Re-enable manually only if you need the MOCK host |
 | 401 from Dhan | Paste a fresh Access Token |
 
 ## Updating later
