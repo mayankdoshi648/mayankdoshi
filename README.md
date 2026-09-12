@@ -113,18 +113,3 @@ Curated study plan, GitHub repos, PDFs, and week-by-week notebook schedule for t
 - [docs/LEARNING_RESOURCES.md](docs/LEARNING_RESOURCES.md) — full curriculum map
 - [workshop/](workshop/) — Week 0 Python scripts (Fyers / Firstock / yfinance Nifty fetch)
 
-## Architecture (DarvaX)
-
-- `backend/darvaxEngine.js` — Box rules, Wyckoff, patterns, strength score, stops
-- `backend/darvaxScanner.js` — Universe scan, RS percentiles, fundamentals, Telegram
-- `backend/darvaxData.js` — NSE via Dhan historical, US via Yahoo
-- `backend/screenerFundamentals.js` — Screener.in scrape + score bonus
-- `backend/telegramAlerts.js` — High-score / SUPER_TREND / BREAKOUT alerts
-- `backend/obsidianExport.js` — Vault markdown export
-- `backend/dhanOrders.js` — Manual-approval Dhan limit orders
-- `frontend/` — Dashboard with DarvaX Scanner tab
-
-## Safety
-
-- Keep `DARVAX_AUTO_TRADE=false` initially; approve orders manually in the dashboard.
-- Telegram and Obsidian are optional; scanner works with Yahoo fallback if Dhan creds are missing (NSE quality is better with Dhan).
