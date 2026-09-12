@@ -14,6 +14,9 @@ const { fetchAccessToken } = require('./dhanAuth');
 const { placeDhanOrder, calcPositionSize } = require('./dhanOrders');
 const { resolveNseInstrumentMap } = require('./instrumentMap');
 const { exportFromDb } = require('./obsidianExport');
+const { getMarketBreadth, readBreadthCache, isRefreshRunning } = require('./marketBreadth');
+const { getMarketOverview } = require('./marketOverview');
+const { createFnoRouter } = require('./fno/routes');
 
 function createApiRouter({
   db,
@@ -21,17 +24,201 @@ function createApiRouter({
   isMarketOpenFn,
   getCandles,
   config,
+  stockDashboard = null,
+  tokenManager = null,
+  dataSources = null,
+  credentialSession = null,
 }) {
   const router = express.Router();
   let instrumentMapCache = null;
+  let breadthProgress = null;
+
+  router.use('/fno', createFnoRouter({ config, credentialSession, dataSources }));
 
   router.get('/status', (req, res) => {
+    const auth = tokenManager?.getStatus?.() || null;
+    const hasDhan = Boolean(
+      (config?.clientId && config?.accessToken)
+      || (config?.clientId && config?.pin && config?.totpSecret)
+    );
+    const connections = dataSources?.snapshot?.({
+      marketOpen: isMarketOpenFn(),
+      hasDhan,
+      auth,
+    }) || null;
     res.json({
       marketOpen: isMarketOpenFn(),
       feedConnected: connectionStatus.isConnected(),
       lastError: connectionStatus.getLastError(),
       darvaxAutoTrade: config?.darvaxAutoTrade ?? false,
+      hasDhan,
+      auth,
+      dashboardMode: stockDashboard?.isDemo?.() ? 'demo' : 'live',
+      connections,
     });
+  });
+
+  router.get('/data-connections', (req, res) => {
+    const auth = tokenManager?.getStatus?.() || null;
+    const hasDhan = Boolean(
+      (config?.clientId && config?.accessToken)
+      || (config?.clientId && config?.pin && config?.totpSecret)
+    );
+    if (dataSources?.setWebsocket) {
+      dataSources.setWebsocket({
+        connected: connectionStatus.isConnected(),
+        error: connectionStatus.getLastError(),
+      });
+    }
+    res.json(dataSources?.snapshot?.({
+      marketOpen: isMarketOpenFn(),
+      hasDhan,
+      auth,
+    }) || {
+      overall: hasDhan ? 'DHAN CONNECTED' : 'DATA ERROR',
+      marketOpen: isMarketOpenFn(),
+      hasDhan,
+      sources: {},
+    });
+  });
+
+  router.get('/auth/status', (req, res) => {
+    res.json(tokenManager?.getStatus?.() || {
+      hasCredentials: false,
+      authenticated: false,
+      mode: 'demo',
+      lastError: null,
+    });
+  });
+
+  router.post('/auth/refresh', async (req, res) => {
+    if (!tokenManager) {
+      return res.status(503).json({ error: 'Auth manager unavailable' });
+    }
+    try {
+      const token = await tokenManager.getAccessToken({ force: true });
+      res.json({
+        ok: true,
+        expiryTime: token.expiryTime || null,
+        ...tokenManager.getStatus(),
+      });
+    } catch (err) {
+      res.status(401).json({ error: err.message, ...tokenManager.getStatus() });
+    }
+  });
+
+  router.get('/dashboard', async (req, res) => {
+    if (!stockDashboard) {
+      return res.status(503).json({ error: 'Stock dashboard not initialized' });
+    }
+    try {
+      const report = await stockDashboard.getDashboard({
+        universe: req.query.universe || 'nifty50',
+        sector: req.query.sector || 'all',
+        ranking: req.query.ranking || 'all',
+        limit: Number(req.query.limit || 100),
+        force: req.query.refresh === '1' || req.query.refresh === 'true',
+      });
+      res.json(report);
+    } catch (err) {
+      res.status(err.status || 500).json({ error: err.message });
+    }
+  });
+
+  router.get('/dashboard/sectors', async (req, res) => {
+    if (!stockDashboard) {
+      return res.status(503).json({ error: 'Stock dashboard not initialized' });
+    }
+    try {
+      res.json(await stockDashboard.getSectors(req.query.universe || 'nifty50'));
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/dashboard/rankings', async (req, res) => {
+    if (!stockDashboard) {
+      return res.status(503).json({ error: 'Stock dashboard not initialized' });
+    }
+    try {
+      res.json(await stockDashboard.getRankings(
+        req.query.universe || 'nifty50',
+        req.query.sector || 'all'
+      ));
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/overview', async (req, res) => {
+    const force = req.query.refresh === '1' || req.query.refresh === 'true';
+    try {
+      const report = await getMarketOverview({ force, background: true });
+      res.json(report);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/breadth', async (req, res) => {
+    const universe = req.query.universe === 'nifty500' ? 'nifty500' : 'nifty50';
+    const force = req.query.refresh === '1' || req.query.refresh === 'true';
+    try {
+      const report = await getMarketBreadth({
+        universe,
+        force,
+        background: true,
+        config,
+        onProgress: (p) => { breadthProgress = p; },
+      });
+      if (report.refreshing) {
+        breadthProgress = breadthProgress || { done: 0, total: 0, symbol: null };
+      } else if (!isRefreshRunning(universe)) {
+        breadthProgress = null;
+      }
+      res.json(report);
+    } catch (err) {
+      breadthProgress = null;
+      const stale = readBreadthCache();
+      if (stale) {
+        return res.status(200).json({ ...stale, fromCache: true, warning: err.message });
+      }
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/breadth/status', (req, res) => {
+    const cached = readBreadthCache();
+    res.json({
+      scanning: Boolean(breadthProgress) || isRefreshRunning(),
+      progress: breadthProgress,
+      cached: cached
+        ? {
+          universe: cached.universe,
+          scannedAt: cached.scannedAt,
+          asOf: cached.asOf,
+          stockCount: cached.stockCount,
+        }
+        : null,
+    });
+  });
+
+  router.post('/breadth/refresh', async (req, res) => {
+    const universe = (req.body?.universe || req.query.universe) === 'nifty500' ? 'nifty500' : 'nifty50';
+    try {
+      breadthProgress = { done: 0, total: 0, symbol: null };
+      const report = await getMarketBreadth({
+        universe,
+        force: true,
+        background: true,
+        config,
+        onProgress: (p) => { breadthProgress = p; },
+      });
+      res.json(report);
+    } catch (err) {
+      breadthProgress = null;
+      res.status(500).json({ error: err.message });
+    }
   });
 
   router.get('/signals', (req, res) => {
@@ -183,7 +370,8 @@ function createApiRouter({
       const securityId = instrumentMapCache.get(order.symbol);
       if (!securityId) throw new Error(`No Dhan securityId for ${order.symbol}`);
 
-      const { accessToken } = await fetchAccessToken(cfg);
+      const accessToken = cfg.accessToken
+        || (await fetchAccessToken(cfg)).accessToken;
       const dhanResp = await placeDhanOrder({
         accessToken,
         clientId: cfg.clientId,

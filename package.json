@@ -5,7 +5,12 @@
   "type": "commonjs",
   "scripts": {
     "start": "node backend/server.js",
-    "test": "node --test backend/**/*.test.js",
+    "build": "node scripts/build-cloudflare.mjs",
+    "build:cloudflare": "node scripts/build-cloudflare.mjs",
+    "deploy": "node scripts/cloudflare-deploy.mjs",
+    "deploy:cloudflare": "node scripts/cloudflare-deploy.mjs",
+    "deploy:version": "node scripts/cloudflare-deploy.mjs version",
+    "test": "node --test --test-timeout=30000 'backend/**/*.test.js'",
     "darvax:scan": "node scripts/darvax-scan.js",
     "universe:build": "node scripts/build-universe.js",
     "cron:install": "bash scripts/setup-cron.sh",
@@ -19,5 +24,9 @@
     "express": "^4.21.0",
     "otplib": "^12.0.1",
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "wrangler": "^4.131.1"
   }
 }

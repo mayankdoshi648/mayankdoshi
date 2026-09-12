@@ -1,0 +1,9 @@
+# Vercel hosts the static frontend only.
+# The Express + SQLite + WebSocket backend is not serverless-compatible.
+backend
+data
+docs
+scripts
+*.test.js
+.env
+.env.*
