@@ -2,7 +2,24 @@
 
 PowerBull Pro can run **without Render** on Cloudflare’s free tier.
 
-## Recommended path (matches your existing project)
+This is the **only free HTTPS host** in this repo that can accept **Dhan Client ID + Access Token** and return **live quotes** (GitHub Pages / Vercel are MOCK-only).
+
+## Fastest path — GitHub Actions deploy
+
+1. Cloudflare dashboard → **My Profile → API Tokens → Create Token**
+   - Use template **Edit Cloudflare Workers** (needs Workers Scripts:Edit + Account:Read)
+2. Cloudflare dashboard → right sidebar **Account ID** (copy it)
+3. GitHub repo → **Settings → Secrets and variables → Actions** → add:
+   - `CLOUDFLARE_API_TOKEN`
+   - `CLOUDFLARE_ACCOUNT_ID`
+4. Cloudflare → **Workers → mayankdoshi → Settings → Variables** → add secret:
+   - `SESSION_SECRET` = any long random string (required for Dhan cookie encryption)
+5. GitHub → **Actions → Deploy Cloudflare Workers (live) → Run workflow**
+6. Open the workers URL from the job log / Cloudflare Overview, e.g.  
+   `https://mayankdoshi.<subdomain>.workers.dev`
+7. On phone: **More → Dhan API** → paste Client ID + Access Token → **Save & use live**
+
+## Recommended path (Workers Builds — matches your existing project)
 
 You already have Workers Builds project **`mayankdoshi`**. Use **Worker + Assets** (not Pages `wrangler pages deploy`).
 

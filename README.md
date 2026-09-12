@@ -6,9 +6,9 @@ Professional **mobile-first Indian NSE F&O market intelligence terminal**, built
 
 | Host | Link | Mode |
 |------|------|------|
-| **Cloudflare Pages (preferred · free)** | Connect GitHub → see [`docs/cloudflare-deploy.md`](docs/cloudflare-deploy.md) → `https://<project>.pages.dev` | **Live F&O** via Pages Functions |
-| **GitHub Pages** | **https://mayankdoshi648.github.io/mayankdoshi/** | Labeled **MOCK** static UI (keep until CF verified) |
-| Vercel | https://mayankdoshi.vercel.app | Labeled **MOCK** static UI |
+| **Cloudflare Workers (preferred · free · live Dhan)** | Add GH secrets + run workflow — see [`docs/cloudflare-deploy.md`](docs/cloudflare-deploy.md) → `https://mayankdoshi.<subdomain>.workers.dev` | **Live F&O** — enter Client ID + Access Token in **More → Dhan API** |
+| **GitHub Pages** | **https://mayankdoshi648.github.io/mayankdoshi/** | Labeled **MOCK** static UI (cannot hold Dhan secrets) |
+| Vercel | https://mayankdoshi.vercel.app | Labeled **MOCK** static UI (cannot hold Dhan secrets) |
 | Render blueprint | `render.yaml` (optional / paid) | Full Node + SQLite + equity WS |
 
 Static hosts (GitHub Pages / Vercel) cannot store Dhan secrets. For a **bookmarkable permanent HTTPS URL** on phone + laptop **without Render**:
