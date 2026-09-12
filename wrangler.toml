@@ -1,0 +1,26 @@
+# Cloudflare Worker + Assets — free permanent host for PowerBull Pro
+#
+# Workers Builds → mayankdoshi → Settings → Builds (paste EXACTLY):
+#   Build command:     npm ci && npm run build
+#   Deploy command:    npm run deploy
+#   Version command:   npm run deploy:version
+#   Production branch: master
+#
+# Do NOT use `wrangler pages deploy`.
+#
+# Secrets (Settings → Variables and Secrets → Production):
+#   SESSION_SECRET       (Secret) required — encrypts per-browser Dhan cookies
+#   DHAN_CLIENT_ID       (Secret) optional shared host Client ID
+#   DHAN_ACCESS_TOKEN    (Secret) optional shared host Access Token
+#   ADMIN_SETUP_KEY      (Secret) optional — require X-Setup-Key to change credentials
+#   DEMO_MODE            (Plain)  default false
+#   FNO_FORCE_MOCK       (Plain)  leave unset for live
+
+name = "mayankdoshi"
+main = "dist/worker.js"
+compatibility_date = "2024-11-12"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "frontend"
+binding = "ASSETS"

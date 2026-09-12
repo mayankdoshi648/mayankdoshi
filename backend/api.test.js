@@ -109,3 +109,45 @@ test('GET /api/candles/:symbol delegates to getCandles', async () => {
   await new Promise((resolve) => server.close(resolve));
   db.close();
 });
+
+test('GET /api/dashboard returns demo board with sector filter', async () => {
+  const { createTokenManager } = require('./dhanToken');
+  const { createStockDashboard } = require('./stockDashboard');
+  const db = openDb(':memory:');
+  const tokenManager = createTokenManager({ config: {} });
+  const stockDashboard = createStockDashboard({
+    tokenManager,
+    config: {},
+    demoMode: true,
+    fetchImpl: async () => { throw new Error('offline'); },
+  });
+  const router = createApiRouter({
+    db,
+    connectionStatus: { isConnected: () => false, getLastError: () => 'demo' },
+    isMarketOpenFn: () => false,
+    getCandles: () => [],
+    config: { darvaxMinScore: 55, darvaxAutoTrade: false },
+    stockDashboard,
+    tokenManager,
+  });
+  const { server, port } = await startTestServer(router);
+
+  const resp = await fetch(`http://localhost:${port}/api/dashboard?ranking=gainers&limit=5`);
+  const body = await resp.json();
+  assert.equal(resp.status, 200);
+  assert.equal(body.mode, 'demo');
+  assert.ok(body.rows.length <= 5);
+  assert.ok(body.rows[0].high52 != null);
+
+  const auth = await fetch(`http://localhost:${port}/api/auth/status`);
+  const authBody = await auth.json();
+  assert.equal(authBody.mode, 'demo');
+
+  const rankings = await fetch(`http://localhost:${port}/api/dashboard/rankings`);
+  const rankBody = await rankings.json();
+  assert.ok(Array.isArray(rankBody.gainers));
+  assert.ok(Array.isArray(rankBody.near52wHigh));
+
+  await new Promise((resolve) => server.close(resolve));
+  db.close();
+});

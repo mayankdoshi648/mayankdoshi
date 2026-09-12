@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm install --omit=dev",
+  "buildCommand": "node -e \"console.log('Vercel: static frontend only (MOCK). Live F&O is on Cloudflare Workers.')\"",
+  "outputDirectory": "frontend",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/$1" }
+  ]
+}
