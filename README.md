@@ -98,6 +98,9 @@ Never commit `.env`. Access tokens are never returned by `GET /api/fno/credentia
 - `GET /api/dashboard` — equity Markets board
 - Existing Node-only: `/api/signals`, `/api/darvax/*`, `/live`
 
+
+**Daily Loop productivity pack:** paste-ready vault templates and the 15-workflow guide live in [`docs/obsidian-workflows/`](docs/obsidian-workflows/README.md). With the dashboard running, open the visual guide at [http://localhost:3000/obsidian-workflows.html](http://localhost:3000/obsidian-workflows.html).
+
 ## Safety
 
 - No naked BUY/SELL — interpretations always show evidence metrics
