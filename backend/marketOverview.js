@@ -7,9 +7,11 @@ const NSE_HOME = 'https://www.nseindia.com';
 const NSE_ALL_INDICES = 'https://www.nseindia.com/api/allIndices';
 
 const HEADLINE = [
-  { id: 'nifty50', nseName: 'NIFTY 50', label: 'Nifty 50' },
-  { id: 'bankNifty', nseName: 'NIFTY BANK', label: 'Bank Nifty' },
-  { id: 'indiaVix', nseName: 'INDIA VIX', label: 'India VIX' },
+  { id: 'nifty50', nseName: 'NIFTY 50', label: 'NIFTY' },
+  { id: 'bankNifty', nseName: 'NIFTY BANK', label: 'BANKNIFTY' },
+  { id: 'finNifty', nseName: 'NIFTY FIN SERVICE', label: 'FINNIFTY' },
+  { id: 'midcpNifty', nseName: 'NIFTY MID SELECT', label: 'MIDCPNIFTY' },
+  { id: 'indiaVix', nseName: 'INDIA VIX', label: 'INDIA VIX' },
 ];
 
 const SIZE_INDICES = [

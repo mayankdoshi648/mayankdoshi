@@ -1,0 +1,15 @@
+apps/api/data/
+apps/web/dev-dist/
+build/
+coverage/
+data/*.db
+*.db
+*.db-journal
+dist/
+.DS_Store
+.env
+.env.local
+*.log
+node_modules/
+.vite/
+tsconfig.tsbuildinfo

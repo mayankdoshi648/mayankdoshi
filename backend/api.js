@@ -16,6 +16,8 @@ const { resolveNseInstrumentMap } = require('./instrumentMap');
 const { exportFromDb } = require('./obsidianExport');
 const { getMarketBreadth, readBreadthCache, isRefreshRunning } = require('./marketBreadth');
 const { getMarketOverview } = require('./marketOverview');
+const { createFnoRouter } = require('./fno/routes');
+const { buildDataHealth, getSharedDataSources } = require('./marketData');
 
 function createApiRouter({
   db,
@@ -23,19 +25,153 @@ function createApiRouter({
   isMarketOpenFn,
   getCandles,
   config,
+  stockDashboard = null,
+  tokenManager = null,
+  dataSources = null,
+  credentialSession = null,
 }) {
   const router = express.Router();
   let instrumentMapCache = null;
   let breadthProgress = null;
 
+  router.use('/fno', createFnoRouter({ config, credentialSession, dataSources }));
+
   router.get('/status', (req, res) => {
+    const auth = tokenManager?.getStatus?.() || null;
+    const hasDhan = Boolean(
+      (config?.clientId && config?.accessToken)
+      || (config?.clientId && config?.pin && config?.totpSecret)
+    );
+    const connections = dataSources?.snapshot?.({
+      marketOpen: isMarketOpenFn(),
+      hasDhan,
+      auth,
+    }) || null;
     res.json({
       marketOpen: isMarketOpenFn(),
       feedConnected: connectionStatus.isConnected(),
       lastError: connectionStatus.getLastError(),
       darvaxAutoTrade: config?.darvaxAutoTrade ?? false,
-      hasDhan: Boolean(config?.clientId && config?.pin && config?.totpSecret),
+      hasDhan,
+      auth,
+      dashboardMode: stockDashboard?.isDemo?.() ? 'demo' : 'live',
+      connections,
     });
+  });
+
+  router.get('/data-connections', (req, res) => {
+    const auth = tokenManager?.getStatus?.() || null;
+    const hasDhan = Boolean(
+      (config?.clientId && config?.accessToken)
+      || (config?.clientId && config?.pin && config?.totpSecret)
+    );
+    if (dataSources?.setWebsocket) {
+      dataSources.setWebsocket({
+        connected: connectionStatus.isConnected(),
+        error: connectionStatus.getLastError(),
+      });
+    }
+    res.json(dataSources?.snapshot?.({
+      marketOpen: isMarketOpenFn(),
+      hasDhan,
+      auth,
+    }) || {
+      overall: hasDhan ? 'DHAN CONNECTED' : 'DATA ERROR',
+      marketOpen: isMarketOpenFn(),
+      hasDhan,
+      sources: {},
+    });
+  });
+
+  
+  router.get('/data-health', (req, res) => {
+    const auth = tokenManager?.getStatus?.() || null;
+    const hasDhan = Boolean(
+      (config?.clientId && config?.accessToken)
+      || (config?.clientId && config?.pin && config?.totpSecret)
+    );
+    const ds = dataSources || getSharedDataSources();
+    if (ds?.setWebsocket) {
+      ds.setWebsocket({
+        connected: connectionStatus.isConnected(),
+        error: connectionStatus.getLastError(),
+      });
+    }
+    res.json(buildDataHealth({
+      dataSources: ds,
+      hasDhan,
+      auth,
+      marketOpen: isMarketOpenFn(),
+      runtime: 'node',
+    }));
+  });
+
+router.get('/auth/status', (req, res) => {
+    res.json(tokenManager?.getStatus?.() || {
+      hasCredentials: false,
+      authenticated: false,
+      mode: 'demo',
+      lastError: null,
+    });
+  });
+
+  router.post('/auth/refresh', async (req, res) => {
+    if (!tokenManager) {
+      return res.status(503).json({ error: 'Auth manager unavailable' });
+    }
+    try {
+      const token = await tokenManager.getAccessToken({ force: true });
+      res.json({
+        ok: true,
+        expiryTime: token.expiryTime || null,
+        ...tokenManager.getStatus(),
+      });
+    } catch (err) {
+      res.status(401).json({ error: err.message, ...tokenManager.getStatus() });
+    }
+  });
+
+  router.get('/dashboard', async (req, res) => {
+    if (!stockDashboard) {
+      return res.status(503).json({ error: 'Stock dashboard not initialized' });
+    }
+    try {
+      const report = await stockDashboard.getDashboard({
+        universe: req.query.universe || 'nifty50',
+        sector: req.query.sector || 'all',
+        ranking: req.query.ranking || 'all',
+        limit: Number(req.query.limit || 100),
+        force: req.query.refresh === '1' || req.query.refresh === 'true',
+      });
+      res.json(report);
+    } catch (err) {
+      res.status(err.status || 500).json({ error: err.message });
+    }
+  });
+
+  router.get('/dashboard/sectors', async (req, res) => {
+    if (!stockDashboard) {
+      return res.status(503).json({ error: 'Stock dashboard not initialized' });
+    }
+    try {
+      res.json(await stockDashboard.getSectors(req.query.universe || 'nifty50'));
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/dashboard/rankings', async (req, res) => {
+    if (!stockDashboard) {
+      return res.status(503).json({ error: 'Stock dashboard not initialized' });
+    }
+    try {
+      res.json(await stockDashboard.getRankings(
+        req.query.universe || 'nifty50',
+        req.query.sector || 'all'
+      ));
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   router.get('/overview', async (req, res) => {
@@ -258,7 +394,8 @@ function createApiRouter({
       const securityId = instrumentMapCache.get(order.symbol);
       if (!securityId) throw new Error(`No Dhan securityId for ${order.symbol}`);
 
-      const { accessToken } = await fetchAccessToken(cfg);
+      const accessToken = cfg.accessToken
+        || (await fetchAccessToken(cfg)).accessToken;
       const dhanResp = await placeDhanOrder({
         accessToken,
         clientId: cfg.clientId,

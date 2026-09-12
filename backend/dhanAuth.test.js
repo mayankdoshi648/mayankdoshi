@@ -43,6 +43,31 @@ test('fetchAccessToken throws when the response body has no accessToken', async 
   const fetchImpl = async () => ({ ok: true, json: async () => ({ foo: 'bar' }) });
   await assert.rejects(
     () => fetchAccessToken({ clientId: 'x', pin: 'y', totpSecret: VALID_TOTP_SECRET }, fetchImpl),
-    /accessToken/
+    /Dhan auth failed/
+  );
+});
+
+test('fetchAccessToken surfaces Dhan remarks when accessToken is missing', async () => {
+  const fetchImpl = async () => ({
+    ok: true,
+    json: async () => ({ status: 'error', remarks: 'Invalid TOTP', message: 'Invalid TOTP' }),
+  });
+  await assert.rejects(
+    () => fetchAccessToken({ clientId: 'x', pin: 'y', totpSecret: VALID_TOTP_SECRET }, fetchImpl),
+    /Invalid TOTP/
+  );
+});
+
+test('fetchAccessToken rejects a 6-digit OTP pasted as the TOTP secret', async () => {
+  await assert.rejects(
+    () => fetchAccessToken({ clientId: 'x', pin: 'y', totpSecret: '123456' }, async () => ({})),
+    /6-digit OTP code/
+  );
+});
+
+test('fetchAccessToken rejects a short non-base32 TOTP secret', async () => {
+  await assert.rejects(
+    () => fetchAccessToken({ clientId: 'x', pin: 'y', totpSecret: 'short!!' }, async () => ({})),
+    /looks invalid/
   );
 });
