@@ -22,10 +22,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Upload frontend
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: cas-expiry-intelligence/package-lock.json
+
+      - name: Build CAS web (static MOCK for mobile)
+        working-directory: cas-expiry-intelligence
+        env:
+          VITE_BASE: /mayankdoshi/cas/
+          VITE_STATIC_DEMO: 'true'
+        run: |
+          npm ci
+          npm run build -w @cas/web
+          rm -rf ../frontend/cas
+          mkdir -p ../frontend/cas
+          cp -R apps/web/dist/. ../frontend/cas/
+
+      - name: Upload frontend (+ CAS)
         uses: actions/upload-pages-artifact@v3
         with:
           path: frontend
+
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4

@@ -3,7 +3,11 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+const base = process.env.VITE_BASE || '/';
+const startUrl = base.endsWith('/') ? base : `${base}/`;
+
 export default defineConfig({
+  base,
   plugins: [
     react(),
     tailwindcss(),
@@ -16,7 +20,7 @@ export default defineConfig({
         theme_color: '#0b1220',
         background_color: '#0b1220',
         display: 'standalone',
-        start_url: '/',
+        start_url: startUrl,
         icons: [],
       },
     }),

@@ -8,6 +8,7 @@ Professional **mobile-first Indian NSE F&O market intelligence terminal**, built
 |------|------|------|
 | **Cloudflare Workers (preferred · free · live Dhan)** | Add GH secrets + run workflow — see [`docs/cloudflare-deploy.md`](docs/cloudflare-deploy.md) → `https://mayankdoshi.<subdomain>.workers.dev` | **Live F&O** — enter Client ID + Access Token in **More → Dhan API** |
 | **GitHub Pages** | **https://mayankdoshi648.github.io/mayankdoshi/** | Labeled **MOCK** static UI (cannot hold Dhan secrets) |
+| **CAS tool (mobile)** | **https://mayankdoshi648.github.io/mayankdoshi/cas/** | Labeled **MOCK** CAS & Expiry terminal (PWA) |
 | Vercel | https://mayankdoshi.vercel.app | Labeled **MOCK** static UI (cannot hold Dhan secrets) |
 | Render blueprint | `render.yaml` (optional / paid) | Full Node + SQLite + equity WS |
 

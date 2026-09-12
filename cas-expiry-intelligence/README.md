@@ -22,6 +22,14 @@ Standalone **analytics / research** terminal for NSE Closing Auction Session (CA
 | Shared | Pure calc engines + `CAS_CONFIG` |
 | Data | DhanHQ market-data APIs only |
 
+## Mobile link (shareable)
+
+| Host | Link | Mode |
+|------|------|------|
+| **GitHub Pages** | **https://mayankdoshi648.github.io/mayankdoshi/cas/** | Labeled **MOCK** static PWA (no Dhan secrets) |
+
+Bookmark that URL on your phone. Live Dhan quotes still need the local/Node API (`npm run dev` below).
+
 ## Quick start
 
 ```bash
