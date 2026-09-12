@@ -1,9 +1,5 @@
-/* frontend/app.js — legacy Live / DarvaX / Track (+ futures table host).
-   F&O terminal navigation lives in js/terminal.js — do not redefine it here. */
-const state = {
-  signals: [],
-  date: new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10),
-};
+// frontend/app.js
+const state = { signals: [], date: new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10) };
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (ch) => ({
@@ -16,12 +12,9 @@ function escapeHtml(value) {
 }
 
 function updateCounters(signals) {
-  const total = document.getElementById('count-total');
-  const buy = document.getElementById('count-buy');
-  const sell = document.getElementById('count-sell');
-  if (total) total.textContent = signals.length;
-  if (buy) buy.textContent = signals.filter((s) => s.side === 'BUY').length;
-  if (sell) sell.textContent = signals.filter((s) => s.side === 'SELL').length;
+  document.getElementById('count-total').textContent = signals.length;
+  document.getElementById('count-buy').textContent = signals.filter((s) => s.side === 'BUY').length;
+  document.getElementById('count-sell').textContent = signals.filter((s) => s.side === 'SELL').length;
 }
 
 function renderSignalRow(signal) {
@@ -52,102 +45,95 @@ function renderTrackRow(signal) {
 async function loadSignals(date) {
   const resp = await fetch(`/api/signals?date=${date}`);
   const signals = await resp.json();
-  state.signals = Array.isArray(signals) ? signals : [];
-  updateCounters(state.signals);
+  state.signals = signals;
+  updateCounters(signals);
 
   const liveBody = document.getElementById('signal-rows');
-  if (liveBody) {
-    liveBody.innerHTML = '';
-    state.signals.forEach((s) => liveBody.appendChild(renderSignalRow(s)));
-  }
+  liveBody.innerHTML = '';
+  signals.forEach((s) => liveBody.appendChild(renderSignalRow(s)));
 
   const trackBody = document.getElementById('track-rows');
-  if (trackBody) {
-    trackBody.innerHTML = '';
-    state.signals.forEach((s) => trackBody.appendChild(renderTrackRow(s)));
-  }
+  trackBody.innerHTML = '';
+  signals.forEach((s) => trackBody.appendChild(renderTrackRow(s)));
 }
 
 async function loadStatus() {
-  try {
-    const resp = await fetch('/api/status', { credentials: 'include' });
-    const status = await resp.json();
-    const banner = document.getElementById('market-banner');
-    if (!banner) return;
-    if (status.runtime === 'cloudflare') {
-      banner.textContent = status.hasDhan
-        ? 'Cloudflare live F&O — equity WebSocket is Node-only; use More → Dhan API session or Pages secrets.'
-        : 'Cloudflare host — connect Client ID + Access Token in More → Dhan API (encrypted cookie, not in the URL).';
-      banner.classList.remove('hidden');
-      return;
-    }
-    if (!status.feedConnected) {
-      if (status.hasDhan) {
-        banner.textContent = status.lastError
-          ? `Equity live socket disconnected (${status.lastError}) — F&O hybrid may still use Dhan; reconnect/restart if quotes stall.`
-          : 'Equity live socket not connected — F&O can still pull via Dhan API credentials (More → Dhan API).';
-      } else {
-        banner.textContent = status.lastError
-          ? `Dhan feed disconnected (${status.lastError}) — set credentials in More → Dhan API or .env, then restart if needed.`
-          : 'Dhan feed not connected — set Client ID / Access Token in More → Dhan API (or .env) for live data.';
-      }
-      banner.classList.remove('hidden');
-    } else if (!status.marketOpen) {
-      banner.textContent = 'Market closed — showing last saved session.';
-      banner.classList.remove('hidden');
-    } else {
-      banner.classList.add('hidden');
-    }
-  } catch {
-    /* status endpoint may be unavailable during mock-only boots */
+  const resp = await fetch('/api/status');
+  const status = await resp.json();
+  const banner = document.getElementById('market-banner');
+  if (!status.feedConnected) {
+    banner.textContent = status.lastError
+      ? `Dhan feed disconnected (${status.lastError}) — check DHAN_CLIENT_ID/DHAN_PIN/DHAN_TOTP_SECRET in .env and restart the server.`
+      : 'Dhan feed not connected — check DHAN_CLIENT_ID/DHAN_PIN/DHAN_TOTP_SECRET in .env and restart the server.';
+    banner.classList.remove('hidden');
+  } else if (!status.marketOpen) {
+    banner.textContent = 'Market closed — showing last saved session.';
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
   }
 }
 
 function connectLiveSocket() {
-  let ws;
-  try {
-    ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/live`);
-  } catch {
-    return;
-  }
+  const ws = new WebSocket(`ws://${location.host}/live`);
   ws.addEventListener('message', (event) => {
     const msg = JSON.parse(event.data);
     if (msg.type === 'signal') {
       state.signals.push(msg);
       updateCounters(state.signals);
-      document.getElementById('signal-rows')?.appendChild(renderSignalRow(msg));
-      document.getElementById('track-rows')?.appendChild(renderTrackRow(msg));
+      document.getElementById('signal-rows').appendChild(renderSignalRow(msg));
+      document.getElementById('track-rows').appendChild(renderTrackRow(msg));
       playAlert(msg);
     } else if (msg.type === 'outcome') {
       const signal = state.signals.find((s) => String(s.id) === String(msg.id));
       if (signal) signal.outcome = msg.outcome;
       const row = document.querySelector(`#track-rows tr[data-id="${msg.id}"]`);
-      const cell = row?.querySelector('.outcome-cell');
+      const cell = row && row.querySelector('.outcome-cell');
       if (cell) cell.textContent = msg.outcome;
     }
   });
   ws.addEventListener('close', () => setTimeout(connectLiveSocket, 2000));
-  ws.addEventListener('error', () => { try { ws.close(); } catch { /* ignore */ } });
 }
 
 function playAlert(signal) {
-  document.getElementById('alert-sound')?.play()?.catch(() => {});
-  if (window.Notification && Notification.permission === 'granted') {
+  document.getElementById('alert-sound').play().catch(() => {});
+  if (Notification.permission === 'granted') {
     new Notification(`${signal.side} ${signal.symbol}`, { body: `Price ${signal.price}` });
   }
 }
 
-const datePicker = document.getElementById('date-picker');
-if (datePicker) {
-  datePicker.value = state.date;
-  datePicker.addEventListener('change', (e) => {
-    state.date = e.target.value;
-    loadSignals(state.date);
-  });
+document.getElementById('tab-live').addEventListener('click', () => {
+  showView('live');
+});
+
+document.getElementById('tab-darvax').addEventListener('click', () => {
+  showView('darvax');
+  loadDarvaxScans();
+  loadPendingOrders();
+});
+
+document.getElementById('tab-track').addEventListener('click', () => {
+  showView('track');
+});
+
+function showView(name) {
+  const views = { live: 'view-live', darvax: 'view-darvax', track: 'view-track' };
+  const tabs = { live: 'tab-live', darvax: 'tab-darvax', track: 'tab-track' };
+  Object.values(views).forEach((id) => document.getElementById(id).classList.add('hidden'));
+  Object.values(tabs).forEach((id) => document.getElementById(id).classList.remove('active'));
+  document.getElementById(views[name]).classList.remove('hidden');
+  document.getElementById(tabs[name]).classList.add('active');
+  document.getElementById('counters').classList.toggle('hidden', name === 'darvax');
 }
 
+document.getElementById('date-picker').value = state.date;
+document.getElementById('date-picker').addEventListener('change', (e) => {
+  state.date = e.target.value;
+  loadSignals(state.date);
+});
+
 if (window.Notification && Notification.permission === 'default') {
-  Notification.requestPermission().catch(() => {});
+  Notification.requestPermission();
 }
 
 loadSignals(state.date);
@@ -155,34 +141,19 @@ loadStatus();
 connectLiveSocket();
 setInterval(loadStatus, 30000);
 
-// Deep-link: ?tab=darvax|track|live|legacy|markets|breadth — optional; prefers FnoTerminal when present
+// Deep-link: ?tab=darvax|track|live (Market Breadth is a separate app on :3002)
 (() => {
   const tab = new URLSearchParams(location.search).get('tab');
-  if (!tab) return;
-  if (tab === 'markets' || tab === 'breadth') {
-    // terminal.js boot also handles these tabs; keep as fallback if boot already ran
-    const tryShow = () => window.FnoTerminal?.showView?.(tab);
-    if (window.FnoTerminal) tryShow();
-    else document.addEventListener('DOMContentLoaded', () => setTimeout(tryShow, 0));
-    return;
-  }
-  if (tab === 'darvax' || tab === 'track' || tab === 'live' || tab === 'futures' || tab === 'legacy') {
-    window.FnoTerminal?.showView?.('legacy');
-    const legacyName = tab === 'legacy' ? 'live' : tab;
-    document.querySelectorAll('#legacy-seg button').forEach((b) => {
-      b.classList.toggle('active', b.dataset.legacy === legacyName);
-    });
-    ['live', 'darvax', 'track', 'futures'].forEach((name) => {
-      document.getElementById(`legacy-${name}`)?.classList.toggle('hidden', name !== legacyName);
-    });
-    if (legacyName === 'darvax') {
-      loadDarvaxScans();
-      loadPendingOrders();
-    }
+  if (tab === 'darvax') {
+    showView('darvax');
+    loadDarvaxScans();
+    loadPendingOrders();
+  } else if (tab === 'track') {
+    showView('track');
   }
 })();
 
-/* —— Chart modal —— */
+// --- appended to frontend/app.js ---
 let activeChart = null;
 
 function formatCandleTime(epochMs) {
@@ -196,31 +167,16 @@ async function openChartModal(symbol) {
   const resp = await fetch(`/api/candles/${symbol}`);
   const candles = await resp.json();
   const modal = document.getElementById('chart-modal');
-  const title = document.getElementById('chart-title');
-  const canvas = document.getElementById('chart-canvas');
-  if (!modal || !title || !canvas) return;
-  if (!Array.isArray(candles)) return;
-
-  title.textContent = symbol;
+  document.getElementById('chart-title').textContent = symbol;
   modal.classList.remove('hidden');
 
-  const ohlc = candles.map((c) => ({
-    x: formatCandleTime(c.time),
-    o: c.open,
-    h: c.high,
-    l: c.low,
-    c: c.close,
-  }));
+  const ohlc = candles.map((c) => ({ x: formatCandleTime(c.time), o: c.open, h: c.high, l: c.low, c: c.close }));
   const markers = state.signals
     .filter((s) => s.symbol === symbol)
-    .map((s) => ({
-      x: formatCandleTime(new Date(s.candle_time).getTime()),
-      y: s.price,
-      side: s.side,
-    }));
+    .map((s) => ({ x: formatCandleTime(new Date(s.candle_time).getTime()), y: s.price, side: s.side }));
 
   if (activeChart) activeChart.destroy();
-  const ctx = canvas.getContext('2d');
+  const ctx = document.getElementById('chart-canvas').getContext('2d');
   activeChart = new Chart(ctx, {
     type: 'candlestick',
     data: {
@@ -230,7 +186,7 @@ async function openChartModal(symbol) {
           type: 'scatter',
           label: 'Signals',
           data: markers.map((m) => ({ x: m.x, y: m.y })),
-          pointBackgroundColor: markers.map((m) => (m.side === 'BUY' ? '#22c55e' : '#ef4444')),
+          pointBackgroundColor: markers.map((m) => (m.side === 'BUY' ? '#21c55d' : '#ef4444')),
           pointStyle: markers.map((m) => (m.side === 'BUY' ? 'triangle' : 'rectRot')),
           pointRadius: 6,
         },
@@ -242,15 +198,55 @@ async function openChartModal(symbol) {
   });
 }
 
-document.getElementById('chart-close')?.addEventListener('click', () => {
-  document.getElementById('chart-modal')?.classList.add('hidden');
+document.getElementById('chart-close').addEventListener('click', () => {
+  document.getElementById('chart-modal').classList.add('hidden');
 });
 
-/* —— DarvaX Scanner —— */
+// --- DarvaX Scanner ---
 function tierClass(tier) {
   if (tier === 'A+') return 'tier-aplus';
   if (tier === 'A') return 'tier-a';
   return 'tier-b';
+}
+
+function renderDarvaxRow(item) {
+  const tr = document.createElement('tr');
+  tr.dataset.symbol = item.symbol;
+  const boxTop = item.box?.top?.toFixed(2) ?? '—';
+  const boxBottom = item.box?.bottom?.toFixed(2) ?? '—';
+  const canOrder = item.market === 'NSE' && (item.stage === 'BREAKOUT' || item.stage === 'SUPER_TREND');
+  tr.innerHTML = `
+    <td><button class="expand-btn" aria-label="Expand">▶</button></td>
+    <td>${escapeHtml(item.symbol)}</td>
+    <td>${escapeHtml(item.market)}</td>
+    <td class="${tierClass(item.tier)}">${escapeHtml(item.strengthScore)} ${escapeHtml(item.tier || '')}</td>
+    <td class="stage-${(item.stage || '').toLowerCase()}">${escapeHtml(item.stage || '—')}</td>
+    <td>${escapeHtml(boxTop)}</td>
+    <td>${escapeHtml(boxBottom)}</td>
+    <td>${item.rsPercentile != null ? escapeHtml(item.rsPercentile.toFixed(0)) : '—'}</td>
+    <td>${item.rvol != null ? escapeHtml(item.rvol.toFixed(1)) : '—'}</td>
+    <td>${canOrder ? '<button class="btn order-btn">Order</button>' : '—'}</td>
+  `;
+
+  const detailTr = document.createElement('tr');
+  detailTr.classList.add('hidden');
+  detailTr.innerHTML = `<td colspan="10"><div class="darvax-reasons">${formatReasons(item)}</div></td>`;
+
+  tr.querySelector('.expand-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = detailTr.classList.toggle('hidden');
+    tr.querySelector('.expand-btn').textContent = open ? '▶' : '▼';
+  });
+
+  const orderBtn = tr.querySelector('.order-btn');
+  if (orderBtn) {
+    orderBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      submitDarvaxOrder(item);
+    });
+  }
+
+  return [tr, detailTr];
 }
 
 function formatReasons(item) {
@@ -263,98 +259,52 @@ function formatReasons(item) {
   return pass + fail + stopLine;
 }
 
-function renderDarvaxRow(item) {
-  const tr = document.createElement('tr');
-  tr.dataset.symbol = item.symbol;
-  const boxTop = item.box?.top?.toFixed(2) ?? '—';
-  const boxBottom = item.box?.bottom?.toFixed(2) ?? '—';
-  const canOrder = item.market === 'NSE' && (item.stage === 'BREAKOUT' || item.stage === 'SUPER_TREND');
-  tr.innerHTML = `
-    <td><button type="button" class="expand-btn" aria-label="Expand">▶</button></td>
-    <td>${escapeHtml(item.symbol)}</td>
-    <td>${escapeHtml(item.market)}</td>
-    <td class="${tierClass(item.tier)}">${escapeHtml(item.strengthScore)} ${escapeHtml(item.tier || '')}</td>
-    <td class="stage-${(item.stage || '').toLowerCase()}">${escapeHtml(item.stage || '—')}</td>
-    <td>${escapeHtml(boxTop)}</td>
-    <td>${escapeHtml(boxBottom)}</td>
-    <td>${item.rsPercentile != null ? escapeHtml(item.rsPercentile.toFixed(0)) : '—'}</td>
-    <td>${item.rvol != null ? escapeHtml(item.rvol.toFixed(1)) : '—'}</td>
-    <td>${canOrder ? '<button type="button" class="btn order-btn">Order</button>' : '—'}</td>
-  `;
-
-  const detailTr = document.createElement('tr');
-  detailTr.classList.add('hidden');
-  detailTr.innerHTML = `<td colspan="10"><div class="darvax-reasons">${formatReasons(item)}</div></td>`;
-
-  tr.querySelector('.expand-btn')?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const open = detailTr.classList.toggle('hidden');
-    const btn = tr.querySelector('.expand-btn');
-    if (btn) btn.textContent = open ? '▶' : '▼';
-  });
-
-  const orderBtn = tr.querySelector('.order-btn');
-  orderBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    submitDarvaxOrder(item);
-  });
-
-  return [tr, detailTr];
-}
-
 async function loadDarvaxScans() {
-  const market = document.getElementById('darvax-market')?.value ?? '';
-  const minScore = document.getElementById('darvax-min-score')?.value ?? '55';
+  const market = document.getElementById('darvax-market').value;
+  const minScore = document.getElementById('darvax-min-score').value;
   const date = state.date;
   let url = `/api/darvax/scans?date=${date}&minScore=${minScore}`;
   if (market) url += `&market=${market}`;
   const statusEl = document.getElementById('darvax-status');
-  if (statusEl) statusEl.textContent = 'Loading...';
+  statusEl.textContent = 'Loading...';
   try {
     const resp = await fetch(url);
     const items = await resp.json();
     const body = document.getElementById('darvax-rows');
-    if (!body) return;
     body.innerHTML = '';
-    const list = Array.isArray(items) ? items : [];
-    list.forEach((item) => {
+    items.forEach((item) => {
       const [tr, detail] = renderDarvaxRow(item);
       body.appendChild(tr);
       body.appendChild(detail);
     });
-    if (statusEl) statusEl.textContent = `${list.length} results for ${date}`;
+    statusEl.textContent = `${items.length} results for ${date}`;
   } catch (err) {
-    if (statusEl) statusEl.textContent = `Error: ${err.message}`;
+    statusEl.textContent = `Error: ${err.message}`;
   }
 }
 
 async function loadPendingOrders() {
-  try {
-    const resp = await fetch('/api/darvax/orders/pending');
-    const orders = await resp.json();
-    const body = document.getElementById('darvax-order-rows');
-    if (!body) return;
-    body.innerHTML = '';
-    (Array.isArray(orders) ? orders : []).forEach((o) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${escapeHtml(o.id)}</td>
-        <td>${escapeHtml(o.symbol)}</td>
-        <td>${escapeHtml(o.side)}</td>
-        <td>${escapeHtml(o.quantity)}</td>
-        <td>${escapeHtml(o.price)}</td>
-        <td>${escapeHtml(o.status)}</td>
-        <td><button type="button" class="btn approve-btn">Approve</button></td>
-      `;
-      tr.querySelector('.approve-btn')?.addEventListener('click', async () => {
-        await fetch(`/api/darvax/orders/${o.id}/approve`, { method: 'POST' });
-        loadPendingOrders();
-      });
-      body.appendChild(tr);
+  const resp = await fetch('/api/darvax/orders/pending');
+  const orders = await resp.json();
+  const body = document.getElementById('darvax-order-rows');
+  body.innerHTML = '';
+  orders.forEach((o) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(o.id)}</td>
+      <td>${escapeHtml(o.symbol)}</td>
+      <td>${escapeHtml(o.side)}</td>
+      <td>${escapeHtml(o.quantity)}</td>
+      <td>${escapeHtml(o.price)}</td>
+      <td>${escapeHtml(o.status)}</td>
+      <td><button class="btn approve-btn">Approve</button></td>
+    `;
+    tr.querySelector('.approve-btn').addEventListener('click', async () => {
+      await fetch(`/api/darvax/orders/${o.id}/approve`, { method: 'POST' });
+      loadPendingOrders();
     });
-  } catch {
-    /* ignore when darvax routes unavailable */
-  }
+    body.appendChild(tr);
+  });
 }
 
 async function submitDarvaxOrder(item) {
@@ -370,7 +320,7 @@ async function submitDarvaxOrder(item) {
     alert('Could not size position — check stop levels');
     return;
   }
-  const ok = confirm(`Place BUY ${item.symbol} qty=${preview.quantity} @ ${Number(price).toFixed(2)}? Stop ${stopLoss != null ? Number(stopLoss).toFixed(2) : '—'}`);
+  const ok = confirm(`Place BUY ${item.symbol} qty=${preview.quantity} @ ${price.toFixed(2)}? Stop ${stopLoss?.toFixed(2)}`);
   if (!ok) return;
   await fetch('/api/darvax/orders', {
     method: 'POST',
@@ -388,33 +338,32 @@ async function submitDarvaxOrder(item) {
   alert('Order submitted — approve in Pending Orders (unless DARVAX_AUTO_TRADE=true)');
 }
 
-document.getElementById('darvax-refresh')?.addEventListener('click', loadDarvaxScans);
-document.getElementById('darvax-market')?.addEventListener('change', loadDarvaxScans);
-document.getElementById('darvax-min-score')?.addEventListener('change', loadDarvaxScans);
-
-document.getElementById('darvax-run-scan')?.addEventListener('click', async () => {
+document.getElementById('darvax-refresh').addEventListener('click', loadDarvaxScans);
+document.getElementById('darvax-market').addEventListener('change', loadDarvaxScans);
+document.getElementById('darvax-min-score').addEventListener('change', loadDarvaxScans);
+document.getElementById('darvax-run-scan').addEventListener('click', async () => {
   const statusEl = document.getElementById('darvax-status');
-  const runBtn = document.getElementById('darvax-run-scan');
-  if (statusEl) statusEl.textContent = 'Running scan (Nifty 500 + S&P 500)... this may take ~20 min.';
-  if (runBtn) runBtn.disabled = true;
+  statusEl.textContent = 'Running scan (Nifty 500 + S&P 500)... this may take ~20 min.';
+  document.getElementById('darvax-run-scan').disabled = true;
   try {
     const resp = await fetch('/api/darvax/scan', { method: 'POST' });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
-    if (data.telegram?.sent && statusEl) {
+    const obs = data.obsidian ? ` | Obsidian: ${data.obsidian.exportedCount} notes` : '';
+    if (data.telegram?.sent) {
       statusEl.textContent += ` | Telegram: ${data.telegram.count} alerts`;
     }
     loadDarvaxScans();
   } catch (err) {
-    if (statusEl) statusEl.textContent = `Scan failed: ${err.message}`;
+    statusEl.textContent = `Scan failed: ${err.message}`;
   } finally {
-    if (runBtn) runBtn.disabled = false;
+    document.getElementById('darvax-run-scan').disabled = false;
   }
 });
 
-document.getElementById('darvax-export-obsidian')?.addEventListener('click', async () => {
+document.getElementById('darvax-export-obsidian').addEventListener('click', async () => {
   const statusEl = document.getElementById('darvax-status');
-  if (statusEl) statusEl.textContent = 'Exporting to Obsidian...';
+  statusEl.textContent = 'Exporting to Obsidian...';
   try {
     const resp = await fetch('/api/darvax/export-obsidian', {
       method: 'POST',
@@ -423,384 +372,8 @@ document.getElementById('darvax-export-obsidian')?.addEventListener('click', asy
     });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
-    if (statusEl) statusEl.textContent = `Obsidian: ${data.exportedCount} stock notes → ${data.dailyPath}`;
+    statusEl.textContent = `Obsidian: ${data.exportedCount} stock notes → ${data.dailyPath}`;
   } catch (err) {
-    if (statusEl) statusEl.textContent = `Export failed: ${err.message}`;
+    statusEl.textContent = `Export failed: ${err.message}`;
   }
 });
-
-window.loadDarvaxScans = loadDarvaxScans;
-window.loadPendingOrders = loadPendingOrders;
-
-/* —— Market Breadth + Overview strip —— */
-function fmtBreadthNum(n, digits = 2) {
-  if (n == null || Number.isNaN(n)) return '—';
-  return Number(n).toLocaleString('en-IN', {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
-}
-
-function fmtBreadthPct(n) {
-  if (n == null || Number.isNaN(n)) return '—';
-  const sign = n > 0 ? '+' : '';
-  return `${sign}${Number(n).toFixed(2)}%`;
-}
-
-function emaChipsHtml(ema) {
-  const periods = [20, 50, 200];
-  return periods.map((p) => {
-    const key = `ema${p}`;
-    const cell = ema?.[key];
-    if (!cell || cell.above == null) {
-      return `<span class="ema-chip na">EMA${p} —</span>`;
-    }
-    const cls = cell.above ? 'above' : 'below';
-    const mark = cell.above ? '▲' : '▼';
-    return `<span class="ema-chip ${cls}">EMA${p} ${mark}</span>`;
-  }).join('');
-}
-
-function quoteCardHtml(q, { showEma = false, showSubtitle = false } = {}) {
-  const dir = q.direction || 'flat';
-  const sub = showSubtitle && (q.subtitle || q.subLabel)
-    ? `<div class="q-sub">${escapeHtml(q.subtitle || q.subLabel)}</div>`
-    : '';
-  const ema = showEma
-    ? `<div class="ema-row">${emaChipsHtml(q.ema)}</div>`
-    : '';
-  return `
-    <div class="quote-card dir-${escapeHtml(dir)}" data-id="${escapeHtml(q.id)}">
-      <div class="q-name">${escapeHtml(q.label)}</div>
-      ${sub}
-      <div class="q-row">
-        <span class="q-last">${fmtBreadthNum(q.last, 2)}</span>
-        <span class="q-arrow">${escapeHtml(q.arrow || '')}</span>
-        <span class="q-chg">${fmtBreadthPct(q.changePct ?? q.changePercent)}</span>
-      </div>
-      ${ema}
-    </div>
-  `;
-}
-
-function sectorCardHtml(q) {
-  const dir = q.direction || 'flat';
-  const bias = q.ema?.bias || '';
-  const biasHtml = bias
-    ? `<div class="bias ${escapeHtml(bias)}">${escapeHtml(bias)}</div>`
-    : `<div class="bias">EMA n/a</div>`;
-  return `
-    <div class="sector-card dir-${escapeHtml(dir)}" data-id="${escapeHtml(q.id)}">
-      <div class="q-name">${escapeHtml(q.label)}</div>
-      <div class="q-row">
-        <span class="q-last">${fmtBreadthNum(q.last, 2)}</span>
-        <span class="q-arrow">${escapeHtml(q.arrow || '')}</span>
-        <span class="q-chg">${fmtBreadthPct(q.changePct ?? q.changePercent)}</span>
-      </div>
-      <div class="ema-row">${emaChipsHtml(q.ema)}</div>
-      ${biasHtml}
-    </div>
-  `;
-}
-
-function renderMarketOverviewStrip(data) {
-  const headlineEl = document.getElementById('overview-headline');
-  const sizeEl = document.getElementById('overview-size');
-  const sectorsEl = document.getElementById('overview-sectors');
-  if (!headlineEl || !sizeEl || !sectorsEl) return;
-
-  headlineEl.innerHTML = (data.headline || []).map((q) => quoteCardHtml(q)).join('');
-  sizeEl.innerHTML = (data.size || [])
-    .map((q) => quoteCardHtml(q, { showEma: true, showSubtitle: true }))
-    .join('');
-  sectorsEl.innerHTML = (data.sectors || []).map((q) => sectorCardHtml(q)).join('');
-}
-
-async function loadMarketOverview({ force = false } = {}) {
-  const statusEl = document.getElementById('breadth-status');
-  try {
-    const url = force ? '/api/overview?refresh=1' : '/api/overview';
-    const resp = await fetch(url);
-    const data = await resp.json();
-    if (data.error) throw new Error(data.error);
-    renderMarketOverviewStrip(data);
-    if (statusEl && !statusEl.textContent.includes('Refreshing') && !statusEl.textContent.includes('Scanning')) {
-      const stamp = data.scannedAt ? new Date(data.scannedAt).toLocaleTimeString() : '';
-      statusEl.textContent = `Overview ${data.fromCache ? 'cached' : 'live'}${stamp ? ` · ${stamp}` : ''}`;
-    }
-  } catch (err) {
-    if (statusEl) statusEl.textContent = `Overview error: ${err.message}`;
-  }
-}
-
-let breadthIndexChart = null;
-let breadthPctChart = null;
-let breadthPollTimer = null;
-
-function drawGauge(canvas, pct) {
-  const ctx = canvas.getContext('2d');
-  const w = canvas.width;
-  const h = canvas.height;
-  const cx = w / 2;
-  const cy = h / 2;
-  const r = Math.min(w, h) / 2 - 10;
-  ctx.clearRect(0, 0, w, h);
-
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.strokeStyle = '#223040';
-  ctx.lineWidth = 12;
-  ctx.stroke();
-
-  const value = Math.max(0, Math.min(100, pct ?? 0));
-  const start = -Math.PI / 2;
-  const end = start + (Math.PI * 2 * value) / 100;
-  const color = value >= 50 ? '#21c55d' : '#ef4444';
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, start, end);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 12;
-  ctx.lineCap = 'round';
-  ctx.stroke();
-
-  const tickAngle = start + Math.PI;
-  ctx.beginPath();
-  ctx.moveTo(cx + Math.cos(tickAngle) * (r - 16), cy + Math.sin(tickAngle) * (r - 16));
-  ctx.lineTo(cx + Math.cos(tickAngle) * (r + 4), cy + Math.sin(tickAngle) * (r + 4));
-  ctx.strokeStyle = '#8892a0';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  ctx.fillStyle = '#e6edf3';
-  ctx.font = 'bold 22px system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(pct == null ? '—' : `${value.toFixed(0)}%`, cx, cy);
-}
-
-function renderBreadthGauges(gauges) {
-  const keys = ['dma20', 'dma50', 'dma200'];
-  keys.forEach((key) => {
-    const card = document.querySelector(`.gauge-card[data-key="${key}"]`);
-    if (!card || !gauges?.[key]) return;
-    const g = gauges[key];
-    drawGauge(card.querySelector('.gauge-canvas'), g.value);
-    card.querySelector('.gauge-pct').textContent = g.value == null ? '—' : `${g.value}%`;
-    card.querySelector('.gauge-arrow').textContent = g.arrow || '';
-    card.querySelector('.gauge-title').textContent = g.label;
-    card.querySelector('.gauge-sub').textContent = g.subtitle;
-  });
-}
-
-function renderBreadthPosture(diagnosis) {
-  const box = document.getElementById('breadth-posture');
-  if (!box) return;
-  box.className = `breadth-posture tone-${diagnosis?.tone || 'neutral'}`;
-  document.getElementById('breadth-posture-value').textContent = diagnosis?.posture || '—';
-  document.getElementById('breadth-diagnosis').textContent = diagnosis?.diagnosis || '';
-}
-
-function renderBreadthCharts(series) {
-  const indexCanvas = document.getElementById('breadth-index-chart');
-  const pctCanvas = document.getElementById('breadth-pct-chart');
-  if (!indexCanvas || !pctCanvas || typeof Chart === 'undefined') return;
-
-  const labels = (series?.dates || []).map((d) => d.slice(5));
-  const commonOpts = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { labels: { color: '#c9d4e0' } } },
-    scales: {
-      x: {
-        ticks: { color: '#8892a0', maxTicksLimit: 8 },
-        grid: { color: '#1a2330' },
-      },
-      y: {
-        ticks: { color: '#8892a0' },
-        grid: { color: '#1a2330' },
-      },
-    },
-  };
-
-  const indexCtx = indexCanvas.getContext('2d');
-  if (breadthIndexChart) breadthIndexChart.destroy();
-  indexCanvas.parentElement.style.height = '220px';
-  breadthIndexChart = new Chart(indexCtx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Nifty 50',
-        data: series?.index || [],
-        borderColor: '#f5b400',
-        backgroundColor: 'rgba(245,180,0,0.12)',
-        fill: true,
-        tension: 0.15,
-        pointRadius: 0,
-        borderWidth: 2,
-      }],
-    },
-    options: commonOpts,
-  });
-
-  const pctCtx = pctCanvas.getContext('2d');
-  if (breadthPctChart) breadthPctChart.destroy();
-  pctCanvas.parentElement.style.height = '260px';
-  breadthPctChart = new Chart(pctCtx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: '20 DMA',
-          data: series?.breadth20 || [],
-          borderColor: '#21c55d',
-          tension: 0.15,
-          pointRadius: 0,
-          borderWidth: 2,
-        },
-        {
-          label: '50 DMA',
-          data: series?.breadth50 || [],
-          borderColor: '#3b82f6',
-          tension: 0.15,
-          pointRadius: 0,
-          borderWidth: 2,
-        },
-        {
-          label: '200 DMA',
-          data: series?.breadth200 || [],
-          borderColor: '#94a3b8',
-          tension: 0.15,
-          pointRadius: 0,
-          borderWidth: 2,
-        },
-      ],
-    },
-    options: {
-      ...commonOpts,
-      scales: {
-        ...commonOpts.scales,
-        y: {
-          ...commonOpts.scales.y,
-          min: 0,
-          max: 100,
-          ticks: {
-            color: '#8892a0',
-            callback: (v) => `${v}%`,
-          },
-        },
-      },
-    },
-    plugins: [{
-      id: 'fiftyLine',
-      afterDraw(chart) {
-        const { ctx, chartArea, scales } = chart;
-        if (!scales.y || !chartArea) return;
-        const y = scales.y.getPixelForValue(50);
-        ctx.save();
-        ctx.strokeStyle = '#8892a0';
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(chartArea.left, y);
-        ctx.lineTo(chartArea.right, y);
-        ctx.stroke();
-        ctx.restore();
-      },
-    }],
-  });
-}
-
-function renderBreadthReport(data) {
-  renderBreadthGauges(data.gauges);
-  renderBreadthPosture(data.diagnosis);
-  renderBreadthCharts(data.series);
-  const statusEl = document.getElementById('breadth-status');
-  if (!statusEl) return;
-  const src = data.dataSource || 'yahoo';
-  const cache = data.fromCache ? 'cached' : 'fresh';
-  statusEl.textContent = `${data.stockCount} stocks · as of ${data.asOf || '—'} · ${src} · ${cache}`
-    + (data.warning ? ` · warn: ${data.warning}` : '');
-}
-
-function stopBreadthPoll() {
-  if (breadthPollTimer) {
-    clearInterval(breadthPollTimer);
-    breadthPollTimer = null;
-  }
-}
-
-function startBreadthPoll(statusEl) {
-  stopBreadthPoll();
-  let seenScanning = false;
-  breadthPollTimer = setInterval(async () => {
-    try {
-      const s = await fetch('/api/breadth/status').then((r) => r.json());
-      if (s.scanning) {
-        seenScanning = true;
-        if (s.progress?.total) {
-          statusEl.textContent = `Refreshing ${s.progress.done}/${s.progress.total}`
-            + (s.progress.symbol ? ` · ${s.progress.symbol}` : '');
-        } else {
-          statusEl.textContent = 'Refreshing breadth in background…';
-        }
-        return;
-      }
-      if (seenScanning) {
-        stopBreadthPoll();
-        loadMarketBreadth({ force: false, quiet: true });
-      }
-    } catch { /* ignore */ }
-  }, 1200);
-}
-
-async function loadMarketBreadth({ force = false, quiet = false } = {}) {
-  const universeEl = document.getElementById('breadth-universe');
-  const statusEl = document.getElementById('breadth-status');
-  const btn = document.getElementById('breadth-refresh');
-  if (!universeEl || !statusEl || !btn) return;
-
-  const universe = universeEl.value;
-  if (!quiet) {
-    statusEl.textContent = force ? 'Refreshing…' : 'Loading…';
-  }
-  btn.disabled = true;
-
-  try {
-    const url = force
-      ? `/api/breadth?universe=${universe}&refresh=1`
-      : `/api/breadth?universe=${universe}`;
-    const resp = await fetch(url);
-    const data = await resp.json();
-    if (data.error) throw new Error(data.error);
-    renderBreadthReport(data);
-    if (data.refreshing) {
-      statusEl.textContent = `${data.stockCount || 0} stocks · showing cache · refreshing in background…`;
-      startBreadthPoll(statusEl);
-    } else {
-      stopBreadthPoll();
-    }
-  } catch (err) {
-    statusEl.textContent = `Error: ${err.message}`;
-    stopBreadthPoll();
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-async function openMarketBreadthView() {
-  await loadMarketOverview({ force: false });
-  await loadMarketBreadth({ force: false });
-}
-
-document.getElementById('breadth-refresh')?.addEventListener('click', () => {
-  loadMarketOverview({ force: true });
-  loadMarketBreadth({ force: true });
-});
-document.getElementById('breadth-universe')?.addEventListener('change', () => {
-  loadMarketBreadth({ force: false });
-});
-
-window.openMarketBreadthView = openMarketBreadthView;
-window.loadMarketBreadth = loadMarketBreadth;
-window.loadMarketOverview = loadMarketOverview;

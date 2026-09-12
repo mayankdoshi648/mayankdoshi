@@ -20,6 +20,8 @@ const { createDataSourceManager } = require('./dataSourceManager');
 const { createCredentialSession } = require('./credentialSession');
 
 const config = loadConfigOptional();
+const breadthPort = Number(config.port || 3002);
+const powerbullPort = Number(config.powerbullPort || 3000);
 const db = openDb();
 const connectionStatus = createConnectionStatus();
 const dataSources = createDataSourceManager();
@@ -33,9 +35,40 @@ const stockDashboard = createStockDashboard({
   demoMode,
 });
 
+const frontendDir = path.join(__dirname, '..', 'frontend');
+
+function isPowerBullRequest(req) {
+  return Number(req.socket.localPort) === powerbullPort;
+}
+
 const app = express();
 app.use(express.json({ limit: '256kb' }));
-app.use(express.static(path.join(__dirname, '..', 'frontend')));
+
+// Homepage by port — PowerBull Pro stays original; Market Breadth stays on 3002.
+// Note: F&O terminal shell from market-breadth tip is NOT the default index yet
+// (conflicting product intent with dual-app separation — see PR notes).
+app.get('/', (req, res) => {
+  if (isPowerBullRequest(req)) {
+    return res.sendFile(path.join(frontendDir, 'index.html'));
+  }
+  return res.sendFile(path.join(frontendDir, 'breadth.html'));
+});
+
+app.get(['/breadth', '/breadth/'], (req, res) => {
+  if (isPowerBullRequest(req)) {
+    return res.redirect(302, `http://localhost:${breadthPort}/`);
+  }
+  return res.sendFile(path.join(frontendDir, 'breadth.html'));
+});
+
+app.get(['/powerbull', '/powerbull/', '/pro', '/pro/'], (req, res) => {
+  if (!isPowerBullRequest(req)) {
+    return res.redirect(302, `http://localhost:${powerbullPort}/`);
+  }
+  return res.sendFile(path.join(frontendDir, 'index.html'));
+});
+
+app.use(express.static(frontendDir));
 app.use('/api', createApiRouter({
   db,
   connectionStatus,
@@ -48,8 +81,12 @@ app.use('/api', createApiRouter({
   credentialSession,
 }));
 
-const httpServer = http.createServer(app);
-const { broadcast } = createLiveSocketServer(httpServer, '/live');
+const breadthServer = http.createServer(app);
+const powerbullServer = http.createServer(app);
+
+// Live WS for PowerBull Pro signals
+const { broadcast } = createLiveSocketServer(powerbullServer, '/live');
+createLiveSocketServer(breadthServer, '/live');
 
 function todayTradeDate() {
   const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
@@ -117,12 +154,11 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-httpServer.listen(config.port, () => {
+function afterBothPortsUp() {
   const mode = demoMode ? 'DEMO' : 'LIVE';
-  console.log(`F&O Intelligence Terminal listening on http://localhost:${config.port} [${mode}]`);
-  if (!config.hasDhan || demoMode) {
-    console.log('Dhan credentials not set (or DEMO_MODE) — F&O uses NSE public / labeled MOCK; Markets equity board uses demo quotes.');
-    console.log('Set DHAN_* for live option chain + equity feed, or enter them in More → Dhan API.');
+  console.log(`Mode: ${mode} · Market Breadth :${breadthPort} · PowerBull :${powerbullPort}`);
+  if (!hasDhanCredentials(config) || demoMode) {
+    console.log('Dhan credentials missing (or DEMO_MODE) — live equity feed off. Market Breadth uses Yahoo/Kotak + NSE universe.');
     return;
   }
   if (isMarketOpen()) {
@@ -131,7 +167,7 @@ httpServer.listen(config.port, () => {
       console.error('Ingestion failed to start:', err);
     });
   } else {
-    console.log('Market closed — equity ingestion waits for 9:30 IST. F&O APIs and Markets REST remain available.');
+    console.log('Market closed — equity ingestion waits for 9:30 IST. F&O APIs remain available.');
     tokenManager.getAccessToken().then(() => {
       stockDashboard.refresh('nifty50').catch((err) => console.warn('Dashboard warm failed:', err.message));
     }).catch((err) => {
@@ -139,4 +175,14 @@ httpServer.listen(config.port, () => {
       console.error('Dhan auth failed:', err.message);
     });
   }
-});
+}
+
+let portsReady = 0;
+function onReady(label, port) {
+  console.log(`${label}: http://localhost:${port}/`);
+  portsReady += 1;
+  if (portsReady === 2) afterBothPortsUp();
+}
+
+breadthServer.listen(breadthPort, () => onReady('Market Breadth', breadthPort));
+powerbullServer.listen(powerbullPort, () => onReady('PowerBull Pro (original)', powerbullPort));

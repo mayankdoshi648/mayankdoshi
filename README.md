@@ -77,12 +77,23 @@ npm run build:cloudflare
 |----------|---------|
 | `DHAN_CLIENT_ID` + `DHAN_ACCESS_TOKEN` | **Preferred** live path |
 | `DHAN_CLIENT_ID` + `DHAN_PIN` + `DHAN_TOTP_SECRET` | Alternate on **Node only** |
+| `KOTAK_NEO_CONSUMER_KEY` | Kotak Neo live quotes (Market Breadth overview) |
+| `KOTAK_NEO_MOBILE`, `KOTAK_NEO_UCC`, `KOTAK_NEO_MPIN`, `KOTAK_NEO_TOTP_SECRET` | Optional Neo trade session |
 | `SESSION_SECRET` | Encrypt credential cookies (required on Cloudflare) |
 | `DEMO_MODE=true` | Force synthetic Markets equity quotes |
 | `FNO_FORCE_MOCK=1` | Force labeled mock F&O data (UI/dev) |
-| `PORT` | Default 3000 (Node) |
+| `PORT` | Market Breadth listen port (default **3002**) |
+| `POWERBULL_PORT` | PowerBull Pro / F&O shell listen port (default **3000**) |
+| `OBSIDIAN_VAULT_PATH` | Full path to your Obsidian vault |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Alerts via @BotFather + @userinfobot |
+| `DARVAX_AUTO_TRADE` | Keep `false` until paper-trading validates picks |
 
 Never commit `.env`. Access tokens are never returned by `GET /api/fno/credentials/dhan`.
+
+**Dashboards** (two separate apps — do not mix):
+
+- **Market Breadth:** http://localhost:3002/
+- **PowerBull Pro / F&O shell:** http://localhost:3000/
 
 ## Key API routes
 
@@ -97,22 +108,33 @@ Never commit `.env`. Access tokens are never returned by `GET /api/fno/credentia
 - `GET /api/health` — Cloudflare/runtime probe
 - `GET /api/dashboard` — equity Markets board
 - Existing Node-only: `/api/signals`, `/api/darvax/*`, `/live`
+- Market Breadth: `/api/overview`, `/api/breadth`, `/api/breadth/status`
 
 
 **Daily Loop productivity pack:** paste-ready vault templates and the 15-workflow guide live in [`docs/obsidian-workflows/`](docs/obsidian-workflows/README.md). With the dashboard running, open the visual guide at [http://localhost:3000/obsidian-workflows.html](http://localhost:3000/obsidian-workflows.html).
 
-## Market Breadth dashboard
+## Market Breadth dashboard (separate app)
 
-Open **Market Breadth** in the app (More → Market Breadth, or `?tab=breadth`) to see:
+Open **http://localhost:3002/** for Market Breadth only.
 
+PowerBull Pro (original Live / DarvaX / Track UI) stays at **http://localhost:3000/** and is not mixed into Market Breadth.
+
+- Live Nifty / Bank Nifty / India VIX + Large/Mid/Small + sector strips
 - % of Nifty 50 / Nifty 500 stocks above 20 / 50 / 200 DMA
 - Index vs breadth line charts (divergence view)
 - Spirit-level gauges + posture diagnosis (STOP PRESSING / REDUCE RISK / SIT OUT / GREEN LIGHT)
 - Headline indices + size/sector EMA strip
 
-Data sources: **Yahoo Finance** (default, no keys) using the NSE Nifty 50/500 universe. If Dhan credentials are set, NSE EOD history is preferred automatically.
+### Data sources
 
-First refresh for Nifty 50 takes ~1–2 minutes; results cache for 6 hours under `data/breadth-cache.json`.
+| Need | Source |
+|------|--------|
+| Live index / sector CMP + % | **Kotak Neo** when `KOTAK_NEO_CONSUMER_KEY` is set; else NSE `allIndices` |
+| DMA / EMA history (breadth + sector bias) | Yahoo Finance (default); Dhan EOD when Dhan creds are set |
+
+Kotak Neo has **no historical candle API**, so breadth DMA still uses Yahoo/Dhan. Quotes only need the consumer access token (full TOTP/MPIN login is optional and not used for the overview strip).
+
+First breadth refresh for Nifty 50 takes ~1–2 minutes; results cache under `data/breadth-cache.json`. Overview quotes cache under `data/overview-cache.json`.
 
 Node-only helpers: `/api/overview`, `/api/breadth`, `/api/breadth/status`, `POST /api/breadth/refresh`.
 

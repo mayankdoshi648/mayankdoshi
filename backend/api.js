@@ -37,6 +37,7 @@ function createApiRouter({
   router.use('/fno', createFnoRouter({ config, credentialSession, dataSources }));
 
   router.get('/status', (req, res) => {
+    const { getKotakStatus } = require('./kotakNeo');
     const auth = tokenManager?.getStatus?.() || null;
     const hasDhan = Boolean(
       (config?.clientId && config?.accessToken)
@@ -56,6 +57,7 @@ function createApiRouter({
       auth,
       dashboardMode: stockDashboard?.isDemo?.() ? 'demo' : 'live',
       connections,
+      kotakNeo: getKotakStatus(),
     });
   });
 
