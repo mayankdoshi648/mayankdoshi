@@ -1,88 +1,110 @@
-# PowerBull Pro + DarvaX Scanner
+# NSE F&O Intelligence Terminal (+ PowerBull / DarvaX)
 
-Intraday EMA/RSI dashboard (Dhan live feed) plus **DarvaX box scanner** for NSE + US markets: strength scoring, Obsidian export, Telegram alerts, Screener.in fundamentals, and optional Dhan order flow.
+Professional **mobile-first Indian NSE F&O market intelligence terminal**, built on the existing PowerBull Pro + DarvaX equity stack.
 
-## Laptop setup (start here)
+## Live demo (shareable · mobile)
 
-### 1. Prerequisites
+| Host | Link | Mode |
+|------|------|------|
+| **Cloudflare Pages (preferred · free)** | Connect GitHub → see [`docs/cloudflare-deploy.md`](docs/cloudflare-deploy.md) → `https://<project>.pages.dev` | **Live F&O** via Pages Functions |
+| **GitHub Pages** | **https://mayankdoshi648.github.io/mayankdoshi/** | Labeled **MOCK** static UI (keep until CF verified) |
+| Vercel | https://mayankdoshi.vercel.app | Labeled **MOCK** static UI |
+| Render blueprint | `render.yaml` (optional / paid) | Full Node + SQLite + equity WS |
 
-- **Node.js 22.5+** (`node -v`)
-- Git
-- Dhan account (for NSE historical data and orders)
-- Obsidian vault path (optional, for second-brain export)
-- Telegram bot (optional, for alerts)
+Static hosts (GitHub Pages / Vercel) cannot store Dhan secrets. For a **bookmarkable permanent HTTPS URL** on phone + laptop **without Render**:
 
-### 2. Clone and install
+1. Follow **[`docs/cloudflare-deploy.md`](docs/cloudflare-deploy.md)**
+2. Set secrets: `SESSION_SECRET`, optional `DHAN_CLIENT_ID` + `DHAN_ACCESS_TOKEN`
+3. Share `https://powerbullpro.pages.dev` (or your project name) — **never put the access token in the URL**
+
+In-app: **More → Dhan API** or the header **connection pill** → Data Connections.
+
+Data matrix: [`docs/data-sources.md`](docs/data-sources.md).
+
+> First-time GitHub Pages: after merge, open **Repo → Settings → Pages → Source = GitHub Actions**, then re-run the **Deploy GitHub Pages** workflow if needed.
+
+## What you get
+
+| Section | Purpose |
+|---------|---------|
+| Home | Regime + Smart Money + options + sectors + alerts |
+| F&O | Long/short buildup scanners |
+| Options | Chain, PCR, max pain, expected move |
+| Scan | Smart Money Proxy rankings |
+| Opp | Opportunity checklist / trade readiness |
+| Heatmap | Sector Smart Money → stock drill-down |
+| Dhan API | Client ID + Access token → live option chain (CF + Node); PIN/TOTP Node-only |
+| WHY drawer | Explainable positioning checklist |
+| Markets | Equity board (live on Node; demo on Cloudflare free) |
+| Equity / DarvaX | Preserved on Node (`npm start`) |
+
+## Architecture
+
+See [`docs/fno-architecture.md`](docs/fno-architecture.md), [`docs/data-sources.md`](docs/data-sources.md), and [`docs/cloudflare-deploy.md`](docs/cloudflare-deploy.md).
+
+Layers: **Providers → Normalize → Calculations → Service/Engines → API → UI**.
+
+- **Dhan** (primary live): futures quotes + option chain (+ equity feed on Node)
+- **NSE public** (secondary): indices / FII-DII via `nseDataService` / HybridProvider
+- **Instrument mapping**: `backend/fno/instrumentMapping.js` + futures security map
+- **Mock / static-demo** (explicitly labeled): GitHub Pages & Vercel, or `FNO_FORCE_MOCK=1`
+- **Connection pill** + `/api/data-connections`: Dhan / NSE / WebSocket health without exposing tokens
+
+## Setup
 
 ```bash
 git clone https://github.com/mayankdoshi648/mayankdoshi.git
 cd mayankdoshi
-git checkout cursor/darvax-engine-dashboard-213b
+git checkout master
 npm install
+cp .env.example .env
 npm test
+FNO_FORCE_MOCK=1 npm start
 ```
 
-All DarvaX work is on branch `cursor/darvax-engine-dashboard-213b` ([PR #1](https://github.com/mayankdoshi648/mayankdoshi/pull/1)). After the PR is merged, use `master` instead.
+Open **http://localhost:3000**
 
-### 3. Configure environment
+### Cloudflare (free permanent URL)
 
 ```bash
-cp .env.example .env
+npm run build:cloudflare
+# then connect the repo in Cloudflare Pages — see docs/cloudflare-deploy.md
 ```
 
-Edit `.env`:
+### Environment
 
 | Variable | Purpose |
 |----------|---------|
-| `DHAN_CLIENT_ID`, `DHAN_PIN`, `DHAN_TOTP_SECRET` | Dhan login + NSE EOD history |
-| `OBSIDIAN_VAULT_PATH` | Full path to your Obsidian vault |
-| `OBSIDIAN_MIN_SCORE` | Min score for Obsidian notes (default 55) |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Alerts via @BotFather + @userinfobot |
-| `TELEGRAM_MIN_SCORE` | Alert threshold (default 85) |
-| `DARVAX_AUTO_TRADE` | Keep `false` until paper-trading validates picks |
+| `DHAN_CLIENT_ID` + `DHAN_ACCESS_TOKEN` | **Preferred** live path |
+| `DHAN_CLIENT_ID` + `DHAN_PIN` + `DHAN_TOTP_SECRET` | Alternate on **Node only** |
+| `SESSION_SECRET` | Encrypt credential cookies (required on Cloudflare) |
+| `DEMO_MODE=true` | Force synthetic Markets equity quotes |
+| `FNO_FORCE_MOCK=1` | Force labeled mock F&O data (UI/dev) |
+| `PORT` | Default 3000 (Node) |
 
-### 4. Run locally
+Never commit `.env`. Access tokens are never returned by `GET /api/fno/credentials/dhan`.
 
-**Dashboard** (DarvaX Scanner tab at http://localhost:3000):
+## Key API routes
 
-```bash
-npm start
-```
+- `GET /api/fno/ticker` — NIFTY / BANKNIFTY / FINNIFTY / MIDCPNIFTY / INDIA VIX
+- `GET /api/fno/overview` — regime + options snapshot
+- `GET /api/fno/option-chain/:underlying?expiry=`
+- `GET /api/fno/scanner` · `/buildups` · `/smart-money` · `/sectors`
+- `GET /api/fno/fii-dii` · `/alerts` · `/watchlist`
+- `GET /api/fno/opportunity` · `/opportunity/:symbol`
+- `GET /api/fno/instruments/resolve?symbol=&kind=` — centralized security-id mapping
+- `GET|PUT|DELETE /api/fno/credentials/dhan` · `POST …/test`
+- `GET /api/health` — Cloudflare/runtime probe
+- `GET /api/dashboard` — equity Markets board
+- Existing Node-only: `/api/signals`, `/api/darvax/*`, `/live`
 
-**One-off daily scan** (~20 min for full Nifty 500 + S&P 500):
+## Safety
 
-```bash
-npm run darvax:scan -- --export-obsidian --telegram
-```
-
-**Weekday cron** (7:00 AM IST, Mon–Fri):
-
-```bash
-npm run cron:install
-# logs: data/darvax-cron.log
-# remove: npm run cron:remove
-```
-
-### 5. Obsidian output
-
-When `OBSIDIAN_VAULT_PATH` is set, scans write:
-
-```
-03-Watchlists/
-  YYYY-MM-DD.md
-  YYYY-MM-DD-NSE.md
-  YYYY-MM-DD-US.md
-  stocks/
-    YYYY-MM-DD-NSE-SYMBOL.md
-```
-
-### 6. Useful commands
-
-```bash
-npm run universe:build    # Rebuild Nifty 500 / S&P 500 symbol lists
-npm run darvax:scan -- --market=NSE   # NSE only
-npm run darvax:scan -- --market=US    # US only
-```
+- No naked BUY/SELL — interpretations always show evidence metrics
+- Smart Money is a **PROXY**, not institutional identification
+- Missing / unavailable fields stay `null` — never fabricated as live
+- Mock responses always set `meta.isMock: true` and UI banner
+- Shareable URL identifies the **app**, never the Dhan token
 
 ## Workshop learning resources
 
