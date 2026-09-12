@@ -10,6 +10,87 @@ function escapeHtml(value) {
   }[ch]));
 }
 
+/** Labeled MOCK used on static hosts (GitHub Pages) when /api/* is unavailable. */
+function staticBreadthDemo(universe) {
+  const now = new Date().toISOString();
+  const mkQuote = (id, label, last, changePct, extra = {}) => ({
+    id,
+    label,
+    last,
+    changePct,
+    changePercent: changePct,
+    direction: changePct > 0.05 ? 'up' : changePct < -0.05 ? 'down' : 'flat',
+    arrow: changePct > 0.05 ? '▲' : changePct < -0.05 ? '▼' : '■',
+    ema: {
+      ema20: { above: changePct >= 0, value: last * 0.99 },
+      ema50: { above: changePct >= -0.3, value: last * 0.98 },
+      ema200: { above: true, value: last * 0.95 },
+      bias: changePct >= 0 ? 'BULLISH' : 'BEARISH',
+    },
+    ...extra,
+  });
+  const dates = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (29 - i));
+    return d.toISOString().slice(0, 10);
+  });
+  const mkSeries = (start) => dates.map((_, i) => Number((start + Math.sin(i / 4) * 2 + i * 0.15).toFixed(2)));
+  return {
+    overview: {
+      fromCache: true,
+      quoteSource: 'STATIC_DEMO',
+      scannedAt: now,
+      headline: [
+        mkQuote('NIFTY', 'NIFTY 50', 24850, 0.42),
+        mkQuote('BANKNIFTY', 'BANK NIFTY', 51240, 0.31),
+        mkQuote('INDIAVIX', 'INDIA VIX', 13.2, -1.1),
+      ],
+      size: [
+        mkQuote('NIFTY', 'Large Cap', 24850, 0.42, { subtitle: 'Nifty 50' }),
+        mkQuote('MIDCAP', 'Mid Cap', 13240, 0.55, { subtitle: 'Nifty Midcap' }),
+        mkQuote('SMLCAP', 'Small Cap', 9800, -0.22, { subtitle: 'Nifty Smallcap' }),
+      ],
+      sectors: [
+        mkQuote('BANK', 'Bank', 51240, 0.31),
+        mkQuote('IT', 'IT', 38200, -0.45),
+        mkQuote('AUTO', 'Auto', 21400, 0.62),
+        mkQuote('PHARMA', 'Pharma', 19800, 0.18),
+        mkQuote('METAL', 'Metal', 8900, -0.7),
+        mkQuote('FMCG', 'FMCG', 56000, 0.12),
+      ],
+    },
+    breadth: {
+      universe: universe || 'nifty50',
+      stockCount: universe === 'nifty500' ? 500 : 50,
+      asOf: now.slice(0, 10),
+      dataSource: 'STATIC_DEMO',
+      fromCache: true,
+      warning: 'STATIC DEMO (MOCK) — labeled sample for GitHub Pages. Not live NSE data.',
+      gauges: {
+        dma20: { value: 62, label: '20 DMA — LEADERS', subtitle: 'Short-term health', arrow: '▲' },
+        dma50: { value: 54, label: '50 DMA — CORE', subtitle: 'Medium-term health', arrow: '▲' },
+        dma200: { value: 48, label: '200 DMA — FOUNDATION', subtitle: 'Long-term health', arrow: '▼' },
+      },
+      diagnosis: {
+        posture: 'SELECTIVE',
+        tone: 'neutral',
+        diagnosis: 'MOCK: short-term breadth constructive; long-term still mixed.',
+      },
+      series: {
+        dates,
+        index: mkSeries(24500),
+        dma20: mkSeries(55),
+        dma50: mkSeries(50),
+        dma200: mkSeries(46),
+      },
+    },
+  };
+}
+
+function isStaticHost() {
+  return /github\.io$/i.test(location.hostname) || /vercel\.app$/i.test(location.hostname);
+}
+
 // --- Market Overview (Nifty / VIX / size / sectors) ---
 function fmtNum(n, digits = 2) {
   if (n == null || Number.isNaN(n)) return '—';
@@ -97,8 +178,10 @@ function renderOverview(data) {
 async function loadOverview({ force = false } = {}) {
   const statusEl = document.getElementById('breadth-status');
   try {
+    if (isStaticHost()) throw new Error('static-host');
     const url = force ? '/api/overview?refresh=1' : '/api/overview';
     const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
     renderOverview(data);
@@ -108,7 +191,11 @@ async function loadOverview({ force = false } = {}) {
       statusEl.textContent = `Overview ${data.fromCache ? 'cached' : 'live'}${src}${stamp ? ` · ${stamp}` : ''}`;
     }
   } catch (err) {
-    if (statusEl) statusEl.textContent = `Overview error: ${err.message}`;
+    const demo = staticBreadthDemo().overview;
+    renderOverview(demo);
+    if (statusEl) {
+      statusEl.textContent = `STATIC DEMO (MOCK) · overview — not live NSE (${err.message})`;
+    }
   }
 }
 
@@ -347,10 +434,12 @@ async function loadBreadth({ force = false, quiet = false } = {}) {
   btn.disabled = true;
 
   try {
+    if (isStaticHost()) throw new Error('static-host');
     const url = force
       ? `/api/breadth?universe=${universe}&refresh=1`
       : `/api/breadth?universe=${universe}`;
     const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
     renderBreadthReport(data);
@@ -361,8 +450,10 @@ async function loadBreadth({ force = false, quiet = false } = {}) {
       stopBreadthPoll();
     }
   } catch (err) {
-    statusEl.textContent = `Error: ${err.message}`;
+    const demo = staticBreadthDemo(universe).breadth;
+    renderBreadthReport(demo);
     stopBreadthPoll();
+    statusEl.textContent = `STATIC DEMO (MOCK) · ${demo.stockCount} stocks — not live NSE (${err.message})`;
   } finally {
     btn.disabled = false;
   }

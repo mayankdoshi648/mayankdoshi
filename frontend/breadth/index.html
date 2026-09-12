@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>
+    (function () {
+      var base = '../';
+      if (/github\.io$/i.test(location.hostname)) base = '/mayankdoshi/';
+      document.write('<base href="' + base + '">');
+    })();
+  </script>
+
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Market Breadth</title>
