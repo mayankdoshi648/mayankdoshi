@@ -3805,3 +3805,16 @@ html[data-theme="night"] .dense-table tbody tr:nth-child(even) td {
 @media (max-width: 720px) {
   .conn-pill { max-width: 34vw; font-size: 0.65rem; padding: 0.2rem 0.5rem; }
 }
+
+
+/* —— Embed mode: chrome-lite, same panels/data —— */
+body.embed-mode .bottom-nav,
+body.embed-mode #desktop-nav,
+body.embed-mode #more-sheet,
+body.embed-mode .topbar-actions,
+body.embed-mode #conn-pill {
+  display: none !important;
+}
+body.embed-mode .app-shell {
+  padding-bottom: 0.5rem;
+}

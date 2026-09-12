@@ -15,6 +15,7 @@ const {
   toQuoteRequests,
 } = require('../futuresSecurityMap');
 const { createOiCache } = require('../../oiCache');
+const { getSharedOiCache } = require('../../marketData');
 const { validateQuote } = require('../../priceValidation');
 
 /**
@@ -38,7 +39,7 @@ class HybridProvider extends FoDataProvider {
     mock,
     loadFuturesMap = loadFuturesSecurityMap,
     defaultSymbols = ALL_SECTOR_FO_SYMBOLS,
-    oiCache = createOiCache(),
+    oiCache = getSharedOiCache(),
     dataSources = null,
   } = {}) {
     super();
@@ -286,7 +287,7 @@ function createProvider({
     dhan,
     mock,
     dataSources,
-    oiCache: oiCache || createOiCache(),
+    oiCache: oiCache || getSharedOiCache(),
   });
 }
 

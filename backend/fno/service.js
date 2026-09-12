@@ -10,12 +10,15 @@ const { computeSectorStrength, rankSectors } = require('./calculations/sectorStr
 const { SECTOR_MAP, sectorForSymbol } = require('./universe/sectors');
 const { TICKER_ORDER } = require('./universe/underlyings');
 const { dataEnvelope } = require('./normalize');
+const { getMarketDataStore, TTL: STORE_TTL, attachFreshness } = require('../marketData');
 
 const CACHE_TTL_MS = {
-  overview: 60_000,
-  chain: 15_000,
-  scanner: 120_000,
-  fii: 300_000,
+  overview: STORE_TTL.OVERVIEW,
+  chain: STORE_TTL.OPTION_CHAIN,
+  scanner: STORE_TTL.SCANNER,
+  futures: STORE_TTL.FUTURES_OI,
+  fii: STORE_TTL.FII,
+  ticker: STORE_TTL.TICKER,
 };
 
 class FnoService {
@@ -23,7 +26,7 @@ class FnoService {
     this.config = config;
     this.dataSources = dataSources;
     this.provider = provider || createProvider({ config, dataSources });
-    this.cache = new Map();
+    this.store = getMarketDataStore();
     this.watchlist = new Set(['NIFTY', 'BANKNIFTY', 'HDFCBANK', 'RELIANCE', 'TCS']);
     this.alertRules = defaultAlertRules();
     this.alertHistory = [];
@@ -37,25 +40,17 @@ class FnoService {
     ) ? 'env' : 'none';
   }
 
-  _getCache(key) {
-    const hit = this.cache.get(key);
-    if (!hit) return null;
-    if (Date.now() - hit.at > hit.ttl) return { ...hit.value, meta: { ...hit.value.meta, stale: true } };
-    return hit.value;
-  }
-
-  _setCache(key, value, ttl) {
-    this.cache.set(key, { at: Date.now(), ttl, value });
-    return value;
+  async _cached(key, ttl, fetcher, sourceHint = null) {
+    return this.store.getOrFetch(key, ttl, async () => attachFreshness(await fetcher()), { sourceHint });
   }
 
   async getTicker() {
-    const cached = this._getCache('ticker');
-    if (cached && !cached.meta?.stale) return cached;
-    const env = await this.provider.getIndexQuotes(TICKER_ORDER);
-    const bySym = new Map((env.data || []).map((q) => [q.symbol, q]));
-    const ordered = TICKER_ORDER.map((id) => bySym.get(id) || { symbol: id, ltp: null, source: env.meta.source });
-    return this._setCache('ticker', dataEnvelope(ordered, env.meta), CACHE_TTL_MS.overview);
+    return this._cached('fno:ticker', CACHE_TTL_MS.ticker, async () => {
+      const env = await this.provider.getIndexQuotes(TICKER_ORDER);
+      const bySym = new Map((env.data || []).map((q) => [q.symbol, q]));
+      const ordered = TICKER_ORDER.map((id) => bySym.get(id) || { symbol: id, ltp: null, source: env.meta.source });
+      return dataEnvelope(ordered, env.meta);
+    }, 'NSE');
   }
 
   async getMarketOverviewIntelligence() {
@@ -119,24 +114,23 @@ class FnoService {
   }
 
   async getOptionChain(underlying = 'NIFTY', expiry = null) {
-    const key = `chain:${underlying}:${expiry || 'near'}`;
-    const cached = this._getCache(key);
-    if (cached && !cached.meta?.stale) return cached;
-
-    let exp = expiry;
-    if (!exp) {
-      const ex = await this.provider.getOptionExpiries(underlying);
-      exp = ex.data?.[0];
-      if (!exp) throw new Error('No expiries available');
-    }
-    const env = await this.provider.getOptionChain(underlying, exp);
-    const analyzed = analyzeOptionChain({
-      spot: env.data.spot,
-      strikes: env.data.strikes,
-      expiry: exp,
-      asOf: env.meta.asOf,
-    });
-    return this._setCache(key, dataEnvelope(analyzed, env.meta), CACHE_TTL_MS.chain);
+    const key = `fno:chain:${underlying}:${expiry || 'near'}`;
+    return this._cached(key, CACHE_TTL_MS.chain, async () => {
+      let exp = expiry;
+      if (!exp) {
+        const ex = await this.provider.getOptionExpiries(underlying);
+        exp = ex.data?.[0];
+        if (!exp) throw new Error('No expiries available');
+      }
+      const env = await this.provider.getOptionChain(underlying, exp);
+      const analyzed = analyzeOptionChain({
+        spot: env.data.spot,
+        strikes: env.data.strikes,
+        expiry: exp,
+        asOf: env.meta.asOf,
+      });
+      return dataEnvelope(analyzed, env.meta);
+    }, 'DHAN');
   }
 
   async getExpiries(underlying = 'NIFTY') {
@@ -144,12 +138,9 @@ class FnoService {
   }
 
   async getFoScanner({ signal = null, sector = null, minAbsScore = 0 } = {}) {
-    const cached = this._getCache('scanner');
-    let env = cached && !cached.meta?.stale ? cached : null;
-    if (!env) {
-      env = await this.provider.getFuturesQuotes();
-      this._setCache('scanner', env, CACHE_TTL_MS.scanner);
-    }
+    const env = await this._cached('fno:futures', CACHE_TTL_MS.futures, async () => {
+      return this.provider.getFuturesQuotes();
+    }, 'DHAN');
 
     const regimeEnv = await this.getMarketOverviewIntelligence();
     const regimeScore = regimeEnv.data?.regime?.score ?? 50;
@@ -601,28 +592,28 @@ class FnoService {
   }
 
   async getFiiDii() {
-    const cached = this._getCache('fii');
-    if (cached && !cached.meta?.stale) return cached;
-    const env = await this.provider.getFiiDii();
-    const cash = env.data?.cash;
-    let positioning = 'NEUTRAL';
-    if (cash?.fiiNet != null) {
-      if (cash.fiiNet >= 2000) positioning = 'STRONG_BULLISH';
-      else if (cash.fiiNet >= 500) positioning = 'BULLISH';
-      else if (cash.fiiNet <= -2000) positioning = 'STRONG_BEARISH';
-      else if (cash.fiiNet <= -500) positioning = 'BEARISH';
-    }
-    const enriched = {
-      ...env.data,
-      positioningRegime: {
-        label: positioning,
-        basis: cash?.fiiNet != null ? `FII cash net ${cash.fiiNet}` : 'Insufficient FII data',
-        note: env.data?.futures?.netFutures == null
-          ? 'Futures long/short unavailable — regime uses cash net only when present'
-          : null,
-      },
-    };
-    return this._setCache('fii', dataEnvelope(enriched, env.meta), CACHE_TTL_MS.fii);
+    return this._cached('fno:fii', CACHE_TTL_MS.fii, async () => {
+      const env = await this.provider.getFiiDii();
+      const cash = env.data?.cash;
+      let positioning = 'NEUTRAL';
+      if (cash?.fiiNet != null) {
+        if (cash.fiiNet >= 2000) positioning = 'STRONG_BULLISH';
+        else if (cash.fiiNet >= 500) positioning = 'BULLISH';
+        else if (cash.fiiNet <= -2000) positioning = 'STRONG_BEARISH';
+        else if (cash.fiiNet <= -500) positioning = 'BEARISH';
+      }
+      const enriched = {
+        ...env.data,
+        positioningRegime: {
+          label: positioning,
+          basis: cash?.fiiNet != null ? `FII cash net ${cash.fiiNet}` : 'Insufficient FII data',
+          note: env.data?.futures?.netFutures == null
+            ? 'Futures long/short unavailable — regime uses cash net only when present'
+            : null,
+        },
+      };
+      return dataEnvelope(enriched, { ...env.meta, source: env.meta?.source || 'NSE' });
+    }, 'NSE');
   }
 
   getWatchlist() {
@@ -942,7 +933,7 @@ class FnoService {
     if (clearForceMock) delete process.env.FNO_FORCE_MOCK;
 
     this.provider = createProvider({ config: this.config, preferMock: false, dataSources: this.dataSources });
-    this.cache.clear();
+    this.store.invalidate('fno:');
 
     if (persistEnv) {
       try {
@@ -978,7 +969,7 @@ class FnoService {
     delete process.env.DHAN_ACCESS_TOKEN;
     this._credentialSource = 'none';
     this.provider = createProvider({ config: this.config || {}, preferMock: false, dataSources: this.dataSources });
-    this.cache.clear();
+    this.store.invalidate('fno:');
     return this.getDhanStatus();
   }
 

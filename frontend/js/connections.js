@@ -37,33 +37,47 @@
     if (cls) pill.classList.add(cls);
   }
 
-  function paintDialog(snapshot) {
+    function paintDialog(snapshot, health) {
     const body = $('#conn-dialog-body');
     if (!body || !snapshot) return;
     const dhan = snapshot.sources?.dhan || {};
     const nse = snapshot.sources?.nse || {};
     const ws = snapshot.sources?.websocket || {};
+    const hDhan = health?.dhan || {};
+    const hNse = health?.nse || {};
+    const cache = health?.cache || {};
+    const age = health?.lastSuccessfulUpdateAgeSeconds;
+    const ageLabel = age == null ? '—' : (age < 60 ? `${age}s ago` : `${Math.round(age / 60)}m ago`);
+    const dhanReqOk = hDhan.requests?.successful ?? 0;
+    const dhanReqFail = hDhan.requests?.failed ?? 0;
     body.innerHTML = `
-      <div class="conn-row"><span>Overall</span><strong>${escapeHtml(snapshot.overall)}</strong></div>
+      <div class="conn-row"><span>Overall</span><strong>${escapeHtml(health?.overall || snapshot.overall)}</strong></div>
       <div class="conn-row"><span>Market</span><strong>${snapshot.marketOpen ? 'OPEN' : 'CLOSED'}</strong></div>
-      <div class="conn-row"><span>Dhan</span><strong>${escapeHtml((dhan.status || (snapshot.authenticated ? 'connected' : 'disconnected')).toUpperCase())}</strong></div>
-      <div class="conn-row"><span>NSE</span><strong>${escapeHtml((nse.status || 'unknown').toUpperCase())}</strong></div>
+      <div class="conn-row"><span>Dhan API</span><strong>${escapeHtml(hDhan.status || (dhan.status || (snapshot.authenticated ? 'connected' : 'disconnected')).toUpperCase())}</strong></div>
+      <div class="conn-row"><span>NSE</span><strong>${escapeHtml(hNse.status || (nse.status || 'unknown').toUpperCase())}</strong></div>
+      <div class="conn-row"><span>Last successful update</span><strong>${escapeHtml(ageLabel)}</strong></div>
+      <div class="conn-row"><span>Dhan requests</span><strong>${escapeHtml(`${dhanReqOk} ok / ${dhanReqFail} fail`)}</strong></div>
+      <div class="conn-row"><span>Cache</span><strong>${escapeHtml(cache.label || '—')} · ${cache.hits ?? 0} hit / ${cache.misses ?? 0} miss</strong></div>
       <div class="conn-row"><span>Equity WebSocket</span><strong>${ws.connected ? 'CONNECTED' : 'DISCONNECTED'}</strong></div>
-      <div class="conn-row"><span>Last Dhan update</span><strong>${escapeHtml(fmtTime(dhan.lastSuccessAt))}</strong></div>
-      <div class="conn-row"><span>Last NSE update</span><strong>${escapeHtml(fmtTime(nse.lastSuccessAt))}</strong></div>
+      <div class="conn-row"><span>Latest market data</span><strong>${escapeHtml(fmtTime(health?.lastSuccessfulUpdateAt || dhan.lastSuccessAt))}</strong></div>
       <p class="tiny muted">Auth mode: ${escapeHtml(snapshot.authMode || '—')}. Tokens are never shown here.</p>
-      ${dhan.lastError ? `<p class="tiny err-text">${escapeHtml(dhan.lastError)}</p>` : ''}
-      ${nse.lastError ? `<p class="tiny err-text">${escapeHtml(nse.lastError)}</p>` : ''}
+      ${hDhan.lastError || dhan.lastError ? `<p class="tiny err-text">${escapeHtml(hDhan.lastError || dhan.lastError)}</p>` : ''}
+      ${hNse.lastError || nse.lastError ? `<p class="tiny err-text">${escapeHtml(hNse.lastError || nse.lastError)}</p>` : ''}
     `;
   }
 
-  async function refreshConnections() {
+async function refreshConnections() {
     try {
       const resp = await fetch('/api/data-connections', { credentials: 'include' });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const snapshot = await resp.json();
-      paintPill(snapshot);
-      paintDialog(snapshot);
+      let health = null;
+      try {
+        const hr = await fetch('/api/data-health', { credentials: 'include' });
+        if (hr.ok) health = await hr.json();
+      } catch (_) { /* optional */ }
+      paintPill(health ? { ...snapshot, overall: health.overall || snapshot.overall } : snapshot);
+      paintDialog(snapshot, health);
       const badge = $('#dhan-connected-badge');
       if (badge) {
         const on = Boolean(snapshot.authenticated || /DHAN/i.test(snapshot.overall || ''));
@@ -114,12 +128,14 @@
     const body = $('#debug-dialog-body');
     if (!dlg || !body) return;
     try {
-      const [conn, status, dhan] = await Promise.all([
+      const [conn, status, dhan, health] = await Promise.all([
         fetch('/api/data-connections', { credentials: 'include' }).then((r) => r.json()),
         fetch('/api/status', { credentials: 'include' }).then((r) => r.json()),
         fetch('/api/fno/credentials/dhan', { credentials: 'include' }).then((r) => r.json()).catch(() => null),
+        fetch('/api/data-health', { credentials: 'include' }).then((r) => r.json()).catch(() => null),
       ]);
       body.textContent = JSON.stringify({
+        dataHealth: health,
         connections: conn,
         status: {
           marketOpen: status.marketOpen,
