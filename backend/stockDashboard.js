@@ -2,7 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { fetchDhanDailyCandles } = require('./dhanHistorical');
-const { fetchOhlcQuotes, fetchFullQuotes } = require('./dhanQuotes');
+const { fetchOhlcQuotes, fetchFullQuotes, isRateLimitError } = require('./dhanQuotes');
 const { compute52WeekStats } = require('./week52');
 const { resolveDashboardUniverse, shortenSector, fetchIndexUniverse } = require('./sectorUniverse');
 
@@ -10,6 +10,8 @@ const CACHE_DIR = path.join(__dirname, '..', 'data');
 const CACHE_FILE = path.join(CACHE_DIR, 'dashboard-cache.json');
 const CACHE_VERSION = 2;
 const QUOTE_TTL_MS = 60 * 1000;
+/** Longer cache on CF / lite mode to avoid Dhan 429s. */
+const QUOTE_TTL_LITE_MS = 180 * 1000;
 const WEEK52_TTL_MS = 12 * 60 * 60 * 1000;
 
 const RANKINGS = ['gainers', 'losers', 'near52wHigh', 'near52wLow', 'volume', 'all'];
@@ -157,6 +159,10 @@ function createStockDashboard({
   config,
   fetchImpl = fetch,
   demoMode = false,
+  /** Skip per-symbol 52w history pulls (required on Cloudflare CPU limits). */
+  skipWeek52 = false,
+  /** Optional preloaded instruments: [{ symbol, name, sector, securityId }] */
+  bundledUniverse = null,
 }) {
   let memoryCache = null;
   let week52Cache = new Map(); // symbol -> { stats, at }
@@ -171,6 +177,24 @@ function createStockDashboard({
     if (universeCache?.universe === universe && universeCache.instruments?.length) {
       return universeCache;
     }
+
+    // Prefer bundled Nifty50 map when provided (Cloudflare — avoids 25MB scrip master).
+    if (bundledUniverse?.instruments?.length && String(universe).toLowerCase().includes('nifty50')) {
+      const instruments = bundledUniverse.instruments.map((row) => ({
+        symbol: row.symbol,
+        name: row.name || row.symbol,
+        sector: row.sector || 'Unknown',
+        securityId: String(row.securityId),
+      }));
+      universeCache = {
+        universe,
+        instruments,
+        sectors: [...new Set(instruments.map((i) => i.sector))].sort(),
+        missing: bundledUniverse.missing || [],
+      };
+      return universeCache;
+    }
+
     if (isDemo()) {
       try {
         const rows = await fetchIndexUniverse(universe, fetchImpl);
@@ -242,38 +266,59 @@ function createStockDashboard({
     const { accessToken } = await tokenManager.getAccessToken();
     const securityIds = instruments.map((i) => i.securityId);
 
+    // On Cloudflare (skipWeek52), use a single OHLC call — never full+ohlc fallback
+    // (that doubled traffic and triggered Dhan 429 / code 805).
     let quotes;
-    try {
-      quotes = await fetchFullQuotes({
-        accessToken,
-        clientId: config.clientId,
-        securityIds,
-        fetchImpl,
-      });
-    } catch {
+    if (skipWeek52) {
       quotes = await fetchOhlcQuotes({
         accessToken,
         clientId: config.clientId,
         securityIds,
         fetchImpl,
       });
+    } else {
+      try {
+        quotes = await fetchFullQuotes({
+          accessToken,
+          clientId: config.clientId,
+          securityIds,
+          fetchImpl,
+        });
+      } catch (err) {
+        if (isRateLimitError(err)) throw err;
+        quotes = await fetchOhlcQuotes({
+          accessToken,
+          clientId: config.clientId,
+          securityIds,
+          fetchImpl,
+        });
+      }
     }
 
-    const week52List = await mapPool(instruments, 4, async (inst) => {
-      try {
-        return await loadWeek52ForInstrument(inst, accessToken);
-      } catch (err) {
-        return {
-          high52: null,
-          low52: null,
-          pctFromHigh: null,
-          pctFromLow: null,
-          rangePosition: null,
-          daysInWindow: 0,
-          error: err.message,
-        };
-      }
-    });
+    const week52List = skipWeek52
+      ? instruments.map(() => ({
+        high52: null,
+        low52: null,
+        pctFromHigh: null,
+        pctFromLow: null,
+        rangePosition: null,
+        daysInWindow: 0,
+      }))
+      : await mapPool(instruments, 4, async (inst) => {
+        try {
+          return await loadWeek52ForInstrument(inst, accessToken);
+        } catch (err) {
+          return {
+            high52: null,
+            low52: null,
+            pctFromHigh: null,
+            pctFromLow: null,
+            rangePosition: null,
+            daysInWindow: 0,
+            error: err.message,
+          };
+        }
+      });
 
     const rows = instruments.map((inst, idx) => {
       const q = quotes.get(String(inst.securityId)) || {};
@@ -318,6 +363,9 @@ function createStockDashboard({
       missing,
       rows,
       sectors: sectorSummary(rows),
+      warning: skipWeek52
+        ? 'Live Dhan OHLC quotes; 52-week history skipped on this host to stay within CPU limits.'
+        : undefined,
     };
   }
 
@@ -347,6 +395,17 @@ function createStockDashboard({
         memoryCache = { payload, at: Date.now(), universe };
         writeDiskCache(memoryCache);
         return payload;
+      } catch (err) {
+        // On Dhan 429, keep serving last good payload instead of hard-failing the UI.
+        const cached = getCached(universe);
+        if (cached?.payload && isRateLimitError(err)) {
+          return {
+            ...cached.payload,
+            warning: `Dhan rate-limited (429). Showing last cached quotes. ${err.message}`.slice(0, 240),
+            stale: true,
+          };
+        }
+        throw err;
       } finally {
         refreshInflight = null;
       }
@@ -355,9 +414,15 @@ function createStockDashboard({
   }
 
   function getCached(universe = 'nifty50') {
-    if (memoryCache?.universe === universe && memoryCache.payload) return memoryCache;
+    if (memoryCache?.universe === universe && memoryCache.payload) {
+      if (isDemo() && memoryCache.payload.mode === 'live') return null;
+      if (!isDemo() && memoryCache.payload.mode === 'demo') return null;
+      return memoryCache;
+    }
     const disk = readDiskCache();
     if (disk?.universe === universe && disk.payload) {
+      if (isDemo() && disk.payload.mode === 'live') return null;
+      if (!isDemo() && disk.payload.mode === 'demo') return null;
       memoryCache = disk;
       return disk;
     }
@@ -376,7 +441,8 @@ function createStockDashboard({
     }
 
     const cached = getCached(universe);
-    const fresh = cached && Date.now() - cached.at < QUOTE_TTL_MS;
+    const ttl = skipWeek52 ? QUOTE_TTL_LITE_MS : QUOTE_TTL_MS;
+    const fresh = cached && Date.now() - cached.at < ttl;
     let payload;
 
     if (!force && fresh) {

@@ -47,3 +47,32 @@ test('fetchOhlcQuotes maps security ids', async () => {
   assert.equal(map.get('2885').ltp, 2500);
   assert.equal(map.get('2885').prevClose, 2490);
 });
+
+test('postMarketFeed retries on HTTP 429 then succeeds', async () => {
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    if (calls < 3) {
+      return {
+        ok: false,
+        status: 429,
+        async text() { return '{"data":{"805":"Too many requests"},"status":"failed"}'; },
+      };
+    }
+    return {
+      ok: true,
+      async json() {
+        return { status: 'success', data: { NSE_EQ: { 2885: { last_price: 1, ohlc: { close: 1 } } } } };
+      },
+    };
+  };
+  const { postMarketFeed, DHAN_OHLC_URL } = require('./dhanQuotes');
+  const data = await postMarketFeed(DHAN_OHLC_URL, {
+    accessToken: 't',
+    clientId: 'c',
+    securityIds: [2885],
+    fetchImpl,
+  });
+  assert.equal(calls, 3);
+  assert.ok(data[2885] || data['2885']);
+});

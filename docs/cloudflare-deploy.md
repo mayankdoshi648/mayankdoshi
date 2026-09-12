@@ -110,6 +110,9 @@ npx wrangler dev
 | Build OK, site 404 on `/api` | Confirm `npm run build:cloudflare` produces `dist/worker.js` |
 | MOCK banner | Add Dhan secrets or connect via More → Dhan API |
 | F&O scanner still mock while NSE is live | Merge/redeploy PR with bundled futures security ids (CF cannot parse Dhan’s 25MB scrip CSV) |
+| Dhan HTTP 429 / code 805 Too many requests | Wait 1–2 min; refresh less often. App now throttles marketfeed + serves cached quotes on 429 |
+| Equity Markets share prices always demo on CF | Connect Dhan — Markets board now uses live Dhan OHLC when `hasDhan` (52w history still Node-only) |
+| Vercel CI red (`esbuild` / build failed) | Expected if `build` ran Worker bundle without devDeps. `vercel.json` now skips CF build and serves `frontend/` MOCK only |
 | 401 from Dhan | Paste a fresh Access Token |
 
 ## Updating later

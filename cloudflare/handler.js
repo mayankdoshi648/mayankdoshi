@@ -9,7 +9,7 @@
  * - No persistent equity Dhan WebSocket (/live)
  * - No PIN/TOTP (Access Token + Client ID only)
  * - Watchlist/alerts are per-isolate memory (not durable)
- * - Equity Markets board uses demo quotes to stay within CPU limits
+ * - Equity Markets: live Dhan OHLC when connected (no 52w history pulls)
  * - REST + in-memory cache (no always-on WebSocket proxy)
  */
 
@@ -221,8 +221,9 @@ async function handleRequest(request, env = {}, _ctx = null) {
           equityLiveWs: false,
           sqliteSignals: false,
           pinTotpLogin: false,
-          marketsLive: false,
-          note: 'F&O REST is live via Dhan/NSE. Equity WS, DarvaX, and live Markets board need Node.',
+          marketsLive: true,
+          marketsLiveNote: 'Equity LTPs via Dhan OHLC when connected; 52w history Node-only',
+          note: 'F&O REST is live via Dhan/NSE. Equity WS and DarvaX need Node. Markets board uses Dhan OHLC when connected.',
         },
       });
     }
@@ -246,9 +247,19 @@ async function handleRequest(request, env = {}, _ctx = null) {
       }, 501);
     }
 
-    // Equity Markets — demo only on free CF (avoids CPU timeouts from 52w history pulls)
+    // Equity Markets — live Dhan OHLC when connected; demo otherwise.
+    // Skip 52w history on CF (CPU). Use bundled Nifty50 security ids (no 25MB scrip CSV).
     if (parts[0] === 'dashboard') {
+      let bundledUniverse = null;
+      try {
+        bundledUniverse = require('../backend/data/nifty50EquityIds.json');
+      } catch {
+        bundledUniverse = null;
+      }
       const tokenManager = {
+        hasCredentials() {
+          return Boolean(config.hasDhan);
+        },
         async getAccessToken() {
           if (!config.hasDhan) throw new Error('No Dhan token');
           return { accessToken: config.accessToken };
@@ -257,7 +268,7 @@ async function handleRequest(request, env = {}, _ctx = null) {
           return {
             hasCredentials: config.hasDhan,
             authenticated: config.hasDhan,
-            mode: 'demo',
+            mode: config.hasDhan ? 'live' : 'demo',
             authMode: config.hasDhan ? 'access_token' : null,
             lastError: null,
           };
@@ -265,8 +276,13 @@ async function handleRequest(request, env = {}, _ctx = null) {
       };
       const dash = createStockDashboard({
         tokenManager,
-        config,
-        demoMode: true,
+        config: {
+          clientId: config.clientId,
+          accessToken: config.accessToken,
+        },
+        demoMode: !config.hasDhan,
+        skipWeek52: true,
+        bundledUniverse,
       });
       if (parts[1] === 'sectors' && method === 'GET') {
         const report = await dash.getDashboard({ universe: 'nifty50', limit: 100 });
@@ -285,9 +301,11 @@ async function handleRequest(request, env = {}, _ctx = null) {
         });
         return json({
           ...report,
-          mode: 'demo',
-          warning: 'Cloudflare free tier: Equity Markets uses demo quotes. F&O terminal uses live Dhan/NSE when connected.',
           runtime: 'cloudflare',
+          warning: report.warning
+            || (report.mode === 'demo'
+              ? 'Connect Dhan (More → Dhan API) for live equity LTPs on Cloudflare.'
+              : undefined),
         });
       }
     }
