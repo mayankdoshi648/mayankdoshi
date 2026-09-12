@@ -9,7 +9,7 @@ It is now fixed in the repo: **`npm run build` creates `dist/worker.js`**.
 
 ## Paste these Builds settings
 
-**Workers & Pages → powerbullpro → Settings → Builds**
+**Workers & Pages → mayankdoshi → Settings → Builds**
 
 | Field | Value |
 |--------|--------|
@@ -26,7 +26,7 @@ Save → **Deployments → Retry deployment**.
 npx wrangler pages deploy
 ```
 
-That is for Pages. This project is Worker **`powerbullpro`**.
+That is for Pages. This project is Worker **`mayankdoshi`**.
 
 ## What each command does
 

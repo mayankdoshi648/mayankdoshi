@@ -4,7 +4,7 @@ PowerBull Pro can run **without Render** on Cloudflare’s free tier.
 
 ## Recommended path (matches your existing project)
 
-You already have Workers Builds project **`powerbullpro`**. Use **Worker + Assets** (not Pages `wrangler pages deploy`).
+You already have Workers Builds project **`mayankdoshi`**. Use **Worker + Assets** (not Pages `wrangler pages deploy`).
 
 ### Dashboard → Settings → Builds
 
@@ -29,7 +29,7 @@ See also [`cloudflare-deploy-fix.md`](./cloudflare-deploy-fix.md).
 
 Permanent URL after green deploy:
 
-`https://powerbullpro.<your-subdomain>.workers.dev`  
+`https://mayankdoshi.<your-subdomain>.workers.dev`  
 (or the workers.dev / custom domain shown on the project Overview)
 
 ### Secrets (Settings → Variables and Secrets)
@@ -48,7 +48,7 @@ Redeploy once after saving secrets.
 ## Architecture
 
 ```
-USER → https://powerbullpro….workers.dev
+USER → https://mayankdoshi….workers.dev
          ↓
    Cloudflare Worker
       ↙           ↘
