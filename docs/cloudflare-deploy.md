@@ -4,7 +4,7 @@ PowerBull Pro can run **without Render** on Cloudflare’s free tier.
 
 ## Recommended path (matches your existing project)
 
-You already have Workers Builds project **`powerbullpro`**. Use **Worker + Assets** (not Pages `wrangler pages deploy`).
+You already have Workers Builds project **`mayankdoshi`**. Use **Worker + Assets** (not Pages `wrangler pages deploy`).
 
 ### Dashboard → Settings → Builds
 
@@ -12,13 +12,16 @@ Set **exactly**:
 
 | Field | Value |
 |-------|--------|
-| **Build command** | `npm ci && npm run build:cloudflare` |
+| **Production branch** | `master` |
+| **Build command** | `npm ci && npm run build` |
 | **Deploy command** | `npm run deploy` |
+| **Version command** | `npm run deploy:version` |
 | Root directory | `/` |
 
 > **This is the CI fix.**  
-> Deploy command **must** be `npm run deploy` (runs `wrangler deploy`).  
-> If it is still `npx wrangler pages deploy …`, every build fails with `Failed: error occurred while running deploy command` — that command is for Pages, but `powerbullpro` is a **Worker**.
+> - `npm run build` now writes `dist/worker.js` (required entry point).  
+> - Deploy **must** be `npm run deploy` — never `wrangler pages deploy`.  
+> - Production branch **must** be `master` (not `main`), or every push uses the Version command.
 
 Then **Save** → **Deployments** → **Retry deployment**.
 
@@ -26,7 +29,7 @@ See also [`cloudflare-deploy-fix.md`](./cloudflare-deploy-fix.md).
 
 Permanent URL after green deploy:
 
-`https://powerbullpro.<your-subdomain>.workers.dev`  
+`https://mayankdoshi.<your-subdomain>.workers.dev`  
 (or the workers.dev / custom domain shown on the project Overview)
 
 ### Secrets (Settings → Variables and Secrets)
@@ -45,7 +48,7 @@ Redeploy once after saving secrets.
 ## Architecture
 
 ```
-USER → https://powerbullpro….workers.dev
+USER → https://mayankdoshi….workers.dev
          ↓
    Cloudflare Worker
       ↙           ↘

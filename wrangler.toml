@@ -1,10 +1,12 @@
 # Cloudflare Worker + Assets — free permanent host for PowerBull Pro
 #
-# Workers Builds (Dashboard → Settings → Builds) MUST use:
-#   Build command:  npm ci && npm run build:cloudflare
-#   Deploy command: npm run deploy
+# Workers Builds → mayankdoshi → Settings → Builds (paste EXACTLY):
+#   Build command:     npm ci && npm run build
+#   Deploy command:    npm run deploy
+#   Version command:   npm run deploy:version
+#   Production branch: master
 #
-# Do NOT use `wrangler pages deploy` — this project is a Worker, not Pages.
+# Do NOT use `wrangler pages deploy`.
 #
 # Secrets (Settings → Variables and Secrets → Production):
 #   SESSION_SECRET       (Secret) required — encrypts per-browser Dhan cookies
@@ -14,7 +16,7 @@
 #   DEMO_MODE            (Plain)  default false
 #   FNO_FORCE_MOCK       (Plain)  leave unset for live
 
-name = "powerbullpro"
+name = "mayankdoshi"
 main = "dist/worker.js"
 compatibility_date = "2024-11-12"
 compatibility_flags = ["nodejs_compat"]
