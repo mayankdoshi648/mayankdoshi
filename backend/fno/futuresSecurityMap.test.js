@@ -7,6 +7,8 @@ const {
   toQuoteRequests,
   pickFrontMonth,
   FUT_SYMBOL_RE,
+  loadFuturesSecurityMap,
+  clearFuturesSecurityMapCache,
 } = require('./futuresSecurityMap');
 
 const SAMPLE_CSV = [
@@ -56,5 +58,22 @@ describe('futuresSecurityMap', () => {
       { expiryMs: Date.parse('2026-09-29T00:00:00Z'), expiryFlag: 'M', securityId: 2 },
     ], Date.parse('2026-09-11T00:00:00Z'));
     assert.equal(picked.securityId, 2);
+  });
+
+  it('uses bundled map on Cloudflare runtime without network', async () => {
+    const prev = process.env.POWERBULL_RUNTIME;
+    process.env.POWERBULL_RUNTIME = 'cloudflare';
+    clearFuturesSecurityMapCache();
+    let fetched = false;
+    const fetchImpl = async () => {
+      fetched = true;
+      throw new Error('network should not be used on Cloudflare');
+    };
+    const map = await loadFuturesSecurityMap(['NIFTY', 'RELIANCE'], fetchImpl);
+    assert.equal(fetched, false);
+    assert.ok(map.get('NIFTY')?.securityId);
+    assert.ok(map.get('RELIANCE')?.securityId);
+    process.env.POWERBULL_RUNTIME = prev;
+    clearFuturesSecurityMapCache();
   });
 });

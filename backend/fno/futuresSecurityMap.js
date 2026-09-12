@@ -3,6 +3,11 @@
 /**
  * Resolve NSE F&O futures security ids from Dhan's public scrip master.
  * Trading symbols look like: RELIANCE-Sep2026-FUT, BAJAJ-AUTO-Oct2026-FUT, NIFTY-Sep2026-FUT.
+ *
+ * Cloudflare Workers cannot reliably download+parse the ~25MB scrip master
+ * (CPU/memory limits) — that made Hybrid fall back to mock F&O prices.
+ * We ship a compact bundled map and only optionally refresh from network
+ * outside Cloudflare.
  */
 
 const DHAN_SCRIP_MASTER_URL = 'https://images.dhan.co/api-data/api-scrip-master.csv';
@@ -10,8 +15,31 @@ const FETCH_TIMEOUT_MS = 60_000;
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const FUT_SYMBOL_RE = /^(.+)-([A-Za-z]{3}\d{4})-FUT$/;
 
-/** @type {{ at: number, map: Map<string, object> } | null} */
+/** @type {{ at: number, map: Map<string, object>, source: string } | null} */
 let cache = null;
+
+/** @type {Map<string, object>|null} */
+let bundledMap = null;
+
+function loadBundledMap() {
+  if (bundledMap) return bundledMap;
+  try {
+    // eslint-disable-next-line import/no-unresolved, global-require
+    const json = require('./data/futuresSecurityIds.json');
+    const underlyings = json.underlyings || json.symbols || {};
+    bundledMap = new Map(
+      Object.entries(underlyings).map(([symbol, row]) => [String(symbol).toUpperCase(), row]),
+    );
+  } catch {
+    bundledMap = new Map();
+  }
+  return bundledMap;
+}
+
+function isCloudflareRuntime() {
+  const rt = String(process.env.POWERBULL_RUNTIME || '').toLowerCase();
+  return rt === 'cloudflare' || rt === 'cloudflare-pages' || rt === 'workerd';
+}
 
 function parseExpiryDate(value) {
   if (!value) return null;
@@ -31,7 +59,12 @@ function pickFrontMonth(contracts, asOfMs) {
     .sort((a, b) => a.expiryMs - b.expiryMs || Number(a.securityId) - Number(b.securityId));
 
   const monthly = upcoming.filter((c) => c.expiryFlag === 'M');
-  return (monthly[0] || upcoming[0] || null);
+  return monthly[0] || upcoming[0] || null;
+}
+
+function isFuturesInstrument(name) {
+  const n = String(name || '').toUpperCase();
+  return n === 'FUTSTK' || n === 'FUTIDX';
 }
 
 /**
@@ -73,7 +106,7 @@ function parseFuturesSecurityMap(csvText, { asOf = new Date(), symbols = null } 
     if (cols[idx.exch] !== 'NSE' || cols[idx.seg] !== 'D') continue;
 
     const instrument = cols[idx.instrument];
-    if (instrument !== 'FUTSTK' && instrument !== 'FUTIDX') continue;
+    if (!isFuturesInstrument(instrument)) continue;
 
     const tradingSymbol = cols[idx.tradingSymbol] || '';
     const match = FUT_SYMBOL_RE.exec(tradingSymbol);
@@ -125,36 +158,56 @@ async function fetchScripMaster(fetchImpl = fetch) {
   return resp.text();
 }
 
-/**
- * Load (and cache) front-month futures security ids for the requested symbols.
- * @param {Iterable<string>} symbols
- * @param {typeof fetch} [fetchImpl]
- * @param {object} [options]
- * @param {boolean} [options.forceRefresh]
- * @param {Date} [options.asOf]
- */
-async function loadFuturesSecurityMap(symbols, fetchImpl = fetch, options = {}) {
-  const want = [...symbols].map((s) => String(s).toUpperCase());
-  const now = Date.now();
-  if (!options.forceRefresh && cache && now - cache.at < CACHE_TTL_MS) {
-    const filtered = new Map();
-    for (const sym of want) {
-      const hit = cache.map.get(sym);
-      if (hit) filtered.set(sym, hit);
-    }
-    return filtered;
-  }
-
-  const csv = await fetchScripMaster(fetchImpl);
-  const full = parseFuturesSecurityMap(csv, { asOf: options.asOf || new Date() });
-  cache = { at: now, map: full };
-
+function filterMap(full, want) {
   const filtered = new Map();
   for (const sym of want) {
     const hit = full.get(sym);
     if (hit) filtered.set(sym, hit);
   }
   return filtered;
+}
+
+/**
+ * Load front-month futures security ids for the requested symbols.
+ * Prefer the bundled compact map on Cloudflare (and as network fallback).
+ *
+ * @param {Iterable<string>} symbols
+ * @param {typeof fetch} [fetchImpl]
+ * @param {object} [options]
+ * @param {boolean} [options.forceRefresh] - attempt network refresh (ignored on CF)
+ * @param {Date} [options.asOf]
+ * @param {boolean} [options.allowNetwork]
+ */
+async function loadFuturesSecurityMap(symbols, fetchImpl = fetch, options = {}) {
+  const want = [...symbols].map((s) => String(s).toUpperCase());
+  const now = Date.now();
+
+  if (!options.forceRefresh && cache && now - cache.at < CACHE_TTL_MS) {
+    return filterMap(cache.map, want);
+  }
+
+  const allowNetwork = options.allowNetwork === true
+    || process.env.FNO_REFRESH_SECURITY_MAP === '1'
+    || (options.forceRefresh && !isCloudflareRuntime());
+
+  // Cloudflare (and default path): use bundled map — never pull 25MB CSV in-worker.
+  if (isCloudflareRuntime() || !allowNetwork) {
+    const bundled = loadBundledMap();
+    cache = { at: now, map: bundled, source: 'bundled' };
+    return filterMap(bundled, want);
+  }
+
+  try {
+    const csv = await fetchScripMaster(fetchImpl);
+    const full = parseFuturesSecurityMap(csv, { asOf: options.asOf || new Date() });
+    cache = { at: now, map: full, source: 'network' };
+    return filterMap(full, want);
+  } catch (err) {
+    const bundled = loadBundledMap();
+    if (!bundled.size) throw err;
+    cache = { at: now, map: bundled, source: `bundled-fallback:${err.message}` };
+    return filterMap(bundled, want);
+  }
 }
 
 function clearFuturesSecurityMapCache() {
@@ -189,4 +242,6 @@ module.exports = {
   clearFuturesSecurityMapCache,
   toQuoteRequests,
   pickFrontMonth,
+  loadBundledMap,
+  isCloudflareRuntime,
 };

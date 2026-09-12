@@ -1,0 +1,721 @@
+{
+  "asOf": "2026-09-12T07:29:51.803Z",
+  "source": "https://images.dhan.co/api-data/api-scrip-master.csv",
+  "count": 102,
+  "underlyings": {
+    "BANKNIFTY": {
+      "securityId": 68390,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTIDX",
+      "tradingSymbol": "BANKNIFTY-Sep2026-FUT"
+    },
+    "FINNIFTY": {
+      "securityId": 68391,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTIDX",
+      "tradingSymbol": "FINNIFTY-Sep2026-FUT"
+    },
+    "MIDCPNIFTY": {
+      "securityId": 68406,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTIDX",
+      "tradingSymbol": "MIDCPNIFTY-Sep2026-FUT"
+    },
+    "NIFTY": {
+      "securityId": 68407,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTIDX",
+      "tradingSymbol": "NIFTY-Sep2026-FUT"
+    },
+    "ABB": {
+      "securityId": 68414,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "ABB-Sep2026-FUT"
+    },
+    "ADANIGREEN": {
+      "securityId": 68418,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "ADANIGREEN-Sep2026-FUT"
+    },
+    "ADANIPORTS": {
+      "securityId": 68419,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "ADANIPORTS-Sep2026-FUT"
+    },
+    "ALKEM": {
+      "securityId": 68421,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "ALKEM-Sep2026-FUT"
+    },
+    "AMBUJACEM": {
+      "securityId": 68423,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "AMBUJACEM-Sep2026-FUT"
+    },
+    "ASHOKLEY": {
+      "securityId": 68427,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "ASHOKLEY-Sep2026-FUT"
+    },
+    "AUROPHARMA": {
+      "securityId": 68433,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "AUROPHARMA-Sep2026-FUT"
+    },
+    "AXISBANK": {
+      "securityId": 68434,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "AXISBANK-Sep2026-FUT"
+    },
+    "BAJAJ-AUTO": {
+      "securityId": 68435,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "BAJAJ-AUTO-Sep2026-FUT"
+    },
+    "BAJAJFINSV": {
+      "securityId": 68436,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "BAJAJFINSV-Sep2026-FUT"
+    },
+    "BAJFINANCE": {
+      "securityId": 68442,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "BAJFINANCE-Sep2026-FUT"
+    },
+    "BANDHANBNK": {
+      "securityId": 68443,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "BANDHANBNK-Sep2026-FUT"
+    },
+    "BANKBARODA": {
+      "securityId": 68444,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "BANKBARODA-Sep2026-FUT"
+    },
+    "BHARATFORG": {
+      "securityId": 68448,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "BHARATFORG-Sep2026-FUT"
+    },
+    "BHARTIARTL": {
+      "securityId": 68449,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "BHARTIARTL-Sep2026-FUT"
+    },
+    "BIOCON": {
+      "securityId": 68451,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "BIOCON-Sep2026-FUT"
+    },
+    "BPCL": {
+      "securityId": 68454,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "BPCL-Sep2026-FUT"
+    },
+    "BRITANNIA": {
+      "securityId": 68455,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "BRITANNIA-Sep2026-FUT"
+    },
+    "CANBK": {
+      "securityId": 68458,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "CANBK-Sep2026-FUT"
+    },
+    "CHOLAFIN": {
+      "securityId": 68461,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "CHOLAFIN-Sep2026-FUT"
+    },
+    "CIPLA": {
+      "securityId": 68462,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "CIPLA-Sep2026-FUT"
+    },
+    "COFORGE": {
+      "securityId": 68465,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "COFORGE-Sep2026-FUT"
+    },
+    "COLPAL": {
+      "securityId": 68466,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "COLPAL-Sep2026-FUT"
+    },
+    "CROMPTON": {
+      "securityId": 68468,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "CROMPTON-Sep2026-FUT"
+    },
+    "DABUR": {
+      "securityId": 68470,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "DABUR-Sep2026-FUT"
+    },
+    "DIVISLAB": {
+      "securityId": 68472,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "DIVISLAB-Sep2026-FUT"
+    },
+    "DIXON": {
+      "securityId": 68473,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "DIXON-Sep2026-FUT"
+    },
+    "DLF": {
+      "securityId": 68474,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "DLF-Sep2026-FUT"
+    },
+    "DRREDDY": {
+      "securityId": 68476,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "DRREDDY-Sep2026-FUT"
+    },
+    "EICHERMOT": {
+      "securityId": 68477,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "EICHERMOT-Sep2026-FUT"
+    },
+    "FEDERALBNK": {
+      "securityId": 68479,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "FEDERALBNK-Sep2026-FUT"
+    },
+    "GAIL": {
+      "securityId": 68482,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "GAIL-Sep2026-FUT"
+    },
+    "GODREJCP": {
+      "securityId": 68486,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "GODREJCP-Sep2026-FUT"
+    },
+    "GODREJPROP": {
+      "securityId": 68487,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "GODREJPROP-Sep2026-FUT"
+    },
+    "GRASIM": {
+      "securityId": 68488,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "GRASIM-Sep2026-FUT"
+    },
+    "HAVELLS": {
+      "securityId": 68491,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "HAVELLS-Sep2026-FUT"
+    },
+    "HCLTECH": {
+      "securityId": 68520,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "HCLTECH-Sep2026-FUT"
+    },
+    "HDFCBANK": {
+      "securityId": 68534,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "HDFCBANK-Sep2026-FUT"
+    },
+    "HDFCLIFE": {
+      "securityId": 68535,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "HDFCLIFE-Sep2026-FUT"
+    },
+    "HEROMOTOCO": {
+      "securityId": 68536,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "HEROMOTOCO-Sep2026-FUT"
+    },
+    "HINDALCO": {
+      "securityId": 68537,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "HINDALCO-Sep2026-FUT"
+    },
+    "HINDUNILVR": {
+      "securityId": 68539,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "HINDUNILVR-Sep2026-FUT"
+    },
+    "ICICIBANK": {
+      "securityId": 68542,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "ICICIBANK-Sep2026-FUT"
+    },
+    "ICICIPRULI": {
+      "securityId": 68544,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "ICICIPRULI-Sep2026-FUT"
+    },
+    "IDEA": {
+      "securityId": 68545,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "IDEA-Sep2026-FUT"
+    },
+    "IDFCFIRSTB": {
+      "securityId": 68546,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "IDFCFIRSTB-Sep2026-FUT"
+    },
+    "INDUSINDBK": {
+      "securityId": 68551,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "INDUSINDBK-Sep2026-FUT"
+    },
+    "INDUSTOWER": {
+      "securityId": 68552,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "INDUSTOWER-Sep2026-FUT"
+    },
+    "INFY": {
+      "securityId": 68553,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "INFY-Sep2026-FUT"
+    },
+    "IOC": {
+      "securityId": 68555,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "IOC-Sep2026-FUT"
+    },
+    "ITC": {
+      "securityId": 68558,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "ITC-Sep2026-FUT"
+    },
+    "JINDALSTEL": {
+      "securityId": 68559,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "JINDALSTEL-Sep2026-FUT"
+    },
+    "JSWSTEEL": {
+      "securityId": 68564,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "JSWSTEEL-Sep2026-FUT"
+    },
+    "KOTAKBANK": {
+      "securityId": 68610,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "KOTAKBANK-Sep2026-FUT"
+    },
+    "LICHSGFIN": {
+      "securityId": 68613,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "LICHSGFIN-Sep2026-FUT"
+    },
+    "LT": {
+      "securityId": 68620,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "LT-Sep2026-FUT"
+    },
+    "LUPIN": {
+      "securityId": 68645,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "LUPIN-Sep2026-FUT"
+    },
+    "M&M": {
+      "securityId": 68646,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "M&M-Sep2026-FUT"
+    },
+    "MARICO": {
+      "securityId": 68649,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "MARICO-Sep2026-FUT"
+    },
+    "MARUTI": {
+      "securityId": 68650,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "MARUTI-Sep2026-FUT"
+    },
+    "MPHASIS": {
+      "securityId": 68736,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "MPHASIS-Sep2026-FUT"
+    },
+    "MUTHOOTFIN": {
+      "securityId": 68737,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "MUTHOOTFIN-Sep2026-FUT"
+    },
+    "NATIONALUM": {
+      "securityId": 68741,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "NATIONALUM-Sep2026-FUT"
+    },
+    "NESTLEIND": {
+      "securityId": 68744,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "NESTLEIND-Sep2026-FUT"
+    },
+    "NMDC": {
+      "securityId": 68748,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "NMDC-Sep2026-FUT"
+    },
+    "NTPC": {
+      "securityId": 68750,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "NTPC-Sep2026-FUT"
+    },
+    "OBEROIRLTY": {
+      "securityId": 68752,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "OBEROIRLTY-Sep2026-FUT"
+    },
+    "ONGC": {
+      "securityId": 68755,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "ONGC-Sep2026-FUT"
+    },
+    "PERSISTENT": {
+      "securityId": 68759,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "PERSISTENT-Sep2026-FUT"
+    },
+    "PFC": {
+      "securityId": 68761,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "PFC-Sep2026-FUT"
+    },
+    "PHOENIXLTD": {
+      "securityId": 68763,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "PHOENIXLTD-Sep2026-FUT"
+    },
+    "PIDILITIND": {
+      "securityId": 68764,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "PIDILITIND-Sep2026-FUT"
+    },
+    "PNB": {
+      "securityId": 68766,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "PNB-Sep2026-FUT"
+    },
+    "POWERGRID": {
+      "securityId": 68770,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "POWERGRID-Sep2026-FUT"
+    },
+    "PRESTIGE": {
+      "securityId": 68773,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "PRESTIGE-Sep2026-FUT"
+    },
+    "RECLTD": {
+      "securityId": 68776,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "RECLTD-Sep2026-FUT"
+    },
+    "RELIANCE": {
+      "securityId": 68777,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "RELIANCE-Sep2026-FUT"
+    },
+    "SAIL": {
+      "securityId": 68779,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "SAIL-Sep2026-FUT"
+    },
+    "SBILIFE": {
+      "securityId": 68781,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "SBILIFE-Sep2026-FUT"
+    },
+    "SBIN": {
+      "securityId": 68782,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "SBIN-Sep2026-FUT"
+    },
+    "SHREECEM": {
+      "securityId": 68783,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "SHREECEM-Sep2026-FUT"
+    },
+    "SIEMENS": {
+      "securityId": 68785,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "SIEMENS-Sep2026-FUT"
+    },
+    "SRF": {
+      "securityId": 68788,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "SRF-Sep2026-FUT"
+    },
+    "SUNPHARMA": {
+      "securityId": 68789,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "SUNPHARMA-Sep2026-FUT"
+    },
+    "TATACONSUM": {
+      "securityId": 68793,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "TATACONSUM-Sep2026-FUT"
+    },
+    "TATAPOWER": {
+      "securityId": 68795,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "TATAPOWER-Sep2026-FUT"
+    },
+    "TATASTEEL": {
+      "securityId": 68796,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "TATASTEEL-Sep2026-FUT"
+    },
+    "TCS": {
+      "securityId": 68797,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "TCS-Sep2026-FUT"
+    },
+    "TECHM": {
+      "securityId": 68798,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "TECHM-Sep2026-FUT"
+    },
+    "TITAN": {
+      "securityId": 68800,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "TITAN-Sep2026-FUT"
+    },
+    "TORNTPHARM": {
+      "securityId": 68802,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "TORNTPHARM-Sep2026-FUT"
+    },
+    "TVSMOTOR": {
+      "securityId": 68804,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "TVSMOTOR-Sep2026-FUT"
+    },
+    "ULTRACEMCO": {
+      "securityId": 68805,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "ULTRACEMCO-Sep2026-FUT"
+    },
+    "UNIONBANK": {
+      "securityId": 68806,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "UNIONBANK-Sep2026-FUT"
+    },
+    "UPL": {
+      "securityId": 68863,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "UPL-Sep2026-FUT"
+    },
+    "VEDL": {
+      "securityId": 68865,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "VEDL-Sep2026-FUT"
+    },
+    "VOLTAS": {
+      "securityId": 68867,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "VOLTAS-Sep2026-FUT"
+    },
+    "WIPRO": {
+      "securityId": 68869,
+      "segment": "NSE_FNO",
+      "expiry": "2026-09-29 14:30:00",
+      "instrument": "FUTSTK",
+      "tradingSymbol": "WIPRO-Sep2026-FUT"
+    }
+  }
+}
