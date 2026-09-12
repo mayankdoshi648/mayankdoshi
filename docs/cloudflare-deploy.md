@@ -109,6 +109,7 @@ npx wrangler dev
 | `Project not found [8000007]` | Same — stop using `wrangler pages deploy` on this Worker |
 | Build OK, site 404 on `/api` | Confirm `npm run build:cloudflare` produces `dist/worker.js` |
 | MOCK banner | Add Dhan secrets or connect via More → Dhan API |
+| F&O scanner still mock while NSE is live | Merge/redeploy PR with bundled futures security ids (CF cannot parse Dhan’s 25MB scrip CSV) |
 | 401 from Dhan | Paste a fresh Access Token |
 
 ## Updating later
