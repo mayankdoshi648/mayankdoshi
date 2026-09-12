@@ -15,7 +15,7 @@ Static hosts (GitHub Pages / Vercel) cannot store Dhan secrets. For a **bookmark
 
 1. Follow **[`docs/cloudflare-deploy.md`](docs/cloudflare-deploy.md)**
 2. Set secrets: `SESSION_SECRET`, optional `DHAN_CLIENT_ID` + `DHAN_ACCESS_TOKEN`
-3. Share `https://powerbullpro.pages.dev` (or your project name) — **never put the access token in the URL**
+3. Share `https://mayankdoshi.<subdomain>.workers.dev` — **never put the access token in the URL**
 
 In-app: **More → Dhan API** or the header **connection pill** → Data Connections.
 
