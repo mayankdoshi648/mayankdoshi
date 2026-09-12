@@ -4,6 +4,10 @@
   "installCommand": "npm install --omit=dev",
   "buildCommand": "node -e \"console.log('Vercel: static frontend only (MOCK). Live F&O is on Cloudflare Workers.')\"",
   "outputDirectory": "frontend",
+  "ignoreCommand": "echo 'Skip Vercel auto-deploy (MOCK host). Live F&O is Cloudflare Workers.' && exit 1",
+  "git": {
+    "deploymentEnabled": false
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/$1" }
   ]

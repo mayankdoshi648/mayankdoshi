@@ -1,0 +1,60 @@
+# Deploy PowerBull Pro to Cloudflare Workers (live F&O + Dhan credential UI)
+#
+# One-time GitHub secrets (Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN   — Token with Workers Scripts:Edit + Account:Read
+#   CLOUDFLARE_ACCOUNT_ID  — Cloudflare account id (dashboard URL / Overview)
+#
+# One-time Cloudflare Worker secrets (Workers → mayankdoshi → Settings → Variables):
+#   SESSION_SECRET         — required (any long random string)
+#   DHAN_CLIENT_ID         — optional shared host Client ID
+#   DHAN_ACCESS_TOKEN      — optional shared host Access Token
+#
+# After green run, open:
+#   https://mayankdoshi.<your-subdomain>.workers.dev
+#   → More → Dhan API → paste Client ID + Access Token → Save & use live
+
+name: Deploy Cloudflare Workers (live)
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: cloudflare-workers-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build & deploy Worker
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build Worker bundle
+        run: npm run build
+
+      - name: Deploy to Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Missing GitHub secrets CLOUDFLARE_API_TOKEN and/or CLOUDFLARE_ACCOUNT_ID."
+            echo "Create a Cloudflare API token (Workers Scripts Edit + Account Read),"
+            echo "then add both secrets under Repo → Settings → Secrets → Actions."
+            exit 1
+          fi
+          npm run deploy
