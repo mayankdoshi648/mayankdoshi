@@ -91,23 +91,37 @@ class DhanProvider extends FoDataProvider {
 
   async _postJson(url, body, label) {
     const token = await this.ensureToken();
-    const resp = await this.fetchImpl(url, {
-      method: 'POST',
-      headers: this._headers(token),
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(25000),
-    });
-    if (!resp.ok) {
+    let lastErr;
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const resp = await this.fetchImpl(url, {
+        method: 'POST',
+        headers: this._headers(token),
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(25000),
+      });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json?.status && String(json.status).toLowerCase() === 'failure') {
+          const msg = json.remarks || json.message || 'status=failure';
+          if (/too many requests|\b805\b/i.test(String(msg)) && attempt < 3) {
+            await this.sleep(2000 * (2 ** attempt));
+            continue;
+          }
+          throw new Error(`Dhan ${label} failed: ${msg}`);
+        }
+        return json;
+      }
       const errBody = await resp.text().catch(() => '');
-      throw new Error(
+      lastErr = new Error(
         `Dhan ${label} failed: HTTP ${resp.status}${errBody ? ` ${errBody.slice(0, 160)}` : ''}`,
       );
+      if (resp.status === 429 && attempt < 3) {
+        await this.sleep(2000 * (2 ** attempt));
+        continue;
+      }
+      throw lastErr;
     }
-    const json = await resp.json();
-    if (json?.status && String(json.status).toLowerCase() === 'failure') {
-      throw new Error(`Dhan ${label} failed: ${json.remarks || json.message || 'status=failure'}`);
-    }
-    return json;
+    throw lastErr;
   }
 
   async getIndexQuotes(symbols = []) {

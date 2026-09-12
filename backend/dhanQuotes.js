@@ -3,6 +3,13 @@ const DHAN_OHLC_URL = 'https://api.dhan.co/v2/marketfeed/ohlc';
 const DHAN_QUOTE_URL = 'https://api.dhan.co/v2/marketfeed/quote';
 const DHAN_LTP_URL = 'https://api.dhan.co/v2/marketfeed/ltp';
 
+/** Dhan marketfeed is aggressively rate-limited (HTTP 429 / code 805). */
+const MIN_MARKETFEED_GAP_MS = 1200;
+const MAX_429_RETRIES = 3;
+
+let lastMarketfeedAt = 0;
+let marketfeedQueue = Promise.resolve();
+
 function chunk(arr, size) {
   const out = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
@@ -18,24 +25,65 @@ function authHeaders({ accessToken, clientId }) {
   };
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRateLimitError(err) {
+  const msg = String(err?.message || err || '');
+  return /\b429\b/.test(msg) || /too many requests/i.test(msg) || /\b805\b/.test(msg);
+}
+
+/**
+ * Serialize marketfeed calls and space them out so Cloudflare + UI polling
+ * do not trip Dhan's per-user rate limit.
+ */
+function enqueueMarketfeed(fn) {
+  const run = marketfeedQueue.then(async () => {
+    const wait = Math.max(0, MIN_MARKETFEED_GAP_MS - (Date.now() - lastMarketfeedAt));
+    if (wait > 0) await sleep(wait);
+    lastMarketfeedAt = Date.now();
+    return fn();
+  });
+  marketfeedQueue = run.catch(() => {});
+  return run;
+}
+
 async function postMarketFeed(url, { accessToken, clientId, securityIds, fetchImpl = fetch }) {
   const ids = securityIds.map((id) => Number(id) || id);
   const body = { NSE_EQ: ids };
-  const resp = await fetchImpl(url, {
-    method: 'POST',
-    headers: authHeaders({ accessToken, clientId }),
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(20000),
+
+  return enqueueMarketfeed(async () => {
+    let lastErr;
+    for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt += 1) {
+      const resp = await fetchImpl(url, {
+        method: 'POST',
+        headers: authHeaders({ accessToken, clientId }),
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(20000),
+      });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json.status && json.status !== 'success') {
+          const failed = new Error(`Dhan marketfeed status=${json.status}`);
+          if (isRateLimitError(JSON.stringify(json))) throw Object.assign(failed, { status: 429 });
+          throw failed;
+        }
+        return json.data?.NSE_EQ || {};
+      }
+      const text = await resp.text().catch(() => '');
+      lastErr = new Error(`Dhan marketfeed HTTP ${resp.status}: ${text.slice(0, 160)}`);
+      lastErr.status = resp.status;
+      if (resp.status === 429 && attempt < MAX_429_RETRIES) {
+        // 2s, 4s, 8s — give Dhan room before retrying
+        await sleep(2000 * (2 ** attempt));
+        lastMarketfeedAt = Date.now();
+        continue;
+      }
+      throw lastErr;
+    }
+    throw lastErr;
   });
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => '');
-    throw new Error(`Dhan marketfeed HTTP ${resp.status}: ${text.slice(0, 160)}`);
-  }
-  const json = await resp.json();
-  if (json.status && json.status !== 'success') {
-    throw new Error(`Dhan marketfeed status=${json.status}`);
-  }
-  return json.data?.NSE_EQ || {};
 }
 
 function normalizeQuote(securityId, raw) {
@@ -105,9 +153,11 @@ module.exports = {
   DHAN_OHLC_URL,
   DHAN_QUOTE_URL,
   DHAN_LTP_URL,
+  MIN_MARKETFEED_GAP_MS,
   chunk,
   normalizeQuote,
   fetchOhlcQuotes,
   fetchFullQuotes,
   postMarketFeed,
+  isRateLimitError,
 };

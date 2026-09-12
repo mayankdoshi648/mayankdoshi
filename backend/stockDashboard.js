@@ -2,7 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { fetchDhanDailyCandles } = require('./dhanHistorical');
-const { fetchOhlcQuotes, fetchFullQuotes } = require('./dhanQuotes');
+const { fetchOhlcQuotes, fetchFullQuotes, isRateLimitError } = require('./dhanQuotes');
 const { compute52WeekStats } = require('./week52');
 const { resolveDashboardUniverse, shortenSector, fetchIndexUniverse } = require('./sectorUniverse');
 
@@ -10,6 +10,8 @@ const CACHE_DIR = path.join(__dirname, '..', 'data');
 const CACHE_FILE = path.join(CACHE_DIR, 'dashboard-cache.json');
 const CACHE_VERSION = 2;
 const QUOTE_TTL_MS = 60 * 1000;
+/** Longer cache on CF / lite mode to avoid Dhan 429s. */
+const QUOTE_TTL_LITE_MS = 180 * 1000;
 const WEEK52_TTL_MS = 12 * 60 * 60 * 1000;
 
 const RANKINGS = ['gainers', 'losers', 'near52wHigh', 'near52wLow', 'volume', 'all'];
@@ -264,21 +266,33 @@ function createStockDashboard({
     const { accessToken } = await tokenManager.getAccessToken();
     const securityIds = instruments.map((i) => i.securityId);
 
+    // On Cloudflare (skipWeek52), use a single OHLC call — never full+ohlc fallback
+    // (that doubled traffic and triggered Dhan 429 / code 805).
     let quotes;
-    try {
-      quotes = await fetchFullQuotes({
-        accessToken,
-        clientId: config.clientId,
-        securityIds,
-        fetchImpl,
-      });
-    } catch {
+    if (skipWeek52) {
       quotes = await fetchOhlcQuotes({
         accessToken,
         clientId: config.clientId,
         securityIds,
         fetchImpl,
       });
+    } else {
+      try {
+        quotes = await fetchFullQuotes({
+          accessToken,
+          clientId: config.clientId,
+          securityIds,
+          fetchImpl,
+        });
+      } catch (err) {
+        if (isRateLimitError(err)) throw err;
+        quotes = await fetchOhlcQuotes({
+          accessToken,
+          clientId: config.clientId,
+          securityIds,
+          fetchImpl,
+        });
+      }
     }
 
     const week52List = skipWeek52
@@ -381,6 +395,17 @@ function createStockDashboard({
         memoryCache = { payload, at: Date.now(), universe };
         writeDiskCache(memoryCache);
         return payload;
+      } catch (err) {
+        // On Dhan 429, keep serving last good payload instead of hard-failing the UI.
+        const cached = getCached(universe);
+        if (cached?.payload && isRateLimitError(err)) {
+          return {
+            ...cached.payload,
+            warning: `Dhan rate-limited (429). Showing last cached quotes. ${err.message}`.slice(0, 240),
+            stale: true,
+          };
+        }
+        throw err;
       } finally {
         refreshInflight = null;
       }
@@ -416,7 +441,8 @@ function createStockDashboard({
     }
 
     const cached = getCached(universe);
-    const fresh = cached && Date.now() - cached.at < QUOTE_TTL_MS;
+    const ttl = skipWeek52 ? QUOTE_TTL_LITE_MS : QUOTE_TTL_MS;
+    const fresh = cached && Date.now() - cached.at < ttl;
     let payload;
 
     if (!force && fresh) {
