@@ -105,3 +105,11 @@ Never commit `.env`. Access tokens are never returned by `GET /api/fno/credentia
 - Missing / unavailable fields stay `null` — never fabricated as live
 - Mock responses always set `meta.isMock: true` and UI banner
 - Shareable URL identifies the **app**, never the Dhan token
+
+## Workshop learning resources
+
+Curated study plan, GitHub repos, PDFs, and week-by-week notebook schedule for the Data Workshop & Algo Trading curriculum:
+
+- [docs/LEARNING_RESOURCES.md](docs/LEARNING_RESOURCES.md) — full curriculum map
+- [workshop/](workshop/) — Week 0 Python scripts (Fyers / Firstock / yfinance Nifty fetch)
+
