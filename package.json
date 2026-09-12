@@ -7,6 +7,7 @@
     "start": "node backend/server.js",
     "build": "node -e \"console.log('Static frontend — no compile step (output: frontend/)')\"",
     "build:cloudflare": "node scripts/build-cloudflare.mjs",
+    "deploy:cloudflare": "bash scripts/cloudflare-deploy.sh",
     "test": "node --test --test-timeout=30000 'backend/**/*.test.js'",
     "darvax:scan": "node scripts/darvax-scan.js",
     "universe:build": "node scripts/build-universe.js",

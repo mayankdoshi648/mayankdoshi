@@ -7503,4 +7503,4 @@ var require_entry = __commonJS({
 });
 const __powerbullEntry = require_entry();
 export const onRequest = __powerbullEntry.onRequest;
-export default __powerbullEntry;
+export default __powerbullEntry.default || { onRequest: __powerbullEntry.onRequest };
