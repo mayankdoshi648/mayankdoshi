@@ -1,12 +1,12 @@
 # Cloudflare Worker + Assets — free permanent host for PowerBull Pro
 #
-# Workers Builds → Settings → Builds (paste EXACTLY):
+# Workers Builds → mayankdoshi → Settings → Builds (paste EXACTLY):
 #   Build command:     npm ci && npm run build
 #   Deploy command:    npm run deploy
 #   Version command:   npm run deploy:version
 #   Production branch: master
 #
-# Do NOT use `wrangler pages deploy` — this is a Worker project named powerbullpro.
+# Do NOT use `wrangler pages deploy`.
 #
 # Secrets (Settings → Variables and Secrets → Production):
 #   SESSION_SECRET       (Secret) required — encrypts per-browser Dhan cookies

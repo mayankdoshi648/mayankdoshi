@@ -90,7 +90,7 @@ function assertSetupAllowed(request, env, body) {
 function applyEnv(env, session) {
   process.env.POWERBULL_RUNTIME = 'cloudflare';
   process.env.POWERBULL_OI_MEMORY_ONLY = '1';
-  process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+  // NODE_ENV is compile-time defined by esbuild; do not assign to it.
   process.env.DEMO_MODE = String(env.DEMO_MODE || 'false');
   process.env.FNO_FORCE_MOCK = env.FNO_FORCE_MOCK || process.env.FNO_FORCE_MOCK || '';
   process.env.DHAN_API_BASE = env.DHAN_API_BASE || 'https://api.dhan.co';

@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 /**
  * Cloudflare Workers Builds deploy entry.
- * Dashboard Deploy command: npm run deploy
- * Dashboard Version command: npm run deploy:version
  *
- * Always rebuilds dist/worker.js first so Deploy never fails with a missing entry point
- * (Workers Builds sometimes runs `npm run build` which previously was a no-op).
+ * Dashboard (Workers → mayankdoshi → Settings → Builds):
+ *   Build command:   npm ci && npm run build
+ *   Deploy command:  npm run deploy
+ *   Version command: npm run deploy:version
+ *   Production branch: master
+ *
+ * Always rebuilds dist/worker.js, then uploads with --no-bundle
+ * (esbuild already bundled; Wrangler re-bundle breaks on process.env.NODE_ENV).
  */
 
 import { spawnSync } from 'node:child_process';
@@ -26,8 +30,12 @@ function run(command, args) {
     env: process.env,
     shell: process.platform === 'win32',
   });
-  if (result.error) throw result.error;
+  if (result.error) {
+    console.error(result.error);
+    process.exit(1);
+  }
   if (result.status !== 0) {
+    console.error(`ERROR: command failed with exit code ${result.status}`);
     process.exit(result.status || 1);
   }
 }
@@ -36,32 +44,41 @@ console.log('==> PowerBull Cloudflare deploy');
 console.log(`    mode=${mode}`);
 console.log(`    pwd=${root}`);
 console.log(`    WORKERS_CI=${process.env.WORKERS_CI || ''}`);
+console.log(`    WRANGLER_CI_OVERRIDE_NAME=${process.env.WRANGLER_CI_OVERRIDE_NAME || ''}`);
 console.log(`    CI=${process.env.CI || ''}`);
 console.log(`    node=${process.version}`);
 
-run('npm', ['run', 'build:cloudflare']);
+run('npm', ['run', 'build']);
 
 if (!fs.existsSync(workerPath)) {
-  console.error('ERROR: dist/worker.js missing after build:cloudflare');
+  console.error('ERROR: dist/worker.js missing after npm run build');
+  try {
+    console.error('dist listing:', fs.readdirSync(path.join(root, 'dist')));
+  } catch {
+    console.error('dist/ directory does not exist');
+  }
   process.exit(1);
 }
 console.log(`==> dist/worker.js ready (${fs.statSync(workerPath).size} bytes)`);
-console.log('==> wrangler.toml name/main:');
+
 const toml = fs.readFileSync(path.join(root, 'wrangler.toml'), 'utf8');
 for (const line of toml.split('\n')) {
-  if (/^\s*(name|main)\s*=/.test(line)) console.log(`    ${line.trim()}`);
+  if (/^\s*(name|main)\s*=/.test(line)) console.log(`    wrangler: ${line.trim()}`);
 }
 
 const wranglerBin = path.join(root, 'node_modules', '.bin', 'wrangler');
-const wranglerCmd = fs.existsSync(wranglerBin) ? wranglerBin : 'npx';
-const wranglerArgs = fs.existsSync(wranglerBin)
-  ? []
-  : ['--yes', 'wrangler@4'];
+const useLocal = fs.existsSync(wranglerBin);
+const cmd = useLocal ? wranglerBin : 'npx';
+const prefix = useLocal ? [] : ['--yes', 'wrangler@4'];
 
-if (mode === 'version') {
-  run(wranglerCmd, [...wranglerArgs, 'versions', 'upload', '--config', 'wrangler.toml']);
-} else {
-  run(wranglerCmd, [...wranglerArgs, 'deploy', '--config', 'wrangler.toml']);
-}
+// --no-bundle: upload our esbuild output as-is (avoids Wrangler define/NODE_ENV breakage)
+const wranglerArgs = [
+  ...prefix,
+  ...(mode === 'version' ? ['versions', 'upload'] : ['deploy']),
+  '--config',
+  'wrangler.toml',
+  '--no-bundle',
+];
 
+run(cmd, wranglerArgs);
 console.log('==> Cloudflare deploy finished OK');
