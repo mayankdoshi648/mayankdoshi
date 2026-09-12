@@ -1,0 +1,22 @@
+{
+  "name": "cas-expiry-intelligence",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone CAS & Expiry Intelligence Terminal for NIFTY and BANK NIFTY \u2014 analytics only, no order execution.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev:api & npm run dev:web",
+    "dev:api": "npm run dev -w @cas/api",
+    "dev:web": "npm run dev -w @cas/web",
+    "build": "npm run build -w @cas/shared && npm run build -w @cas/api && npm run build -w @cas/web",
+    "test": "npm run test -w @cas/shared && npm run test -w @cas/api",
+    "lint": "npm run lint -w @cas/shared && npm run lint -w @cas/api && npm run lint -w @cas/web",
+    "typecheck": "npm run typecheck -w @cas/shared && npm run typecheck -w @cas/api && npm run typecheck -w @cas/web"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
