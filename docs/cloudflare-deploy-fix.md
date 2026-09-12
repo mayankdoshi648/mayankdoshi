@@ -2,7 +2,7 @@
 
 ## Why it fails
 
-Your Git project **`mayankdoshipowerbullpro` is a Worker** (Workers Builds).
+Your Git project **`powerbullpro` is a Worker** (Workers Builds).
 
 If **Deploy command** is still:
 
@@ -16,7 +16,7 @@ deploy **always** fails. That command is only for Pages projects.
 
 Open:
 
-**Workers & Pages → mayankdoshipowerbullpro → Settings → Builds**
+**Workers & Pages → powerbullpro → Settings → Builds**
 
 Set:
 

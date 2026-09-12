@@ -14,7 +14,7 @@
 #   DEMO_MODE            (Plain)  default false
 #   FNO_FORCE_MOCK       (Plain)  leave unset for live
 
-name = "mayankdoshipowerbullpro"
+name = "powerbullpro"
 main = "dist/worker.js"
 compatibility_date = "2024-11-12"
 compatibility_flags = ["nodejs_compat"]
