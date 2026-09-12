@@ -27,19 +27,23 @@ If a feature exceeds Workers CPU time on the free plan (rare; heavy scanner cold
 
 ## One-time Cloudflare setup
 
+> **Critical:** create a **Pages** project, not a Worker.  
+> If the form shows **Deploy command** (and no **Build output directory**), you are on the Workers path — that will fail with `error occurred while running deploy command`. Go back and choose **Pages → Connect to Git**.
+
 1. Push this repo to GitHub (already done for `mayankdoshi648/mayankdoshi`).
-2. Open [Cloudflare Dashboard](https://dash.cloudflare.com) → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**.
+2. Open [Cloudflare Dashboard](https://dash.cloudflare.com) → **Workers & Pages** → **Create application** → **Pages** → **Import an existing Git repository** (or **Connect to Git**).
 3. Select the repository. Configure:
 
 | Field | Value |
 |-------|--------|
-| Framework preset | None |
+| Framework preset | **None** |
 | Build command | `npm ci && npm run build:cloudflare` |
-| Build output directory | `frontend` |
+| **Build output directory** | `frontend` |
 | Root directory | `/` (repo root) |
-| Node version | `22` (or `20+`) |
+| Node version | `22` (Environment variable `NODE_VERSION=22` if asked) |
+| Deploy command | **Do not set** — Pages has no Deploy command field |
 
-4. **Compatibility:** `wrangler.toml` sets `nodejs_compat` and `pages_build_output_dir = "frontend"`.
+4. **Compatibility:** `wrangler.toml` sets `nodejs_compat` and `pages_build_output_dir = "frontend"`. Pages Functions in `functions/` deploy automatically with the site.
 5. After first deploy, open **Settings → Environment variables** (Production):
 
 ### SECRET variables
@@ -112,6 +116,22 @@ npx wrangler pages dev frontend --compatibility-flags=nodejs_compat
 - [ ] Scanner / Smart Money / Opportunity / Playbook still render
 - [ ] GitHub Pages MOCK URL still works independently
 - [ ] No secrets committed to GitHub
+
+## Troubleshooting deploy failures
+
+| Symptom | Cause | Fix |
+|---------|--------|-----|
+| Build OK, **Deploying** fails: `error occurred while running deploy command` | Project was created as a **Worker** (form had **Deploy command**) | Delete that project. Recreate via **Pages → Connect to Git**. Use **Build output directory = `frontend`**. Leave Deploy command empty (field should not exist). |
+| `Project not found [code: 8000007]` | `wrangler pages deploy` against a Worker name | Same as above — need a real Pages project |
+| No **Build output directory** field | Wrong create wizard (Workers Builds) | Back out → **Create** → **Pages** → **Import existing Git repository** |
+| Build fails on `build:cloudflare` | Node too old / missing lockfile | Set `NODE_VERSION=22`; ensure `package-lock.json` is on `master` |
+
+### Delete the failed Worker project
+
+1. **Workers & Pages** → open `mayankdoshipowerbullpro`
+2. **Settings** → scroll to **Delete application / Delete project**
+3. Confirm delete
+4. Recreate as **Pages** using the table above (suggested name: `powerbullpro`)
 
 ## Troubleshooting Dhan / NSE
 
