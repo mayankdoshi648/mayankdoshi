@@ -874,6 +874,19 @@ html[data-theme="auto"] body {
   cursor: pointer;
 }
 
+.more-sheet-inner > a.more-link {
+  display: block;
+  text-align: left;
+  text-decoration: none;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  padding: 0.7rem 0.85rem;
+  font-family: var(--font);
+  font-size: 13px;
+  border-radius: var(--radius);
+}
+
 .more-sheet-inner > button[data-nav]:active {
   border-color: var(--accent);
 }

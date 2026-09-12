@@ -4,11 +4,21 @@ Professional **mobile-first Indian NSE F&O market intelligence terminal**, built
 
 ## Live demo (shareable · mobile)
 
+### App links (GitHub Pages · phone bookmarks)
+
+| App | Link | Mode |
+|-----|------|------|
+| **PowerBull Pro** (F&O terminal) | **https://mayankdoshi648.github.io/mayankdoshi/powerbull/** | Labeled **MOCK** |
+| **CAS & Expiry** | **https://mayankdoshi648.github.io/mayankdoshi/cas/** | Labeled **MOCK** |
+| **Market Breadth** | **https://mayankdoshi648.github.io/mayankdoshi/breadth/** | Labeled **MOCK** |
+| Root (same as PowerBull) | https://mayankdoshi648.github.io/mayankdoshi/ | Labeled **MOCK** |
+
+### Hosts
+
 | Host | Link | Mode |
 |------|------|------|
 | **Cloudflare Workers (preferred · free · live Dhan)** | Add GH secrets + run workflow — see [`docs/cloudflare-deploy.md`](docs/cloudflare-deploy.md) → `https://mayankdoshi.<subdomain>.workers.dev` | **Live F&O** — enter Client ID + Access Token in **More → Dhan API** |
-| **GitHub Pages** | **https://mayankdoshi648.github.io/mayankdoshi/** | Labeled **MOCK** static UI (cannot hold Dhan secrets) |
-| **CAS tool (mobile)** | **https://mayankdoshi648.github.io/mayankdoshi/cas/** | Labeled **MOCK** CAS & Expiry terminal (PWA) |
+| **GitHub Pages** | App links above | Labeled **MOCK** static UI (cannot hold Dhan secrets) |
 | Vercel | https://mayankdoshi.vercel.app | Labeled **MOCK** static UI (cannot hold Dhan secrets) |
 | Render blueprint | `render.yaml` (optional / paid) | Full Node + SQLite + equity WS |
 
