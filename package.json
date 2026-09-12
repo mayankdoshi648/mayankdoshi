@@ -7,6 +7,7 @@
     "start": "node backend/server.js",
     "build": "node -e \"console.log('Static frontend — no compile step (output: frontend/)')\"",
     "build:cloudflare": "node scripts/build-cloudflare.mjs",
+    "deploy": "bash scripts/cloudflare-deploy.sh",
     "deploy:cloudflare": "bash scripts/cloudflare-deploy.sh",
     "test": "node --test --test-timeout=30000 'backend/**/*.test.js'",
     "darvax:scan": "node scripts/darvax-scan.js",
@@ -24,6 +25,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "wrangler": "^4.131.1"
   }
 }

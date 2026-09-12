@@ -1,11 +1,12 @@
 # Cloudflare Worker + Assets — free permanent host for PowerBull Pro
 #
-# Matches the existing Workers Builds project connected to this GitHub repo.
-# Dashboard → Settings → Builds:
+# Workers Builds (Dashboard → Settings → Builds) MUST use:
 #   Build command:  npm ci && npm run build:cloudflare
-#   Deploy command: npx wrangler deploy
+#   Deploy command: npm run deploy
 #
-# Secrets (Settings → Variables):
+# Do NOT use `wrangler pages deploy` — this project is a Worker, not Pages.
+#
+# Secrets (Settings → Variables and Secrets → Production):
 #   SESSION_SECRET       (Secret) required — encrypts per-browser Dhan cookies
 #   DHAN_CLIENT_ID       (Secret) optional shared host Client ID
 #   DHAN_ACCESS_TOKEN    (Secret) optional shared host Access Token
@@ -13,7 +14,7 @@
 #   DEMO_MODE            (Plain)  default false
 #   FNO_FORCE_MOCK       (Plain)  leave unset for live
 
-name = "mayankdoshipowerbullpro"
+name = "powerbullpro"
 main = "dist/worker.js"
 compatibility_date = "2024-11-12"
 compatibility_flags = ["nodejs_compat"]
@@ -21,6 +22,3 @@ compatibility_flags = ["nodejs_compat"]
 [assets]
 directory = "frontend"
 binding = "ASSETS"
-# Run the Worker first so /api/* hits the F&O handler before static assets.
-run_worker_first = true
-not_found_handling = "single-page-application"
