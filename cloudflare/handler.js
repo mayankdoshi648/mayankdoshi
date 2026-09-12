@@ -16,6 +16,7 @@
 const { FnoService } = require('../backend/fno/service');
 const { createProvider } = require('../backend/fno/providers');
 const { createDataSourceManager } = require('../backend/dataSourceManager');
+const { getSharedDataSources, buildDataHealth, getMarketDataStore } = require('../backend/marketData');
 const { isMarketOpen } = require('../backend/marketWindow');
 const { createStockDashboard } = require('../backend/stockDashboard');
 const {
@@ -151,7 +152,7 @@ async function handleRequest(request, env = {}, _ctx = null) {
   const sealed = readCookie(request, COOKIE);
   const session = sealed ? await openCredentials(sealed, secret) : null;
   const config = applyEnv(env, session);
-  const dataSources = createDataSourceManager();
+    const dataSources = getSharedDataSources();
   dataSources.setWebsocket({
     connected: false,
     error: 'Equity WebSocket is Node-only; F&O uses REST on Cloudflare',
@@ -228,7 +229,23 @@ async function handleRequest(request, env = {}, _ctx = null) {
       });
     }
 
-    if (parts[0] === 'auth' && parts[1] === 'status' && method === 'GET') {
+    
+    if (parts[0] === 'data-health' && method === 'GET') {
+      const marketOpen = isMarketOpen();
+      const health = buildDataHealth({
+        dataSources,
+        hasDhan: config.hasDhan,
+        auth: {
+          authenticated: config.hasDhan,
+          authMode: config.hasDhan ? 'access_token' : null,
+        },
+        marketOpen,
+        runtime: 'cloudflare',
+      });
+      return json(health);
+    }
+
+if (parts[0] === 'auth' && parts[1] === 'status' && method === 'GET') {
       return json({
         hasCredentials: config.hasDhan,
         authenticated: config.hasDhan,

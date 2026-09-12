@@ -1,3 +1,4 @@
+const { getMarketDataStore } = require('./marketData');
 // backend/dhanQuotes.js — Dhan marketfeed LTP / OHLC / Quote helpers
 const DHAN_OHLC_URL = 'https://api.dhan.co/v2/marketfeed/ohlc';
 const DHAN_QUOTE_URL = 'https://api.dhan.co/v2/marketfeed/quote';
@@ -69,6 +70,7 @@ async function postMarketFeed(url, { accessToken, clientId, securityIds, fetchIm
           if (isRateLimitError(JSON.stringify(json))) throw Object.assign(failed, { status: 429 });
           throw failed;
         }
+        try { getMarketDataStore().recordDhan({ ok: true }); } catch (_) {}
         return json.data?.NSE_EQ || {};
       }
       const text = await resp.text().catch(() => '');
@@ -80,6 +82,13 @@ async function postMarketFeed(url, { accessToken, clientId, securityIds, fetchIm
         lastMarketfeedAt = Date.now();
         continue;
       }
+      try {
+        getMarketDataStore().recordDhan({
+          ok: false,
+          rateLimited: lastErr?.status === 429 || isRateLimitError(lastErr),
+          error: lastErr,
+        });
+      } catch (_) {}
       throw lastErr;
     }
     throw lastErr;
@@ -108,8 +117,8 @@ function normalizeQuote(securityId, raw) {
     high: Number.isFinite(high) ? high : null,
     low: Number.isFinite(low) ? low : null,
     prevClose: Number.isFinite(prevClose) ? prevClose : null,
-    change: netChange == null || !Number.isFinite(netChange) ? null : Math.round(netChange * 100) / 100,
-    changePct: changePct == null || !Number.isFinite(changePct) ? null : Math.round(changePct * 100) / 100,
+    change: netChange == null || !Number.isFinite(netChange) ? null : netChange,
+    changePct: changePct == null || !Number.isFinite(changePct) ? null : changePct,
     volume: raw.volume != null ? Number(raw.volume) : null,
     averagePrice: raw.average_price != null ? Number(raw.average_price) : null,
   };

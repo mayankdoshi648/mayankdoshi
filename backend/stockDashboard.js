@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { fetchDhanDailyCandles } = require('./dhanHistorical');
 const { fetchOhlcQuotes, fetchFullQuotes, isRateLimitError } = require('./dhanQuotes');
+const { getMarketDataStore, TTL: MD_TTL } = require('./marketData');
 const { compute52WeekStats } = require('./week52');
 const { resolveDashboardUniverse, shortenSector, fetchIndexUniverse } = require('./sectorUniverse');
 
@@ -266,19 +267,22 @@ function createStockDashboard({
     const { accessToken } = await tokenManager.getAccessToken();
     const securityIds = instruments.map((i) => i.securityId);
 
-    // On Cloudflare (skipWeek52), use a single OHLC call — never full+ohlc fallback
-    // (that doubled traffic and triggered Dhan 429 / code 805).
-    let quotes;
-    if (skipWeek52) {
-      quotes = await fetchOhlcQuotes({
-        accessToken,
-        clientId: config.clientId,
-        securityIds,
-        fetchImpl,
-      });
-    } else {
+    // Shared isolate store: concurrent Markets/Scanner refreshes share one Dhan OHLC pull.
+    // On Cloudflare (skipWeek52), use a single OHLC call — never full+ohlc fallback.
+    const store = getMarketDataStore();
+    const quoteKey = `equity:quotes:${universe}:${skipWeek52 ? 'ohlc' : 'full'}:${securityIds.length}`;
+    const quoteTtl = skipWeek52 ? MD_TTL.EQUITY_QUOTES_LITE : MD_TTL.EQUITY_QUOTES;
+    const quotes = await store.getOrFetch(quoteKey, quoteTtl, async () => {
+      if (skipWeek52) {
+        return fetchOhlcQuotes({
+          accessToken,
+          clientId: config.clientId,
+          securityIds,
+          fetchImpl,
+        });
+      }
       try {
-        quotes = await fetchFullQuotes({
+        return await fetchFullQuotes({
           accessToken,
           clientId: config.clientId,
           securityIds,
@@ -286,14 +290,14 @@ function createStockDashboard({
         });
       } catch (err) {
         if (isRateLimitError(err)) throw err;
-        quotes = await fetchOhlcQuotes({
+        return fetchOhlcQuotes({
           accessToken,
           clientId: config.clientId,
           securityIds,
           fetchImpl,
         });
       }
-    }
+    }, { sourceHint: 'DHAN' });
 
     const week52List = skipWeek52
       ? instruments.map(() => ({

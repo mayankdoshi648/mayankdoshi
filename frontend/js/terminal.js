@@ -1774,6 +1774,36 @@
   }
 
   async function boot() {
+
+    // /embed?view=... — same data layer, chrome-lite presentation (no redesign)
+    const embedPath = /^\/embed\/?$/i.test(location.pathname);
+    const embedFlag = new URLSearchParams(location.search).get('embed') === '1';
+    if (embedPath || embedFlag) {
+      document.body.classList.add('embed-mode');
+      const viewMap = {
+        market: 'markets',
+        markets: 'markets',
+        opportunity: 'opportunity',
+        'smart-money': 'smart',
+        smart: 'smart',
+        options: 'chain',
+        chain: 'chain',
+        playbook: 'playbook',
+        scanner: 'scanner',
+        overview: 'overview',
+      };
+      const raw = new URLSearchParams(location.search).get('view') || 'overview';
+      const mapped = viewMap[String(raw).toLowerCase()] || raw;
+      if (!new URLSearchParams(location.search).get('tab') && !new URLSearchParams(location.search).get('view')) {
+        /* keep default */
+      } else {
+        // rewrite view query into tab resolution below
+        const sp = new URLSearchParams(location.search);
+        sp.set('view', mapped);
+        history.replaceState({}, document.title, `${location.pathname}?${sp.toString()}${location.hash||''}`);
+      }
+    }
+
     initTheme();
     updateMarketSession();
     setInterval(updateMarketSession, 30_000);

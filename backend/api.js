@@ -17,6 +17,7 @@ const { exportFromDb } = require('./obsidianExport');
 const { getMarketBreadth, readBreadthCache, isRefreshRunning } = require('./marketBreadth');
 const { getMarketOverview } = require('./marketOverview');
 const { createFnoRouter } = require('./fno/routes');
+const { buildDataHealth, getSharedDataSources } = require('./marketData');
 
 function createApiRouter({
   db,
@@ -82,7 +83,30 @@ function createApiRouter({
     });
   });
 
-  router.get('/auth/status', (req, res) => {
+  
+  router.get('/data-health', (req, res) => {
+    const auth = tokenManager?.getStatus?.() || null;
+    const hasDhan = Boolean(
+      (config?.clientId && config?.accessToken)
+      || (config?.clientId && config?.pin && config?.totpSecret)
+    );
+    const ds = dataSources || getSharedDataSources();
+    if (ds?.setWebsocket) {
+      ds.setWebsocket({
+        connected: connectionStatus.isConnected(),
+        error: connectionStatus.getLastError(),
+      });
+    }
+    res.json(buildDataHealth({
+      dataSources: ds,
+      hasDhan,
+      auth,
+      marketOpen: isMarketOpenFn(),
+      runtime: 'node',
+    }));
+  });
+
+router.get('/auth/status', (req, res) => {
     res.json(tokenManager?.getStatus?.() || {
       hasCredentials: false,
       authenticated: false,
