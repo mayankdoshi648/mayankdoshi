@@ -385,7 +385,7 @@ function createStockDashboard({
         missing,
         rows,
         sectors: sectorSummary(rows),
-        warning: 'Running in demo mode — set DHAN_CLIENT_ID, DHAN_PIN, DHAN_TOTP_SECRET for live Dhan data.',
+        warning: 'Running in demo mode — set DHAN_CLIENT_ID + DHAN_ACCESS_TOKEN for live Dhan data (or PIN + TOTP on Node).',
       };
     }
     return fetchLiveRows(universe);

@@ -483,16 +483,16 @@
           <input id="dhan-client-id" name="clientId" type="text" inputmode="numeric" placeholder="Dhan client id" required>
         </label>
         <label>
-          <span>Access token <em>(optional if using PIN+TOTP)</em></span>
-          <input id="dhan-access-token" name="accessToken" type="password" placeholder="Paste Dhan access token">
+          <span>Access token <em>(preferred)</em></span>
+          <input id="dhan-access-token" name="accessToken" type="password" placeholder="Paste Dhan access token" autocomplete="off">
         </label>
         <label>
-          <span>PIN <em>(optional if using access token)</em></span>
-          <input id="dhan-pin" name="pin" type="password" placeholder="App PIN">
+          <span>PIN <em>(Node alternate — leave blank if using access token)</em></span>
+          <input id="dhan-pin" name="pin" type="password" placeholder="App PIN" autocomplete="off">
         </label>
         <label>
-          <span>TOTP secret <em>(optional if using access token)</em></span>
-          <input id="dhan-totp" name="totpSecret" type="password" placeholder="Base32 TOTP secret">
+          <span>TOTP secret <em>(Node alternate — Base32 secret, not 6-digit OTP)</em></span>
+          <input id="dhan-totp" name="totpSecret" type="password" placeholder="Base32 TOTP secret" autocomplete="off">
         </label>
         <label class="dhan-check">
           <input id="dhan-persist" type="checkbox" checked>
