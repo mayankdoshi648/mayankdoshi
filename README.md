@@ -101,6 +101,22 @@ Never commit `.env`. Access tokens are never returned by `GET /api/fno/credentia
 
 **Daily Loop productivity pack:** paste-ready vault templates and the 15-workflow guide live in [`docs/obsidian-workflows/`](docs/obsidian-workflows/README.md). With the dashboard running, open the visual guide at [http://localhost:3000/obsidian-workflows.html](http://localhost:3000/obsidian-workflows.html).
 
+## Market Breadth dashboard
+
+Open **Market Breadth** in the app (More → Market Breadth, or `?tab=breadth`) to see:
+
+- % of Nifty 50 / Nifty 500 stocks above 20 / 50 / 200 DMA
+- Index vs breadth line charts (divergence view)
+- Spirit-level gauges + posture diagnosis (STOP PRESSING / REDUCE RISK / SIT OUT / GREEN LIGHT)
+- Headline indices + size/sector EMA strip
+
+Data sources: **Yahoo Finance** (default, no keys) using the NSE Nifty 50/500 universe. If Dhan credentials are set, NSE EOD history is preferred automatically.
+
+First refresh for Nifty 50 takes ~1–2 minutes; results cache for 6 hours under `data/breadth-cache.json`.
+
+Node-only helpers: `/api/overview`, `/api/breadth`, `/api/breadth/status`, `POST /api/breadth/refresh`.
+
+
 ## Safety
 
 - No naked BUY/SELL — interpretations always show evidence metrics

@@ -141,6 +141,7 @@
       if (name === 'playbook') await renderPlaybook();
       if (name === 'opportunity') await renderOpportunity();
       if (name === 'markets') await window.MarketsBoard?.render?.();
+      if (name === 'breadth') await window.openMarketBreadthView?.();
       if (name === 'legacy') await renderFuturesTable();
     } catch (err) {
       console.error(err);
@@ -1747,6 +1748,7 @@
       ['watch', 'Watchlist'],
       ['alerts', 'Alerts'],
       ['markets', 'Markets'],
+      ['breadth', 'Breadth'],
       ['settings', 'Settings'],
     ];
     const render = () => {
@@ -1783,6 +1785,7 @@
       const viewMap = {
         market: 'markets',
         markets: 'markets',
+        breadth: 'breadth',
         opportunity: 'opportunity',
         'smart-money': 'smart',
         smart: 'smart',
@@ -1814,7 +1817,7 @@
       || new URLSearchParams(location.search).get('view');
     const allowed = new Set([
       'overview', 'playbook', 'opportunity', 'smart', 'intel', 'chain', 'oi',
-      'heatmap', 'sectors', 'scanner', 'fii', 'alerts', 'watch', 'markets', 'settings', 'legacy',
+      'heatmap', 'sectors', 'scanner', 'fii', 'alerts', 'watch', 'markets', 'breadth', 'settings', 'legacy',
     ]);
     const initial = allowed.has(tab) ? tab : 'overview';
     await showView(initial);
